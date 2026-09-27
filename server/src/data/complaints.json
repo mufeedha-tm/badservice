@@ -1,0 +1,94 @@
+[
+  {
+    "id": "hp-laptop",
+    "title": "HP Laptop - Heating issue, service denied - HP Support",
+    "company": "HP",
+    "category": "Computers",
+    "subcategory": "Laptops",
+    "createdAtLabel": "2 hours ago",
+    "metadata": [
+      "HP",
+      "Laptops",
+      "2 hours ago"
+    ],
+    "badge": {
+      "label": "BEST SELLER",
+      "tone": "best-seller"
+    },
+    "similarComplaintCount": 45,
+    "actionLabel": "View Complaint - 45 same issue"
+  },
+  {
+    "id": "apollo-hospital",
+    "title": "Apollo Hospital - Overbilling, no bill details",
+    "company": "Apollo Hospital",
+    "category": "Hospital & Healthcare",
+    "subcategory": "Healthcare",
+    "location": "Kochi",
+    "createdAtLabel": "5 hours ago",
+    "metadata": [
+      "Healthcare - Kochi - 5 hours ago"
+    ],
+    "badge": {
+      "label": "HOSPITAL",
+      "tone": "hospital"
+    },
+    "actionLabel": "View Details"
+  },
+  {
+    "id": "maruti-swift",
+    "title": "Maruti Swift - Service center damaged car",
+    "company": "Maruti Suzuki",
+    "category": "Vehicles & Automotive",
+    "subcategory": "Cars",
+    "createdAtLabel": "1 day ago",
+    "metadata": [
+      "Maruti Suzuki",
+      "Cars - 1 day ago"
+    ],
+    "badge": {
+      "label": "VEHICLE",
+      "tone": "vehicle"
+    },
+    "actionLabel": "View Details"
+  },
+  {
+    "id": "oyo-rooms",
+    "title": "OYO Rooms - Hotel denied check-in, no refund",
+    "company": "OYO",
+    "category": "Hotel & Travel",
+    "subcategory": "Hotels",
+    "createdAtLabel": "3 hours ago",
+    "metadata": [
+      "OYO",
+      "Hotels - 3 hours ago"
+    ],
+    "actionLabel": "View Details"
+  },
+  {
+    "id": "indigo-flight",
+    "title": "IndiGo Flight - Cancelled, refund pending 30 days",
+    "company": "IndiGo",
+    "category": "Flights & Trains",
+    "subcategory": "Flights",
+    "createdAtLabel": "6 hours ago",
+    "metadata": [
+      "Flights",
+      "IndiGo - 6 hours ago"
+    ],
+    "actionLabel": "View Details"
+  },
+  {
+    "id": "royal-enfield",
+    "title": "Royal Enfield - Bike engine issue in 10 days",
+    "company": "Royal Enfield",
+    "category": "Vehicles & Automotive",
+    "subcategory": "Two Wheeler",
+    "createdAtLabel": "8 hours ago",
+    "metadata": [
+      "Two Wheeler",
+      "RE - 8 hours ago"
+    ],
+    "actionLabel": "View Details"
+  }
+]

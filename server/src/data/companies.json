@@ -1,0 +1,8 @@
+[
+  { "id": "hp", "name": "HP" },
+  { "id": "apollo-hospital", "name": "Apollo Hospital" },
+  { "id": "maruti-suzuki", "name": "Maruti Suzuki" },
+  { "id": "oyo", "name": "OYO" },
+  { "id": "indigo", "name": "IndiGo" },
+  { "id": "royal-enfield", "name": "Royal Enfield" }
+]

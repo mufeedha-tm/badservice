@@ -1,0 +1,206 @@
+{
+  "secondaryNavigationItems": [
+    { "label": "All Complaints", "to": "/complaints" },
+    { "label": "Today's Complaints", "to": "/complaints/today" },
+    { "label": "Most Complained", "to": "/complaints/most-complained" },
+    { "label": "Hospital", "to": "/categories/hospital", "category": "Hospital & Healthcare" },
+    { "label": "Vehicles", "to": "/categories/vehicles", "category": "Vehicles & Automotive" },
+    { "label": "Hotels", "to": "/categories/hotels", "category": "Hotel & Travel" },
+    { "label": "Flights", "to": "/categories/flights", "category": "Flights & Trains" },
+    { "label": "Food Delivery", "to": "/categories/food-delivery", "category": "Restaurants & Food" },
+    { "label": "Two Wheeler", "to": "/categories/two-wheeler", "category": "Vehicles & Automotive" },
+    { "label": "Help", "to": "/help" }
+  ],
+  "megaMenuColumns": [
+    {
+      "id": "trending-and-digital",
+      "sections": [
+        {
+          "id": "trending",
+          "title": "Trending",
+          "items": [
+            { "id": "most-complained", "label": "Most Complained Companies", "to": "/complaints/most-complained" },
+            { "id": "new-complaints", "label": "New Complaints", "to": "/complaints/new" },
+            { "id": "resolved-today", "label": "Resolved Today", "to": "/complaints/resolved-today" }
+          ]
+        },
+        {
+          "id": "digital-content-services",
+          "title": "Digital Content and Services",
+          "items": [
+                { "id": "mobile-recharge", "label": "Mobile Recharge", "examples": "Jio, Airtel, Vi", "category": "Telecom" },
+                { "id": "dth", "label": "DTH", "examples": "Tata Play, Airtel", "category": "Telecom" },
+                { "id": "broadband", "label": "Broadband", "examples": "JioFiber, ACT, BSNL", "category": "Telecom" },
+            { "id": "ott", "label": "OTT", "examples": "Netflix, Prime Video, Hotstar" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "shop-by-category",
+      "sections": [
+        {
+          "id": "shop-by-category",
+          "title": "Shop by Category",
+          "groups": [
+            {
+              "id": "mobiles-and-computers",
+              "title": "Mobiles, Computers",
+              "categories": ["Mobiles", "Computers"],
+              "items": [
+                { "id": "mobiles", "label": "Mobiles", "examples": "Samsung, Apple, Xiaomi, OnePlus, Realme, Vivo, Oppo", "category": "Mobiles" },
+                { "id": "computers", "label": "Computers", "category": "Computers" },
+                { "id": "laptops", "label": "Laptops", "examples": "HP, Dell, Lenovo, Asus, Acer, Apple MacBook", "category": "Computers" },
+                { "id": "computer-accessories", "label": "Computer Accessories", "examples": "Logitech, HP Printers", "category": "Computers" }
+              ]
+            },
+            {
+              "id": "tv-appliances-electronics",
+              "title": "TV, Appliances, Electronics",
+              "categories": ["TV & Electronics"],
+              "items": [
+                { "id": "tv", "label": "TV", "examples": "Samsung, LG, Sony, Mi, OnePlus TV", "category": "TV & Electronics" },
+                { "id": "appliances", "label": "Appliances", "examples": "Whirlpool, LG, Samsung, IFB, Bosch", "category": "TV & Electronics" },
+                { "id": "electronics", "label": "Electronics", "examples": "Boat, Noise, JBL, Sony", "category": "TV & Electronics" }
+              ]
+            },
+            {
+              "id": "fashion",
+              "title": "Fashion",
+              "categories": ["Fashion"],
+              "items": [
+                { "id": "mens-fashion", "label": "Men's Fashion", "examples": "Nike, Adidas, Puma, Levi's", "category": "Fashion" },
+                { "id": "womens-fashion", "label": "Women's Fashion", "examples": "Biba, FabIndia, Nykaa", "category": "Fashion" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "services",
+      "sections": [
+        {
+          "id": "services-we-cover",
+          "title": "Services We Cover",
+          "groups": [
+            {
+              "id": "hospital-healthcare",
+              "title": "Hospital & Healthcare",
+              "categories": ["Hospital & Healthcare"],
+              "items": [
+                { "id": "hospitals", "label": "Hospitals", "examples": "Apollo, Aster, KIMS, Fortis, Max, Govt Hospitals", "category": "Hospital & Healthcare" },
+                { "id": "pharmacies", "label": "Pharmacies", "examples": "MedPlus, Apollo Pharmacy", "category": "Hospital & Healthcare" }
+              ]
+            },
+            {
+              "id": "vehicles-automotive",
+              "title": "Vehicles & Automotive",
+              "categories": ["Vehicles & Automotive"],
+              "items": [
+                { "id": "cars", "label": "Cars", "examples": "Maruti Suzuki, Tata Motors, Hyundai, Mahindra, Kia, Toyota, Honda Cars", "category": "Vehicles & Automotive" },
+                { "id": "two-wheeler", "label": "Two Wheeler", "examples": "Honda Activa, TVS, Bajaj, Hero, Royal Enfield, Yamaha, KTM", "category": "Vehicles & Automotive" },
+                { "id": "service-centers", "label": "Service Centers", "examples": "All Brand Service", "category": "Vehicles & Automotive" }
+              ]
+            },
+            {
+              "id": "hotel-restaurant-travel",
+              "title": "Hotel, Restaurant, Travel",
+              "categories": ["Hotel & Travel", "Restaurants & Food", "Flights & Trains"],
+              "items": [
+                { "id": "hotels", "label": "Hotels", "examples": "Taj, Oberoi, OYO, FabHotels, Treebo, Local Hotels", "category": "Hotel & Travel" },
+                { "id": "restaurants", "label": "Restaurants", "examples": "Swiggy, Zomato, Domino's, KFC, Local Restaurants", "category": "Restaurants & Food" },
+                { "id": "flights", "label": "Flights", "examples": "IndiGo, Air India, SpiceJet, Vistara, Akasa", "category": "Flights & Trains" },
+                { "id": "trains-buses", "label": "Trains & Bus", "examples": "IRCTC, RedBus, KSRTC, Private Buses", "category": "Flights & Trains" }
+              ]
+            },
+            {
+              "id": "banking-finance",
+              "title": "Banking & Finance",
+              "categories": ["Banking"],
+              "items": [
+                { "id": "banks", "label": "Banks and NBFCs", "examples": "SBI, HDFC, ICICI, Axis, Kotak, Federal Bank, NBFCs", "category": "Banking" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "programs-and-features",
+      "sections": [
+        {
+          "id": "programs-features",
+          "title": "Programs & Features",
+          "items": [
+            { "id": "e-commerce", "label": "E-commerce", "examples": "Amazon, Flipkart, Myntra, Meesho, Ajio" },
+            { "id": "food-delivery", "label": "Food Delivery", "examples": "Swiggy, Zomato", "category": "Restaurants & Food" },
+            { "id": "courier", "label": "Courier", "examples": "DTDC, BlueDart, Delhivery, India Post" },
+            { "id": "edtech", "label": "EdTech", "examples": "Byju's, Unacademy, PhysicsWallah" },
+            { "id": "real-estate", "label": "Real Estate", "examples": "MagicBricks, 99acres, NoBroker" },
+            { "id": "jobs", "label": "Jobs", "examples": "Naukri, Indeed, LinkedIn" },
+            { "id": "utilities", "label": "Utilities", "examples": "KSEB, Water Authority, Gas - Indane" },
+            { "id": "government-services", "label": "Government Services", "examples": "Aadhaar, Passport, RTO" }
+          ]
+        }
+      ],
+      "note": "12,000+ Brands - Maximum companies added. If not found, users can add a new company while filing a complaint."
+    }
+  ],
+  "departments": [
+    {
+      "id": "mobiles-computers",
+      "title": "1. Mobiles & Computers",
+      "count": "4,231",
+      "items": [
+        "HP (245) - Laptops, Printers",
+        "Dell (198) - Laptop Service",
+        "Lenovo (165) | Asus (140) | Acer (110)",
+        "Apple iPhone / MacBook (320)",
+        "Samsung Mobile (410)"
+      ]
+    },
+    {
+      "id": "hospital-healthcare",
+      "title": "2. Hospital & Healthcare",
+      "count": "1,890",
+      "items": [
+        "Apollo Hospitals (120)",
+        "Aster Medcity (89)",
+        "KIMS Health (76)",
+        "Govt Medical College (210)",
+        "MedPlus, Apollo Pharmacy"
+      ]
+    },
+    {
+      "id": "vehicles",
+      "title": "3. Vehicles",
+      "count": "2,450",
+      "items": [
+        "Cars - Maruti (340), Tata (290), Hyundai (210), Mahindra (180), Kia (150), Toyota",
+        "Two Wheeler - Honda (310), TVS (250), Bajaj (230), Hero (220), Royal Enfield (180), Yamaha"
+      ]
+    },
+    {
+      "id": "hotel-restaurant-flight",
+      "title": "4. Hotel, Restaurant, Flight",
+      "count": "2,100",
+      "items": [
+        "Hotels - OYO (420), Taj (45), Local Hotels (600)",
+        "Restaurant - Swiggy (520), Zomato (480)",
+        "Flights - IndiGo (210), Air India (180), SpiceJet (140)",
+        "IRCTC - Train (390), RedBus (180)"
+      ]
+    },
+    {
+      "id": "banking-telecom-ecommerce",
+      "title": "5. Banking, Telecom, E-commerce",
+      "count": null,
+      "items": [
+        "SBI (412), HDFC (310), ICICI (280)",
+        "Jio (520), Airtel (410), BSNL (190)",
+        "Amazon (380), Flipkart (420), Myntra (150)"
+      ]
+    }
+  ]
+}
