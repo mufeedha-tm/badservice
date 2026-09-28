@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import * as complaintRepository from '../repositories/inMemoryComplaintRepository.js';
+import * as complaintRepository from '../repositories/mysqlComplaintRepository.js';
 import { ApiError } from '../utils/ApiError.js';
-import { listCategories } from './categoryService.js';
+import { isValidCategory } from './categoryService.js';
+import { isValidCompany } from './companyService.js';
 
 export function listComplaints() {
   return complaintRepository.findAll();
@@ -28,26 +29,28 @@ export async function createComplaint(input) {
   const category = readRequiredText(input.category, 'category', 100);
   const description = readRequiredText(input.description, 'description', 5000);
   const location = readOptionalText(input.location, 'location', 120);
-  const categories = await listCategories();
-
-  if (!categories.includes(category)) {
+  if (!(await isValidCategory(category))) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
+  }
+
+  if (!(await isValidCompany(company))) {
+    throw new ApiError(400, 'Select a valid complaint company.', 'INVALID_COMPANY');
   }
 
   const createdAtLabel = 'Just now';
 
-  return complaintRepository.create({
-    id: randomUUID(),
-    title,
-    description,
-    company,
-    category,
-    ...(location && { location }),
-    createdAt: new Date().toISOString(),
-    createdAtLabel,
-    metadata: [company, category, location, createdAtLabel].filter(Boolean),
-    actionLabel: 'View Details',
-  });
+return complaintRepository.create({
+  id: randomUUID(),
+  title,
+  description,
+  companyId: company,
+  categoryId: category,
+  ...(location && { location }),
+  createdAt: new Date().toISOString(),
+  createdAtLabel,
+  metadata: [company, category, location, createdAtLabel].filter(Boolean),
+  actionLabel: 'View Details',
+});
 }
 
 function readRequiredText(value, field, maxLength) {

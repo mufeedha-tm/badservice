@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
-import * as authRepository from '../repositories/jsonAuthRepository.js';
+import * as authRepository from '../repositories/mysqlAuthRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 
 const scrypt = promisify(scryptCallback);

@@ -16,7 +16,7 @@ export default function DepartmentSidebar() {
       </div>
       <div className="department-sidebar__cta">
         <FileComplaintCTA />
-        <p>Can&apos;t find brand? Type company name while filing - auto added!</p>
+        <p>Can&apos;t find your company? Use an existing supported company when filing a complaint.</p>
       </div>
     </aside>
   );

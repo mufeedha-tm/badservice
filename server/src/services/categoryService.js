@@ -1,5 +1,9 @@
-import * as categoryRepository from '../repositories/inMemoryCategoryRepository.js';
+import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 
 export function listCategories() {
   return categoryRepository.findAll();
+}
+
+export async function isValidCategory(category) {
+  return Boolean(await categoryRepository.findByName(category));
 }
