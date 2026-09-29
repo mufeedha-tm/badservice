@@ -6,13 +6,38 @@ export async function findUserByEmail(email) {
       id,
       name,
       email,
+      phone,
+      role,
+      status,
       password_salt AS passwordSalt,
       password_hash AS passwordHash,
       created_at AS createdAt
      FROM users
-     WHERE email = ?
+     WHERE LOWER(email) = LOWER(?)
      LIMIT 1`,
-    [email]
+    [email.trim()]
+  );
+
+  return rows[0] || null;
+}
+
+export async function findUserByPhone(phone) {
+  if (!phone) return null;
+  const [rows] = await pool.execute(
+    `SELECT
+      id,
+      name,
+      email,
+      phone,
+      role,
+      status,
+      password_salt AS passwordSalt,
+      password_hash AS passwordHash,
+      created_at AS createdAt
+     FROM users
+     WHERE phone = ?
+     LIMIT 1`,
+    [phone.trim()]
   );
 
   return rows[0] || null;
@@ -24,6 +49,9 @@ export async function findUserById(id) {
       id,
       name,
       email,
+      phone,
+      role,
+      status,
       password_salt AS passwordSalt,
       password_hash AS passwordHash,
       created_at AS createdAt
@@ -38,21 +66,29 @@ export async function findUserById(id) {
 
 export async function insertUser(user) {
   try {
+    const createdAt = user.createdAt ? new Date(user.createdAt) : new Date();
+    const role = user.role || 'USER';
+    const status = user.status || 'ACTIVE';
+    const phone = user.phone || null;
+
     await pool.execute(
       `INSERT INTO users
-        (id, name, email, password_salt, password_hash, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+        (id, name, email, phone, password_salt, password_hash, role, status, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id,
         user.name,
-        user.email,
+        user.email.toLowerCase().trim(),
+        phone,
         user.passwordSalt,
         user.passwordHash,
-        user.createdAt,
+        role,
+        status,
+        createdAt,
       ]
     );
 
-    return user;
+    return { ...user, phone, role, status };
   } catch (error) {
     if (error.code === 'ER_DUP_ENTRY') {
       return null;
@@ -62,18 +98,49 @@ export async function insertUser(user) {
   }
 }
 
+export async function findAllUsers() {
+  const [rows] = await pool.execute(`
+    SELECT
+      id,
+      name,
+      email,
+      phone,
+      role,
+      status,
+      created_at AS createdAt
+    FROM users
+    ORDER BY created_at DESC
+  `);
+  return rows;
+}
+
+export async function updateUserStatus(userId, status) {
+  await pool.execute(
+    `UPDATE users SET status = ? WHERE id = ?`,
+    [status, userId]
+  );
+  return findUserById(userId);
+}
+
+export async function updateUserRole(userId, role) {
+  await pool.execute(
+    `UPDATE users SET role = ? WHERE id = ?`,
+    [role, userId]
+  );
+  return findUserById(userId);
+}
+
 export async function insertSession(session) {
-  const id = session.id ?? null;
+  const expiresAt = session.expiresAt ? new Date(session.expiresAt) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
   await pool.execute(
     `INSERT INTO sessions
-      (id, token_hash, user_id, expires_at)
-     VALUES (?, ?, ?, ?)`,
+      (token_hash, user_id, expires_at)
+     VALUES (?, ?, ?)`,
     [
-      id,
       session.tokenHash,
       session.userId,
-      session.expiresAt,
+      expiresAt,
     ]
   );
 

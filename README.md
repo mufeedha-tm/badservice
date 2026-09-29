@@ -1,37 +1,123 @@
-# BadService.in foundation
+# BadService.in — Production Complaint Platform
 
-The project contains two independent applications:
+A full-stack public complaint and resolution platform built with **React** (frontend) and **Node.js/Express** (backend), using **MySQL** as the production source of truth.
 
-- `client/`: React, Vite, React Router, and Axios
-- `server/`: Express REST API
+---
 
-## Architecture
+## 🏗️ Architecture
 
-Business data flows through the application as:
+- **Frontend (`client/`)**: React 18, Vite, React Router v6, Axios, Plain CSS. Hosted on **Hostinger**.
+- **Backend (`server/`)**: Express REST API, MySQL2 connection pool, Scrypt password hashing, HttpOnly session cookies, Multer with storage abstraction. Hosted on **Render**.
+- **Database**: MySQL 8.0 on Hostinger Cloud with connection pooling, foreign keys, utf8mb4 encoding, and indexes.
 
-React frontend
--> Node.js and Express API
--> MySQL database
+---
 
-The React client communicates with the Express API and never connects directly to MySQL.
+## 🚀 Getting Started Locally
 
-## Run locally
+### 1. Prerequisites
+- Node.js (v18+)
+- MySQL Database
 
-In separate terminals, run `npm run dev` from `server/` and `npm run dev` from `client/`.
-The client calls the API through `/api` and Vite proxies those requests to the server on port 5000.
+### 2. Backend Setup
+```bash
+cd server
+npm install
 
-To point the client at a different API, set `VITE_API_BASE_URL` in `client/.env` (for example, `http://localhost:5000/api`).
-Configure the server with the variables in `server/.env.example`, including its MySQL connection settings.
+# Configure environment
+cp .env.example .env
+# Edit .env with your MySQL credentials
 
-## Data storage
+# Run database migrations and seed data (both are idempotent)
+npm run db:migrate
+npm run db:seed
 
-MySQL stores users, sessions, complaints, categories, and companies. Normal registration, login/session handling, complaint creation, complaint search, category listing, and company listing use the Express API and MySQL.
+# Start development server
+npm run dev
+```
 
-`server/src/data/navigation.json` remains intentionally static application configuration for navigation and department display content.
+The backend starts on port `5000` (or `process.env.PORT`).
 
-The other JSON files in `server/src/data/`, together with the retained JSON and in-memory repositories, are migration backups. They are not used by active business-data API paths.
+### 3. Frontend Setup
+```bash
+cd client
+npm install
+npm run dev
+```
 
-Passwords are stored as scrypt hashes, and session tokens are stored as hashes; the browser receives an HTTP-only session cookie.
+The client will start at `http://localhost:5173` and proxy `/api` calls to the backend.
 
-Authentication endpoints are `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, and `POST /api/auth/logout`.
-Use HTTPS in production; production session cookies require HTTPS. Production configuration should explicitly set `NODE_ENV=production`, `CLIENT_ORIGIN` to the frontend origin, and the production MySQL connection variables. Set `VITE_API_BASE_URL` when building the deployed client.
+---
+
+## 🗄️ Database Management
+
+- **Run Migrations**: `npm run db:migrate` (inside `server/`)
+  - Ensures `users`, `categories`, `companies`, `complaints`, `company_requests`, and `sessions` tables exist with correct columns, keys, and indexes.
+  - Idempotent and safe to run multiple times.
+- **Run Seeding**: `npm run db:seed` (inside `server/`)
+  - Populates standard parent and child categories, initial approved companies, legacy complaints, and the default administrator account.
+
+---
+
+## 🔑 Authentication & Authorization
+
+- **Roles**:
+  - `USER`: Regular authenticated user. Can submit complaints, upload proof documents, submit company requests, view "My Complaints", and update profile.
+  - `ADMIN`: Administrator. Can access the React **Admin Dashboard** (`/admin`), manage users (enable/disable, promote/demote), approve/reject company requests, change complaint statuses, add companies directly, and delete spam complaints.
+- **Default Admin Account**:
+  - Email: `admin@badservice.in`
+  - Password: `Admin@123456`
+  *(Also `mufeedha059@gmail.com` is granted the `ADMIN` role upon migration)*.
+- **Security**:
+  - Passwords hashed using Node `scrypt` with unique 16-byte random salts.
+  - Sessions stored in MySQL and validated using SHA-256 token hashes.
+  - Session cookie: `HttpOnly; SameSite=Lax` (or `None; Secure` in production with HTTPS).
+  - Server-side role enforcement via `requireAuth` and `requireRole('ADMIN')` middleware.
+
+---
+
+## 🏢 Company Request & Approval Flow
+
+1. Normal users cannot directly create publicly active companies.
+2. If a company is not listed, an authenticated user submits a request via:
+   `POST /api/company-requests` (status initially `PENDING`).
+3. The requested company is hidden from public catalogs while pending.
+4. Administrators review pending requests in the Admin Dashboard (`/admin` -> Company Requests tab).
+5. Upon Admin **Approval**:
+   - The company is created in MySQL `companies` table with `status = 'ACTIVE'` and category association.
+   - The request status is set to `APPROVED` with `reviewed_by` and `reviewed_at`.
+   - The company immediately becomes publicly selectable.
+6. Upon Admin **Rejection**:
+   - The request status is set to `REJECTED`. The company is not created.
+
+---
+
+## 📂 Proof Storage Abstraction
+
+- Handled by `server/src/services/storageService.js`.
+- By default, stores files safely in `server/uploads/proofs/` served statically at `/uploads/proofs/...`.
+- Supports cloud object storage (e.g. Cloudinary / S3) via environment variables (`CLOUDINARY_URL`).
+
+---
+
+## 🌐 Production Deployment
+
+### Render (Backend API)
+- **Environment**: Node
+- **Build Command**: `npm install`
+- **Start Command**: `npm start`
+- **Health Check Path**: `/health`
+- **Required Environment Variables**:
+  - `PORT`: (Render injects automatically)
+  - `NODE_ENV`: `production`
+  - `PRODUCTION`: `true`
+  - `CLIENT_ORIGIN`: `https://your-hostinger-domain.com`
+  - `DB_HOST`: Your MySQL host
+  - `DB_PORT`: `3306`
+  - `DB_USER`: Your MySQL username
+  - `DB_PASSWORD`: Your MySQL password
+  - `DB_NAME`: Your MySQL database name
+
+### Hostinger (Frontend)
+- **Build Command**: `npm run build`
+- **Publish Directory**: `dist`
+- **Environment Variable**: `VITE_API_BASE_URL=https://your-render-app.onrender.com/api`

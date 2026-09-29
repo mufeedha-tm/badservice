@@ -4,3 +4,6 @@ dist/
 .env.*
 !.env.example
 npm-debug.log*
+uploads/
+server/uploads/
+*.log

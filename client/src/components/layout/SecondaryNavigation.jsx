@@ -10,7 +10,14 @@ export default function SecondaryNavigation() {
       <ul>
         {items.map((item) => (
           <li key={item.to}>
-            <Link to={item.to}>{item.label}</Link>
+            <Link to={item.to}>
+              {item.icon && (
+                <span className="nav-item-icon" aria-hidden="true" style={{ marginRight: '0.35rem' }}>
+                  {item.icon}
+                </span>
+              )}
+              {item.label}
+            </Link>
           </li>
         ))}
       </ul>

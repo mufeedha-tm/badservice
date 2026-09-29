@@ -123,25 +123,32 @@ button {
 
 .search-bar select,
 .search-bar input,
-.search-bar button {
-  min-width: 0;
+.search-bar button,
+.search-bar__submit {
   border: 0;
 }
 
 .search-bar select {
-  max-width: 12rem;
-  padding: 0 0.7rem;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 12.5rem;
+  padding: 0 0.75rem;
   border-right: 1px solid #cbd1d5;
   background: #e6e6e6;
   color: #29313a;
+  font-size: 0.82rem;
+  cursor: pointer;
 }
 
 .search-bar input {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
-  padding: 0 0.8rem;
-  outline-offset: -3px;
+  padding: 0 0.85rem;
+  outline: none;
   background: #fff;
-  color: #202b28;
+  color: #111;
+  font-size: 0.9rem;
 }
 
 .search-bar input::placeholder {
@@ -149,22 +156,45 @@ button {
   opacity: 1;
 }
 
-.search-bar button {
-  padding: 0 1.2rem;
-  background: var(--color-search);
-  color: #202b28;
+.search-bar button,
+.search-bar__submit {
+  flex: 0 0 auto;
+  min-width: 96px;
+  height: 100%;
+  padding: 0 1.25rem;
+  background: #febd69;
+  color: #111;
   font-weight: 800;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  transition: background 0.15s ease-in-out;
+  white-space: nowrap;
 }
 
-.search-bar button:hover {
-  background: #f5ad4f;
+.search-bar button:hover,
+.search-bar__submit:hover {
+  background: #f3a847;
 }
 
 .search-bar button:active,
+.search-bar__submit:active,
 .file-complaint-button:active,
 .file-complaint-cta:active,
 .complaint-action-button:active {
+  background: #e49b38;
   filter: brightness(0.95);
+}
+
+.search-bar button:focus-visible,
+.search-bar__submit:focus-visible {
+  outline: 2px solid #005a9c;
+  outline-offset: -2px;
 }
 
 .account-section {
@@ -738,9 +768,13 @@ button {
     font-size: 0.74rem;
   }
 
-  .search-bar button {
-    padding: 0 0.55rem;
-    font-size: 0.72rem;
+  .search-bar button,
+  .search-bar__submit {
+    min-width: 72px;
+    padding: 0 0.75rem;
+    font-size: 0.8rem;
+    background: #febd69;
+    color: #111;
   }
 
   .account-section {
@@ -820,9 +854,13 @@ button {
     opacity: 1;
   }
 
-  .search-bar button {
-    padding: 0 0.7rem;
-    font-size: 0.75rem;
+  .search-bar button,
+  .search-bar__submit {
+    min-width: 72px;
+    padding: 0 0.75rem;
+    font-size: 0.8rem;
+    background: #febd69;
+    color: #111;
   }
 
   .secondary-navigation ul {

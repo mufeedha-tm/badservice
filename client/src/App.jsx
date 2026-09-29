@@ -10,6 +10,7 @@ import HelpPage from './pages/HelpPage.jsx';
 import HomePage from './pages/HomePage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import PlaceholderPage from './pages/PlaceholderPage.jsx';
+import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 
 export default function App() {
   return (
@@ -19,12 +20,13 @@ export default function App() {
       <Route path="/complaints/today" element={<ComplaintCollectionPage title="Today's Complaints" search={{ period: 'today', sort: 'latest' }} />} />
       <Route path="/complaints/most-complained" element={<ComplaintCollectionPage title="Most Complained Companies" search={{ sort: 'most-complained' }} />} />
       <Route path="/complaints/new" element={<ComplaintCollectionPage title="New Complaints" search={{ sort: 'latest' }} />} />
-      <Route path="/complaints/resolved-today" element={<PlaceholderPage title="Resolved Today" />} />
+      <Route path="/complaints/resolved-today" element={<ComplaintCollectionPage title="Resolved Complaints" search={{ status: 'RESOLVED', sort: 'latest' }} />} />
       <Route path="/complaints/:id" element={<ComplaintDetailPage />} />
       <Route path="/companies" element={<CompanyDirectoryPage />} />
       <Route path="/companies/:id" element={<CompanyPage />} />
       <Route path="/file-complaint" element={<FileComplaintPage />} />
       <Route path="/account" element={<AccountPage />} />
+      <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/categories/:slug" element={<CategoryPage />} />
       <Route path="/help" element={<HelpPage />} />
       <Route path="*" element={<NotFoundPage />} />

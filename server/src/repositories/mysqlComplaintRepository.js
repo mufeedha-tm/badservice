@@ -1,4 +1,7 @@
 import pool from '../config/database.js';
+import * as companyRepository from './mysqlCompanyRepository.js';
+import * as categoryRepository from './mysqlCategoryRepository.js';
+import { ApiError } from '../utils/ApiError.js';
 
 function mapComplaint(row) {
   const createdAt = row.createdAt
@@ -11,14 +14,21 @@ function mapComplaint(row) {
     title: row.title,
     description: row.description ?? '',
     company: row.companyName,
+    companyId: row.companyId,
     category: row.categoryName,
+    categoryId: row.categoryId,
     subcategory: row.subcategory ?? '',
     location: row.location ?? '',
+    proofUrl: row.proofUrl ?? null,
+    proofName: row.proofName ?? null,
+    userId: row.userId ?? null,
+    status: row.status || 'PENDING',
     createdAt,
     createdAtLabel,
     metadata: [
       row.companyName,
       row.categoryName,
+      row.subcategory,
       row.location,
       createdAtLabel,
     ].filter(Boolean),
@@ -63,11 +73,17 @@ const baseQuery = `
     c.description,
     c.subcategory,
     c.location,
+    c.proof_url AS proofUrl,
+    c.proof_name AS proofName,
+    c.user_id AS userId,
+    c.status AS status,
     c.created_at AS createdAt,
     c.similar_complaint_count AS similarComplaintCount,
     c.badge_label AS badgeLabel,
     c.badge_tone AS badgeTone,
     c.action_label AS actionLabel,
+    c.company_id AS companyId,
+    c.category_id AS categoryId,
     co.name AS companyName,
     ca.name AS categoryName
   FROM complaints c
@@ -105,10 +121,6 @@ const searchableComplaintSql = `
     NULLIF(c.subcategory, ''),
     NULLIF(c.location, ''),
     ${relativeCreatedAtLabelSql},
-    NULLIF(co.name, ''),
-    NULLIF(ca.name, ''),
-    NULLIF(c.location, ''),
-    ${relativeCreatedAtLabelSql},
     NULLIF(c.badge_label, '')
   )
 `;
@@ -132,16 +144,33 @@ export async function findById(id) {
   return rows[0] ? mapComplaint(rows[0]) : null;
 }
 
+export async function findByUserId(userId) {
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE c.user_id = ?
+    ORDER BY c.created_at DESC
+  `, [userId]);
+
+  return rows.map(mapComplaint);
+}
+
 export async function search({
   q = '',
   category = '',
+  subcategory = '',
   company = '',
+  status = '',
   period = '',
+  date = '',
   sort = '',
+  page = 1,
+  limit = 100,
 } = {}) {
   const normalizedQuery = q.trim().toLocaleLowerCase();
   const normalizedCategory = category.trim().toLocaleLowerCase();
+  const normalizedSubcategory = subcategory.trim().toLocaleLowerCase();
   const normalizedCompany = company.trim().toLocaleLowerCase();
+  const normalizedStatus = status.trim().toUpperCase();
   const conditions = [];
   const parameters = [];
 
@@ -150,17 +179,49 @@ export async function search({
     parameters.push(`%${escapeLike(normalizedQuery)}%`);
   }
 
+  if (normalizedSubcategory) {
+    conditions.push('LOWER(c.subcategory) = ?');
+    parameters.push(normalizedSubcategory);
+  }
+
   if (normalizedCategory && normalizedCategory !== 'all categories') {
-    conditions.push('LOWER(ca.name) = ?');
-    parameters.push(normalizedCategory);
+    if (['two-wheeler', 'two wheeler'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "two wheeler"');
+    } else if (['cars', 'car'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "cars"');
+    } else if (['laptops', 'laptop'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "laptops"');
+    } else if (['hospitals', 'hospital'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "healthcare"');
+    } else if (['hotels', 'hotel'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "hotels"');
+    } else if (['flights', 'flight'].includes(normalizedCategory)) {
+      conditions.push('LOWER(c.subcategory) = "flights"');
+    } else {
+      conditions.push(`(
+        LOWER(ca.name) = ?
+        OR LOWER(ca.slug) = ?
+        OR LOWER(ca.id) = ?
+        OR ca.parent_id = ?
+      )`);
+      parameters.push(normalizedCategory, normalizedCategory, normalizedCategory, normalizedCategory);
+    }
   }
 
   if (normalizedCompany) {
-    conditions.push('LOWER(co.name) = ?');
-    parameters.push(normalizedCompany);
+    conditions.push('(LOWER(co.name) = ? OR LOWER(co.slug) = ? OR LOWER(c.company_id) = ?)');
+    parameters.push(normalizedCompany, normalizedCompany, normalizedCompany);
   }
 
-  if (period === 'today') {
+  if (normalizedStatus) {
+    conditions.push('c.status = ?');
+    parameters.push(normalizedStatus);
+  }
+
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date.trim())) {
+    conditions.push('DATE(c.created_at) = ?');
+    parameters.push(date.trim());
+  } else if (period === 'today') {
     conditions.push('c.created_at > DATE_SUB(UTC_TIMESTAMP(), INTERVAL 24 HOUR)');
   }
 
@@ -183,23 +244,18 @@ function escapeLike(value) {
 }
 
 export async function create(complaint) {
-  const [companyRows] = await pool.execute(
-    `SELECT id FROM companies WHERE name = ? LIMIT 1`,
-    [complaint.companyId]
-  );
-
-  const [categoryRows] = await pool.execute(
-    `SELECT id FROM categories WHERE name = ? LIMIT 1`,
-    [complaint.categoryId]
-  );
-
-  if (!companyRows[0]) {
-    throw new Error(`Company not found: ${complaint.companyId}`);
+  // Validate company must already exist in database
+  const company = await companyRepository.findByName(complaint.company);
+  if (!company) {
+    throw new ApiError(400, `Company '${complaint.company}' is not registered. Please request to add this company first.`, 'COMPANY_NOT_FOUND');
   }
 
-  if (!categoryRows[0]) {
-    throw new Error(`Category not found: ${complaint.categoryId}`);
+  const category = await categoryRepository.findByName(complaint.category);
+  if (!category) {
+    throw new ApiError(400, `Category '${complaint.category}' is not valid.`, 'INVALID_CATEGORY');
   }
+
+  const createdAt = complaint.createdAt ? new Date(complaint.createdAt) : new Date();
 
   await pool.execute(
     `
@@ -212,23 +268,31 @@ export async function create(complaint) {
           category_id,
           subcategory,
           location,
+          proof_url,
+          proof_name,
+          user_id,
+          status,
           created_at,
           similar_complaint_count,
           badge_label,
           badge_tone,
           action_label
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       complaint.id,
       complaint.title,
       complaint.description || null,
-      companyRows[0].id,
-      categoryRows[0].id,
+      company.id,
+      category.id,
       complaint.subcategory || null,
       complaint.location || null,
-      complaint.createdAt,
+      complaint.proofUrl || null,
+      complaint.proofName || null,
+      complaint.userId || null,
+      complaint.status || 'PENDING',
+      createdAt,
       complaint.similarComplaintCount || 0,
       complaint.badge?.label || null,
       complaint.badge?.tone || null,
@@ -237,4 +301,48 @@ export async function create(complaint) {
   );
 
   return findById(complaint.id);
+}
+
+export async function updateStatus(id, status) {
+  const allowedStatuses = ['PENDING', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED'];
+  if (!allowedStatuses.includes(status)) {
+    throw new ApiError(400, `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`, 'INVALID_STATUS');
+  }
+
+  const [result] = await pool.execute(
+    `UPDATE complaints SET status = ? WHERE id = ?`,
+    [status, id]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+
+  return findById(id);
+}
+
+export async function remove(id) {
+  const [result] = await pool.execute(
+    `DELETE FROM complaints WHERE id = ?`,
+    [id]
+  );
+  return result.affectedRows > 0;
+}
+
+export async function getStats() {
+  const [[complaintsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints`);
+  const [[pendingComplaints]] = await pool.execute(`SELECT COUNT(*) AS pending FROM complaints WHERE status = 'PENDING'`);
+  const [[resolvedComplaints]] = await pool.execute(`SELECT COUNT(*) AS resolved FROM complaints WHERE status = 'RESOLVED'`);
+  const [[companiesCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM companies WHERE status = 'ACTIVE'`);
+  const [[usersCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM users`);
+  const [[pendingRequestsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM company_requests WHERE status = 'PENDING'`);
+
+  return {
+    totalComplaints: complaintsCount.total,
+    pendingComplaints: pendingComplaints.pending,
+    resolvedComplaints: resolvedComplaints.resolved,
+    totalCompanies: companiesCount.total,
+    totalUsers: usersCount.total,
+    pendingCompanyRequests: pendingRequestsCount.total,
+  };
 }

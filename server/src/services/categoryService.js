@@ -5,5 +5,6 @@ export function listCategories() {
 }
 
 export async function isValidCategory(category) {
+  if (!category || typeof category !== 'string') return false;
   return Boolean(await categoryRepository.findByName(category));
 }

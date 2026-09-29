@@ -15,7 +15,9 @@ export default function SearchBar({ onSearch }) {
 
     getCategories()
       .then((availableCategories) => {
-        if (isCurrent) setCategories(availableCategories);
+        if (isCurrent && Array.isArray(availableCategories)) {
+          setCategories(availableCategories);
+        }
       })
       .catch(() => {
         if (isCurrent) setCategoryLoadFailed(true);
@@ -59,12 +61,18 @@ export default function SearchBar({ onSearch }) {
         onChange={(event) => setCategory(event.target.value)}
       >
         <option value="">All Categories</option>
-        {categories.map((category) => (
-          <option key={category} value={category}>
-            {category}
-          </option>
-        ))}
+        {categories.map((cat) => {
+          const id = typeof cat === 'object' ? (cat.id || cat.slug || cat.name) : cat;
+          const name = typeof cat === 'object' ? (cat.name || cat.slug) : cat;
+          const val = typeof cat === 'object' ? (cat.name || cat.slug) : cat;
+          return (
+            <option key={id} value={val}>
+              {name}
+            </option>
+          );
+        })}
       </select>
+
       <label className="visually-hidden" htmlFor="company-search">
         Search companies and complaints
       </label>
@@ -75,7 +83,25 @@ export default function SearchBar({ onSearch }) {
         onChange={(event) => setQuery(event.target.value)}
         placeholder="Search any company - HP, Apollo, Maruti, Taj Hotel, IndiGo..."
       />
-      <button type="submit">SEARCH</button>
+
+      <button className="search-bar__submit" type="submit" aria-label="Search complaints">
+        <svg
+          className="search-bar__icon"
+          viewBox="0 0 24 24"
+          width="16"
+          height="16"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <span className="search-bar__submit-text">SEARCH</span>
+      </button>
     </form>
   );
 }

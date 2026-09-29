@@ -13,17 +13,45 @@ export async function registerAccount(input) {
     throw new ApiError(400, 'An account object is required.', 'INVALID_ACCOUNT');
   }
 
-  const name = readText(input.name, 'Name', 80);
+  const name = readText(input.name, 'Full Name', 80);
+  if (name.length < 2) {
+    throw new ApiError(400, 'Full Name must be at least 2 characters.', 'INVALID_ACCOUNT_FIELD');
+  }
+
   const email = normalizeEmail(input.email);
+  const phone = normalizePhone(input.phone);
   const password = readPassword(input.password);
+
+  if (input.confirmPassword !== undefined && input.confirmPassword !== password) {
+    throw new ApiError(400, 'Passwords do not match.', 'PASSWORD_MISMATCH');
+  }
+
+  if (input.termsAccepted !== true && input.terms !== true) {
+    throw new ApiError(400, 'You must accept the Terms & Conditions.', 'TERMS_NOT_ACCEPTED');
+  }
+
+  // Check unique email and phone
+  const existingEmail = await authRepository.findUserByEmail(email);
+  if (existingEmail) {
+    throw new ApiError(409, 'An account with this email already exists.', 'ACCOUNT_EXISTS');
+  }
+
+  const existingPhone = await authRepository.findUserByPhone(phone);
+  if (existingPhone) {
+    throw new ApiError(409, 'An account with this phone number already exists.', 'PHONE_EXISTS');
+  }
+
   const passwordSalt = randomBytes(16).toString('hex');
   const passwordHash = await hashPassword(password, passwordSalt);
   const user = {
     id: randomUUID(),
     name,
     email,
+    phone,
     passwordSalt,
     passwordHash,
+    role: 'USER',
+    status: 'ACTIVE',
     createdAt: new Date().toISOString(),
   };
   const insertedUser = await authRepository.insertUser(user);
@@ -48,6 +76,10 @@ export async function loginAccount(input) {
     throw new ApiError(401, 'Email or password is incorrect.', 'INVALID_CREDENTIALS');
   }
 
+  if (user.status === 'DISABLED') {
+    throw new ApiError(403, 'Your account has been disabled. Please contact support.', 'ACCOUNT_DISABLED');
+  }
+
   return createSession(user);
 }
 
@@ -59,7 +91,9 @@ export async function getAccountForSession(sessionToken) {
   if (!session) return null;
 
   const user = await authRepository.findUserById(session.userId);
-  return user ? publicAccount(user) : null;
+  if (!user || user.status === 'DISABLED') return null;
+
+  return publicAccount(user);
 }
 
 export async function endSession(sessionToken) {
@@ -70,6 +104,56 @@ export function getSessionDurationSeconds() {
   return sessionDurationMs / 1000;
 }
 
+export async function getAllUsers() {
+  return authRepository.findAllUsers();
+}
+
+export async function setUserStatus(userId, status) {
+  if (!['ACTIVE', 'DISABLED'].includes(status)) {
+    throw new ApiError(400, 'Status must be ACTIVE or DISABLED.', 'INVALID_STATUS');
+  }
+  const updated = await authRepository.updateUserStatus(userId, status);
+  if (!updated) throw new ApiError(404, 'User not found.', 'USER_NOT_FOUND');
+  return publicAccount(updated);
+}
+
+export async function setUserRole(userId, role, actingUserId) {
+  if (!['USER', 'ADMIN'].includes(role)) {
+    throw new ApiError(
+      400,
+      'Invalid user role.',
+      'INVALID_ROLE'
+    );
+  }
+
+  // Prevent the last admin from removing their own admin access.
+  if (role === 'USER' && userId === actingUserId) {
+    const adminUsers = await authRepository.findAllUsers();
+    const activeAdmins = adminUsers.filter(
+      (user) => user.role === 'ADMIN' && user.status === 'ACTIVE'
+    );
+
+    if (activeAdmins.length <= 1) {
+      throw new ApiError(
+        403,
+        'You cannot remove the last administrator.',
+        'LAST_ADMIN_PROTECTED'
+      );
+    }
+  }
+
+  const updated = await authRepository.updateUserRole(userId, role);
+
+  if (!updated) {
+    throw new ApiError(
+      404,
+      'User not found.',
+      'USER_NOT_FOUND'
+    );
+  }
+
+  return publicAccount(updated);
+}
 async function createSession(user) {
   const token = randomBytes(32).toString('base64url');
   const expiresAt = new Date(Date.now() + sessionDurationMs).toISOString();
@@ -111,6 +195,18 @@ function normalizeEmail(value) {
   return email;
 }
 
+function normalizePhone(value) {
+  if (!value || typeof value !== 'string') {
+    throw new ApiError(400, 'Phone number is required.', 'INVALID_PHONE');
+  }
+  const cleaned = value.trim().replace(/[\s\-\(\)]/g, '');
+  const phoneRegex = /^(?:\+91|0)?[6-9]\d{9}$/;
+  if (!phoneRegex.test(cleaned)) {
+    throw new ApiError(400, 'Please enter a valid 10-digit Indian phone number.', 'INVALID_PHONE');
+  }
+  return cleaned.slice(-10);
+}
+
 function readPassword(value) {
   if (typeof value !== 'string' || value.length < 8 || value.length > 128) {
     throw new ApiError(400, 'Password must be between 8 and 128 characters.', 'INVALID_PASSWORD');
@@ -128,5 +224,13 @@ function readText(value, label, maxLength) {
 }
 
 function publicAccount(user) {
-  return { id: user.id, name: user.name, email: user.email };
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone || null,
+    role: user.role || 'USER',
+    status: user.status || 'ACTIVE',
+    createdAt: user.createdAt,
+  };
 }

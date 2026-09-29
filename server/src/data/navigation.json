@@ -1,15 +1,16 @@
 {
   "secondaryNavigationItems": [
-    { "label": "All Complaints", "to": "/complaints" },
-    { "label": "Today's Complaints", "to": "/complaints/today" },
-    { "label": "Most Complained", "to": "/complaints/most-complained" },
-    { "label": "Hospital", "to": "/categories/hospital", "category": "Hospital & Healthcare" },
-    { "label": "Vehicles", "to": "/categories/vehicles", "category": "Vehicles & Automotive" },
-    { "label": "Hotels", "to": "/categories/hotels", "category": "Hotel & Travel" },
-    { "label": "Flights", "to": "/categories/flights", "category": "Flights & Trains" },
-    { "label": "Food Delivery", "to": "/categories/food-delivery", "category": "Restaurants & Food" },
-    { "label": "Two Wheeler", "to": "/categories/two-wheeler", "category": "Vehicles & Automotive" },
-    { "label": "Help", "to": "/help" }
+    { "label": "All Complaints", "to": "/complaints", "icon": "📋" },
+    { "label": "Companies", "to": "/companies", "icon": "🏢" },
+    { "label": "Today's Complaints", "to": "/complaints/today", "icon": "📅" },
+    { "label": "Most Complained", "to": "/complaints/most-complained", "icon": "🔥" },
+    { "label": "Hospital", "to": "/categories/hospital", "category": "Hospital & Healthcare", "icon": "🏥" },
+    { "label": "Vehicles", "to": "/categories/vehicles", "category": "Vehicles & Automotive", "icon": "🚗" },
+    { "label": "Hotels", "to": "/categories/hotels", "category": "Hotel & Travel", "icon": "🏨" },
+    { "label": "Flights", "to": "/categories/flights", "category": "Flights & Trains", "icon": "✈️" },
+    { "label": "Food Delivery", "to": "/categories/food-delivery", "category": "Restaurants & Food", "icon": "🍔" },
+    { "label": "Two Wheeler", "to": "/categories/two-wheeler", "category": "Vehicles & Automotive", "icon": "🏍️" },
+    { "label": "Help", "to": "/help", "icon": "❓" }
   ],
   "megaMenuColumns": [
     {
@@ -144,62 +145,53 @@
           ]
         }
       ],
-      "note": "Browse supported companies and use an existing company when filing a complaint."
+      "note": "12,000+ Brands - Maximum companies added. If not found, users can add a new company while filing a complaint."
     }
   ],
   "departments": [
     {
       "id": "mobiles-computers",
-      "title": "1. Mobiles & Computers",
-      "count": "4,231",
+      "title": "Mobiles & Computers",
       "items": [
-        "HP (245) - Laptops, Printers",
-        "Dell (198) - Laptop Service",
-        "Lenovo (165) | Asus (140) | Acer (110)",
-        "Apple iPhone / MacBook (320)",
-        "Samsung Mobile (410)"
+        { "label": "Laptops & Computers", "to": "/categories/laptops" },
+        { "label": "Mobiles & Smartphones", "to": "/categories/mobiles" },
+        { "label": "Computer Accessories", "to": "/categories/computer-accessories" }
       ]
     },
     {
       "id": "hospital-healthcare",
-      "title": "2. Hospital & Healthcare",
-      "count": "1,890",
+      "title": "Hospital & Healthcare",
       "items": [
-        "Apollo Hospitals (120)",
-        "Aster Medcity (89)",
-        "KIMS Health (76)",
-        "Govt Medical College (210)",
-        "MedPlus, Apollo Pharmacy"
+        { "label": "Hospitals", "to": "/categories/hospitals" },
+        { "label": "Pharmacies", "to": "/categories/pharmacies" }
       ]
     },
     {
       "id": "vehicles",
-      "title": "3. Vehicles",
-      "count": "2,450",
+      "title": "Vehicles & Automotive",
       "items": [
-        "Cars - Maruti (340), Tata (290), Hyundai (210), Mahindra (180), Kia (150), Toyota",
-        "Two Wheeler - Honda (310), TVS (250), Bajaj (230), Hero (220), Royal Enfield (180), Yamaha"
+        { "label": "Cars", "to": "/categories/cars" },
+        { "label": "Two Wheeler", "to": "/categories/two-wheeler" },
+        { "label": "Service Centers", "to": "/categories/service-centers" }
       ]
     },
     {
       "id": "hotel-restaurant-flight",
-      "title": "4. Hotel, Restaurant, Flight",
-      "count": "2,100",
+      "title": "Travel, Hotels & Food",
       "items": [
-        "Hotels - OYO (420), Taj (45), Local Hotels (600)",
-        "Restaurant - Swiggy (520), Zomato (480)",
-        "Flights - IndiGo (210), Air India (180), SpiceJet (140)",
-        "IRCTC - Train (390), RedBus (180)"
+        { "label": "Hotels & Stay", "to": "/categories/hotels" },
+        { "label": "Restaurants & Food Delivery", "to": "/categories/food-delivery" },
+        { "label": "Flights", "to": "/categories/flights" },
+        { "label": "Trains & Buses", "to": "/categories/trains-buses" }
       ]
     },
     {
       "id": "banking-telecom-ecommerce",
-      "title": "5. Banking, Telecom, E-commerce",
-      "count": null,
+      "title": "Banking & Services",
       "items": [
-        "SBI (412), HDFC (310), ICICI (280)",
-        "Jio (520), Airtel (410), BSNL (190)",
-        "Amazon (380), Flipkart (420), Myntra (150)"
+        { "label": "Banks & NBFCs", "to": "/categories/banks" },
+        { "label": "Telecom & Broadband", "to": "/categories/broadband" },
+        { "label": "E-Commerce", "to": "/categories/e-commerce" }
       ]
     }
   ]

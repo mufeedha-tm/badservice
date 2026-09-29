@@ -11,12 +11,11 @@ export default function ComplaintToolbar({ search, resultCount, title = 'All Com
       <span>
         Showing complaints for <strong>{category}</strong>
         {query && <> matching <strong>&quot;{query}&quot;</strong></>}
-        {hasFilters ? ` - ${resultCount} ${resultCount === 1 ? 'result' : 'results'}` : ' - 1-12 of 12,000+'}
+        {` - ${resultCount} ${resultCount === 1 ? 'complaint' : 'complaints'}`}
       </span>
       <span>
         Sort: <strong>{sortLabel}</strong>
       </span>
-      {!hasFilters && <span>Filter by Brand: HP, Apollo, Maruti, OYO, IndiGo...</span>}
       <Link className="complaint-toolbar__companies" to="/companies">Browse companies</Link>
     </div>
   );

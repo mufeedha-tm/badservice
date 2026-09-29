@@ -1,6 +1,7 @@
 import { useSearchParams } from 'react-router-dom';
 import ComplaintPage from './ComplaintPage.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
+import DepartmentSidebar from '../components/departments/DepartmentSidebar.jsx';
 
 export default function HomePage() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,7 +17,7 @@ export default function HomePage() {
   }
 
   return (
-    <MainLayout onSearch={handleSearch}>
+    <MainLayout onSearch={handleSearch} sidebar={<DepartmentSidebar />}>
       <ComplaintPage search={search} />
     </MainLayout>
   );

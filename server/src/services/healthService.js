@@ -1,6 +1,16 @@
-export function getHealthStatus() {
+import pool from '../config/database.js';
+
+export async function getHealthStatus() {
+  let dbStatus = 'ok';
+  try {
+    await pool.query('SELECT 1');
+  } catch (err) {
+    dbStatus = `error: ${err.message}`;
+  }
+
   return {
     status: 'ok',
-    message: 'API is running',
+    database: dbStatus,
+    timestamp: new Date().toISOString(),
   };
 }
