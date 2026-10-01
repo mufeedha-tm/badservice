@@ -64,9 +64,8 @@ The client will start at `http://localhost:5173` and proxy `/api` calls to the b
   - `USER`: Regular authenticated user. Can submit complaints, upload proof documents, submit company requests, view "My Complaints", and update profile.
   - `ADMIN`: Administrator. Can access the React **Admin Dashboard** (`/admin`), manage users (enable/disable, promote/demote), approve/reject company requests, change complaint statuses, add companies directly, and delete spam complaints.
 - **Default Admin Account**:
-  - Email: `admin@badservice.in`
-  - Password: `Admin@123456`
-  *(Also `mufeedha059@gmail.com` is granted the `ADMIN` role upon migration)*.
+  - 
+ `mufeedha059@gmail.com` is granted the `ADMIN` role upon migration*.
 - **Security**:
   - Passwords hashed using Node `scrypt` with unique 16-byte random salts.
   - Sessions stored in MySQL and validated using SHA-256 token hashes.
