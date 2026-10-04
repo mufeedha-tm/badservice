@@ -4,8 +4,9 @@ import * as companyRepository from '../repositories/mysqlCompanyRepository.js';
 import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { isValidCategory } from './categoryService.js';
-import { consumeVerificationToken } from './otpService.js';
+import { assertVerificationToken, consumeChallenge } from './otpService.js';
 import { saveComplaintMedia, saveProof } from './storageService.js';
+import { assertRealMediaFile } from '../middleware/upload.js';
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
@@ -47,7 +48,8 @@ export async function createComplaint(input, user = null, file = null, files = {
   const complainantAddress = readRequiredText(input.address, 'address', 500);
   const phone = input.phone;
   const verificationToken = input.verificationToken;
-  const verifiedPhone = await consumeVerificationToken(phone, verificationToken);
+  const verified = await assertVerificationToken(phone, verificationToken);
+  const verifiedPhone = verified.phone;
 
   const complaintType = normalizeComplaintType(input.type);
   const companyName = readRequiredText(input.company, 'company', 120);
@@ -73,6 +75,9 @@ export async function createComplaint(input, user = null, file = null, files = {
 
   assertRequiredMedia(productImage, billImage, productVideo, complaintType);
   assertMediaLimits(productImage, billImage, productVideo);
+  await assertRealMediaFile(productImage, 'image');
+  await assertRealMediaFile(billImage, 'image');
+  await assertRealMediaFile(productVideo, 'video');
 
   const productImageInfo = productImage ? await saveComplaintMedia(productImage, 'productImage') : null;
   const billImageInfo = billImage ? await saveComplaintMedia(billImage, 'billImage') : null;
@@ -90,7 +95,7 @@ export async function createComplaint(input, user = null, file = null, files = {
 
   const createdAtLabel = 'Just now';
 
-  return complaintRepository.create({
+  const created = await complaintRepository.create({
     id: randomUUID(),
     title,
     description,
@@ -123,6 +128,9 @@ export async function createComplaint(input, user = null, file = null, files = {
     metadata: [companyRecord.name, category, location, createdAtLabel].filter(Boolean),
     actionLabel: 'View Details',
   });
+
+  await consumeChallenge(verified.challengeId);
+  return created;
 }
 
 async function resolveCompany(companyName, categoryId) {
@@ -163,14 +171,14 @@ function assertMediaLimits(productImage, billImage, productVideo) {
       throw new ApiError(400, 'Image files must be 10MB or smaller.', 'FILE_TOO_LARGE');
     }
     const imageType = file?.mimetype || '';
-    if (file && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(imageType)) {
+    if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(imageType)) {
       throw new ApiError(400, 'Photos must be JPG, JPEG, PNG, or WEBP.', 'INVALID_FILE_TYPE');
     }
   }
   if (productVideo?.size > VIDEO_MAX_BYTES) {
     throw new ApiError(400, 'Video files must be 25MB or smaller.', 'FILE_TOO_LARGE');
   }
-  if (productVideo && !['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'].includes(productVideo.mimetype)) {
+  if (productVideo && !['video/mp4', 'video/webm', 'video/quicktime'].includes(productVideo.mimetype)) {
     throw new ApiError(400, 'Video must be MP4, MOV, or WEBM.', 'INVALID_FILE_TYPE');
   }
 }

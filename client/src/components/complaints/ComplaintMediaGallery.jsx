@@ -1,16 +1,15 @@
-import MediaCarousel from '../media/MediaCarousel.jsx';
-import { getComplaintMedia } from '../../utils/complaintMedia.js';
+import EvidenceCarousel from '../media/EvidenceCarousel.jsx';
 
 export default function ComplaintMediaGallery({ complaint, autoPlay = false }) {
-  const items = getComplaintMedia(complaint);
   return (
-    <div className="complaint-media-gallery">
-      <MediaCarousel items={items} alt={complaint?.title || 'Complaint evidence'} autoPlay={autoPlay} />
-      {items.length > 0 && (
-        <p className="complaint-media-gallery__caption">
-          {items.length} evidence file{items.length === 1 ? '' : 's'} · photos and video from the original complaint
-        </p>
-      )}
+    <div className="complaint-media-gallery complaint-media-gallery--evidence">
+      <EvidenceCarousel
+        complaint={complaint}
+        category={complaint?.category}
+        productName={complaint?.productName || complaint?.model || complaint?.company || 'Product'}
+        autoPlay={autoPlay}
+      />
+      <p className="complaint-media-gallery__caption">Evidence rail: product photo · product video · purchase proof. Missing customer evidence is clearly labelled.</p>
     </div>
   );
 }

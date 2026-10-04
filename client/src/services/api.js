@@ -27,7 +27,7 @@ export function getErrorMessage(error, defaultMessage = 'An unexpected error occ
     return 'Unable to reach the server. Please check your network connection or try again later.';
   }
   if (error?.response?.status === 401) {
-    return 'Please sign in to continue.';
+    return 'Your email verification has expired or is invalid. Please verify your email address again.';
   }
   if (error?.response?.status === 403) {
     return 'You do not have permission to perform this action.';
@@ -81,8 +81,8 @@ export async function getComplaint(id) {
   return response.data.data;
 }
 
-export async function sendOtp(phone) {
-  const response = await api.post('/otp/send', { phone });
+export async function sendOtp({ phone, email }) {
+  const response = await api.post('/otp/send', { phone, email });
   return response.data.data;
 }
 

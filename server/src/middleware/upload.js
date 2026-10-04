@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
@@ -27,7 +28,6 @@ const imageMimeTypes = new Set([
   'image/jpeg',
   'image/png',
   'image/webp',
-  'image/gif',
 ]);
 const videoMimeTypes = new Set([
   'video/mp4',
@@ -35,7 +35,7 @@ const videoMimeTypes = new Set([
   'video/webm',
   'video/x-msvideo',
 ]);
-const allowedImageExts = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const allowedImageExts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 const allowedVideoExts = new Set(['.mp4', '.mov', '.webm', '.avi']);
 
 function buildStorageForFolder(folder) {
@@ -71,7 +71,7 @@ function makeFileFilter({ allowImages = false, allowVideos = false, allowLegacyP
     const allowedText = [
       allowImages ? 'JPG, JPEG, PNG, WEBP' : '',
       allowVideos ? 'MP4, MOV, WEBM' : '',
-      allowLegacyProof ? 'PDF, JPG, PNG, WEBP, GIF' : '',
+      allowLegacyProof ? 'PDF, JPG, PNG, WEBP' : '',
     ].filter(Boolean).join(', ');
 
     cb(new ApiError(400, `Invalid file type. Allowed types: ${allowedText || 'images and videos'}.`, 'INVALID_FILE_TYPE'));
@@ -108,4 +108,21 @@ export function getComplaintUploadFolder(fieldName) {
   if (fieldName === 'billImage') return complaintDirs.billImage;
   if (fieldName === 'productVideo') return complaintDirs.productVideo;
   return complaintDirs.legacy;
+}
+
+export async function assertRealMediaFile(file, kind) {
+  if (!file?.path) throw new ApiError(400, 'Uploaded media is invalid.', 'INVALID_FILE');
+  const header = await readFile(file.path, { encoding: null }).then((buffer) => buffer.subarray(0, 32));
+  const starts = (...bytes) => bytes.every((value, index) => header[index] === value);
+  const isJpeg = starts(0xff, 0xd8, 0xff);
+  const isPng = starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
+  const isWebp = starts(0x52, 0x49, 0x46, 0x46) && header.slice(8, 12).toString() === 'WEBP';
+  const isMp4Family = header.slice(4, 8).toString() === 'ftyp';
+  const isWebm = starts(0x1a, 0x45, 0xdf, 0xa3);
+  if (kind === 'image' && !(isJpeg || isPng || isWebp)) {
+    throw new ApiError(400, 'The uploaded image is not a valid JPG, PNG, or WEBP file.', 'INVALID_MEDIA_CONTENT');
+  }
+  if (kind === 'video' && !(isMp4Family || isWebm)) {
+    throw new ApiError(400, 'The uploaded video is not a valid MP4, MOV, or WEBM file.', 'INVALID_MEDIA_CONTENT');
+  }
 }

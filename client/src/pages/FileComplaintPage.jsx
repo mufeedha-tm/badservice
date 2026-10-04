@@ -42,6 +42,8 @@ export default function FileComplaintPage() {
     description: '',
   });
   const [mediaFiles, setMediaFiles] = useState(emptyMedia);
+  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState('');
 
   useEffect(() => {
     localStorage.setItem('badservice_lang', lang);
@@ -115,6 +117,21 @@ export default function FileComplaintPage() {
     if (validateStep1()) setStep(2);
   }
 
+  function openAddCompany(name = form.company) {
+    setNewCompanyName(name.trim());
+    setAddCompanyOpen(true);
+  }
+
+  function confirmAddCompany(event) {
+    event.preventDefault();
+    const name = newCompanyName.trim();
+    if (name.length < 2) return;
+    setForm((prev) => ({ ...prev, company: name }));
+    setCompanies((prev) => prev.some((item) => item.name.toLowerCase() === name.toLowerCase()) ? prev : [{ id: `new-${Date.now()}`, name, status: 'PENDING' }, ...prev]);
+    setErrors((prev) => ({ ...prev, company: '' }));
+    setAddCompanyOpen(false);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     if (!validateStep2() || isSubmitting) return;
@@ -159,8 +176,8 @@ export default function FileComplaintPage() {
           <div className="success-card">
             <p className="success-card__eyebrow">BadService.in</p>
             <h1>Complaint Submitted Successfully</h1>
-            <p>Your complaint is now public with the evidence you uploaded.</p>
-            <p className="success-card__id">Reference: {submitted.id}</p>
+            <p>{submitted.status === 'PENDING' ? 'Your complaint has been submitted and is pending review.' : 'Your complaint has been submitted successfully with the evidence you uploaded.'}</p>
+            <p className="success-card__id">Complaint reference: <strong>{submitted.id}</strong></p>
             <div className="success-card__actions">
               <Link className="primary-cta" to={`/complaints/${encodeURIComponent(submitted.id)}`}>View Complaint</Link>
               <Link className="ghost-cta" to="/">Back to Home</Link>
@@ -176,7 +193,7 @@ export default function FileComplaintPage() {
       <div className="complaint-form-shell">
         <div className="complaint-form-header">
           <div>
-            <h1>🔥 {t('title')}</h1>
+            <h1><span className="complaint-title-icon" aria-hidden="true">+</span> {t('title')}</h1>
             <p className="complaint-form-header__subtitle">{t('description')}</p>
           </div>
           <label className="lang-select">
@@ -206,22 +223,22 @@ export default function FileComplaintPage() {
 
             <OtpVerification
               phone={identity.phone}
+              email={identity.email}
               onPhoneChange={(value) => {
                 setIdentity((prev) => ({ ...prev, phone: value }));
                 setOtpResult(null);
                 setErrors((prev) => ({ ...prev, phone: '', otp: '' }));
+              }}
+              onEmailChange={(value) => {
+                setIdentity((prev) => ({ ...prev, email: value }));
+                setOtpResult(null);
+                setErrors((prev) => ({ ...prev, email: '', otp: '' }));
               }}
               verified={Boolean(otpResult?.verified)}
               onVerified={setOtpResult}
               t={t}
               error={errors.phone || errors.otp}
             />
-
-            <label className="field">
-              <span>{t('email')} *</span>
-              <input type="email" name="email" value={identity.email} onChange={handleIdentityChange} autoComplete="email" className={errors.email ? 'is-invalid' : ''} />
-              {errors.email && <small className="field-error">{errors.email}</small>}
-            </label>
 
             <label className="field">
               <span>{t('city')} *</span>
@@ -279,6 +296,7 @@ export default function FileComplaintPage() {
                 error={errors.company}
                 label={`${t('company')} *`}
                 placeholder={t('typeCompany')}
+                onAddCompany={openAddCompany}
               />
             </div>
 
@@ -371,6 +389,19 @@ export default function FileComplaintPage() {
               </button>
             </div>
           </form>
+        )}
+
+        {addCompanyOpen && (
+          <div className="modal-backdrop" role="presentation" onMouseDown={() => setAddCompanyOpen(false)}>
+            <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-company-title" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="modal-card__header"><div><span className="home-section__eyebrow">Company directory</span><h2 id="add-company-title">Add a company</h2></div><button type="button" className="modal-card__close" aria-label="Close" onClick={() => setAddCompanyOpen(false)}>×</button></div>
+              <p className="modal-card__text">Can’t find the brand or company? Enter its name and continue. The company will be added to the complaint record for administrator review.</p>
+              <form onSubmit={confirmAddCompany}>
+                <label className="field"><span>Company / Brand Name *</span><input autoFocus value={newCompanyName} onChange={(event) => setNewCompanyName(event.target.value)} placeholder="Enter company or brand name" /></label>
+                <div className="modal-card__actions"><button type="button" className="ghost-cta" onClick={() => setAddCompanyOpen(false)}>Cancel</button><button type="submit" className="submit-button" disabled={newCompanyName.trim().length < 2}>Add Company</button></div>
+              </form>
+            </div>
+          </div>
         )}
       </div>
     </MainLayout>

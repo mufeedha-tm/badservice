@@ -8,6 +8,16 @@ function normalizeItems(items) {
         const isVideo = /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(item) || /\/product-videos\//i.test(item);
         return { id: `${item}-${index}`, url: item, type: isVideo ? 'video' : 'image', label: isVideo ? 'Video' : 'Image' };
       }
+      if (item.type === 'placeholder') {
+        return {
+          id: item.id || `${item.label || 'placeholder'}-${index}`,
+          url: '',
+          type: 'placeholder',
+          label: item.label || 'Evidence',
+          title: item.placeholderTitle || item.label || 'Evidence',
+          placeholderText: item.placeholderText || 'Evidence will appear here when available.',
+        };
+      }
       if (!item.url) return null;
       return {
         id: item.id || `${item.url}-${index}`,
@@ -82,7 +92,13 @@ export default function MediaCarousel({
               className={`media-carousel__slide${isActive ? ' is-active' : ''}`}
               hidden={!isActive}
             >
-              {item.type === 'video' ? (
+              {item.type === 'placeholder' ? (
+                <div className="media-carousel__placeholder">
+                  <span className="media-carousel__placeholder-icon" aria-hidden="true">{item.label === 'Product video' ? '▶' : '▣'}</span>
+                  <strong>{item.title}</strong>
+                  <small>{item.placeholderText}</small>
+                </div>
+              ) : item.type === 'video' ? (
                 <video
                   ref={(node) => {
                     if (node) videoRefs.current[item.id] = node;

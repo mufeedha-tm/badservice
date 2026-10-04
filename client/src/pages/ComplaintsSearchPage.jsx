@@ -12,9 +12,10 @@ export default function ComplaintsSearchPage() {
     status: params.get('status') || '',
   };
 
+  const hasFilters = Object.values(search).some(Boolean);
   return (
     <MainLayout>
-      <ComplaintPage title="Search complaints" search={search} />
+      <ComplaintPage title={hasFilters ? 'Search complaints' : 'All Complaints'} search={search} />
     </MainLayout>
   );
 }

@@ -1,14 +1,9 @@
 import { submitCompanyRequest } from '../services/companyService.js';
-import { ApiError } from '../utils/ApiError.js';
 
 export async function postCompanyRequest(request, response) {
-  if (!request.user) {
-    throw new ApiError(401, 'Please sign in to request a new company.', 'AUTH_REQUIRED');
-  }
-
   const { companyName, categoryId, description } = request.body || {};
   const newRequest = await submitCompanyRequest({
-    requestedByUserId: request.user.id,
+    requestedByUserId: request.user?.id || null,
     companyName,
     categoryId,
     description,

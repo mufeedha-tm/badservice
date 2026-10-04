@@ -13,7 +13,10 @@ export const env = {
 
   otpSecret: process.env.OTP_SECRET || '',
   otpDevEcho: process.env.OTP_DEV_ECHO === 'true',
-  msg91AuthKey: process.env.MSG91_AUTH_KEY || '',
-  msg91SenderId: process.env.MSG91_SENDER_ID || 'BADSVC',
-  msg91TemplateId: process.env.MSG91_TEMPLATE_ID || '',
+  smtpHost: process.env.SMTP_HOST || 'smtp.gmail.com',
+  smtpPort: Number(process.env.SMTP_PORT) || 465,
+  smtpSecure: process.env.SMTP_SECURE !== 'false',
+  smtpUser: process.env.SMTP_USER || '',
+  smtpPass: process.env.SMTP_PASS || '',
+  otpMethod: process.env.OTP_METHOD || 'email',
 };

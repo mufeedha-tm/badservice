@@ -7,6 +7,7 @@ import { useNavigation } from '../context/NavigationContext.jsx';
 import { getCategories, searchComplaints } from '../services/api.js';
 import { getCategoryFilterForSlug } from '../utils/categoryForSlug.js';
 import { getNavigationTitle } from '../utils/navigationTitle.js';
+import { getShowcaseImage } from '../utils/showcaseImages.js';
 
 export default function CategoryPage() {
   const { slug } = useParams();
@@ -124,10 +125,16 @@ export default function CategoryPage() {
         </div>
 
         {result.categories.length > 0 && result.status !== 'empty' && (
-          <ComplaintToolbar
-            search={{ category: result.categories.join(', ') }}
-            resultCount={result.complaints.length}
-          />
+          <>
+            <section className="category-page-modern__hero">
+              <div><span className="home-section__eyebrow">Category complaint record</span><h2>{displayTitle}</h2><p>Explore complaint patterns, recent reports and the evidence attached to customer complaints in this category.</p></div>
+              <img src={getShowcaseImage(result.categories[0])} alt="" />
+            </section>
+            <ComplaintToolbar
+              search={{ category: result.categories.join(', ') }}
+              resultCount={result.complaints.length}
+            />
+          </>
         )}
 
         {result.status === 'loading' && (

@@ -289,7 +289,7 @@ export default function AdminDashboardPage() {
 
   return (
     <MainLayout>
-      <section style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
+      <section className="admin-dashboard" style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #eee', paddingBottom: '1rem' }}>
           <div>
             <h1 style={{ margin: 0 }}>⚙️ Admin Dashboard</h1>
