@@ -1,32 +1,15 @@
 import { Link } from 'react-router-dom';
-import MegaMenuItem from './MegaMenuItem.jsx';
 
-function MegaMenuList({ items }) {
-  return (
-    <ul className="mega-menu__list">
-      {items.map((item) => (
-        <MegaMenuItem item={item} key={item.id} />
-      ))}
-    </ul>
-  );
-}
+export default function MegaMenuItem({ item }) {
+  const label = item.label?.name ?? item.label;
+  const examples = item.examples?.name ?? item.examples;
 
-export default function MegaMenuSection({ section }) {
   return (
-    <section className="mega-menu__section">
-      <h2>{section.title}</h2>
-      {section.groups ? (
-        section.groups.map((group) => (
-          <section className="mega-menu__group" key={group.id}>
-            <h3>
-              <Link to={`/categories/${group.id}`}>{group.title}</Link>
-            </h3>
-            <MegaMenuList items={group.items} />
-          </section>
-        ))
-      ) : (
-        <MegaMenuList items={section.items} />
-      )}
-    </section>
+    <li className="mega-menu__item">
+      <Link className="mega-menu__item-link" to={item.to || `/categories/${item.id}`}>
+        <span className="mega-menu__item-label">{label}</span>
+        {examples && <span className="mega-menu__item-examples">{examples}</span>}
+      </Link>
+    </li>
   );
 }

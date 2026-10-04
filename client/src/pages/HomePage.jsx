@@ -53,7 +53,20 @@ export default function HomePage() {
               {topProducts.map((product, index) => (
                 <article className="product-rank-card" key={`${product.companyId || product.company}-${product.name}`}>
                   <div className="product-rank-card__top"><span>#{index + 1}</span><span>{product.count} {product.count === 1 ? 'complaint' : 'complaints'}</span></div>
-                  <EvidenceCarousel complaint={product.latestComplaint} category={product.category} productName={product.name} compact autoPlay />
+                 {product.latestComplaint ? (
+  <EvidenceCarousel
+    complaint={product.latestComplaint}
+    category={product.category}
+    productName={product.name}
+    compact
+    autoPlay
+  />
+) : (
+  <div className="product-rank-card__media-placeholder">
+    <span>Product showcase</span>
+    <small>Customer evidence not available</small>
+  </div>
+)}
                   <div className="product-rank-card__body"><span>{product.category || 'Product'}</span><h3>{product.name}</h3><p>{product.company}</p><Link to={`/complaints?q=${encodeURIComponent(product.name)}`}>See complaints →</Link></div>
                 </article>
               ))}
