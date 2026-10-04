@@ -10,4 +10,10 @@ export const env = {
   dbUser: process.env.DB_USER || 'u523277800_badservice_app',
   dbPassword: process.env.DB_PASSWORD,
   dbName: process.env.DB_NAME || 'u523277800_badservice_app',
+
+  otpSecret: process.env.OTP_SECRET || '',
+  otpDevEcho: process.env.OTP_DEV_ECHO === 'true',
+  msg91AuthKey: process.env.MSG91_AUTH_KEY || '',
+  msg91SenderId: process.env.MSG91_SENDER_ID || 'BADSVC',
+  msg91TemplateId: process.env.MSG91_TEMPLATE_ID || '',
 };

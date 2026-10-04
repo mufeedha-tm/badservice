@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import ComplaintGrid from '../components/complaints/ComplaintGrid.jsx';
 import ComplaintToolbar from '../components/complaints/ComplaintToolbar.jsx';
+import EmptyState from '../components/ui/EmptyState.jsx';
+import Skeleton from '../components/ui/Skeleton.jsx';
 import { getComplaints, searchComplaints } from '../services/api.js';
 
 export default function ComplaintPage({ search, title = 'All Complaints' }) {
@@ -16,7 +18,6 @@ export default function ComplaintPage({ search, title = 'All Complaints' }) {
     request
       .then((results) => {
         if (!isCurrent) return;
-
         setComplaints(results);
         setStatus(results.length > 0 ? 'success' : 'empty');
       })
@@ -27,7 +28,7 @@ export default function ComplaintPage({ search, title = 'All Complaints' }) {
     return () => {
       isCurrent = false;
     };
-  }, [search?.q, search?.category, search?.company, search?.period, search?.sort]);
+  }, [search?.q, search?.category, search?.company, search?.period, search?.sort, search?.status]);
 
   return (
     <section className="complaint-page" aria-labelledby="complaint-page-title">
@@ -35,20 +36,17 @@ export default function ComplaintPage({ search, title = 'All Complaints' }) {
         {title}
       </h1>
       <ComplaintToolbar search={search} resultCount={complaints.length} title={title} />
-      {status === 'loading' && (
-        <p className="complaint-list-state" role="status">
-          Loading complaints...
-        </p>
-      )}
+      {status === 'loading' && <Skeleton className="skeleton-card" lines={4} />}
       {status === 'error' && (
-        <p className="complaint-list-state complaint-list-state--error" role="alert">
-          Unable to load complaints. Please try again later.
+        <p className="form-banner form-banner--error" role="alert">
+          Unable to load complaints. Please try again.
         </p>
       )}
       {status === 'empty' && (
-        <p className="complaint-list-state" role="status">
-          No complaints found.
-        </p>
+        <EmptyState
+          title="No complaints found"
+          message="Try another search, or file a complaint with evidence."
+        />
       )}
       {status === 'success' && <ComplaintGrid complaints={complaints} />}
     </section>

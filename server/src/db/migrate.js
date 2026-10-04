@@ -93,8 +93,42 @@ export async function runMigrations() {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
 
+  await addColumnIfNotExists('complaints', 'complaint_type', "VARCHAR(30) NOT NULL DEFAULT 'Product'");
+  await addColumnIfNotExists('complaints', 'product_image_url', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'product_image_name', 'VARCHAR(255) NULL');
+  await addColumnIfNotExists('complaints', 'bill_image_url', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'bill_image_name', 'VARCHAR(255) NULL');
+  await addColumnIfNotExists('complaints', 'product_video_url', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'product_video_name', 'VARCHAR(255) NULL');
+  await addColumnIfNotExists('complaints', 'product_model', 'VARCHAR(150) NULL');
+  await addColumnIfNotExists('complaints', 'seller_name', 'VARCHAR(150) NULL');
+  await addColumnIfNotExists('complaints', 'complainant_name', 'VARCHAR(80) NULL');
+  await addColumnIfNotExists('complaints', 'complainant_phone', 'VARCHAR(20) NULL');
+  await addColumnIfNotExists('complaints', 'complainant_email', 'VARCHAR(254) NULL');
+  await addColumnIfNotExists('complaints', 'complainant_city', 'VARCHAR(120) NULL');
+  await addColumnIfNotExists('complaints', 'complainant_address', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'phone_verified', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await addColumnIfNotExists('complaints', 'otp_verified_at', 'DATETIME NULL');
   await addColumnIfNotExists('complaints', 'status', "ENUM('PENDING', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED') NOT NULL DEFAULT 'PENDING'");
   await addColumnIfNotExists('complaints', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+
+  console.log('Migrating otp_challenges table...');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS otp_challenges (
+      id CHAR(36) PRIMARY KEY,
+      phone VARCHAR(20) NOT NULL,
+      code_hash CHAR(64) NOT NULL,
+      expires_at DATETIME NOT NULL,
+      verified_at DATETIME NULL,
+      attempt_count INT UNSIGNED NOT NULL DEFAULT 0,
+      verification_token_hash CHAR(64) NULL,
+      token_expires_at DATETIME NULL,
+      consumed_at DATETIME NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_otp_phone (phone),
+      INDEX idx_otp_token (verification_token_hash)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
 
   // 5. company_requests table
   console.log('Migrating company_requests table...');

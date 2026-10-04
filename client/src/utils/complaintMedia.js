@@ -1,0 +1,103 @@
+import { getAssetUrl } from '../services/api.js';
+
+export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
+export const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov';
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+
+export function isVideoUrl(url = '') {
+  return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /\/product-videos\//i.test(url);
+}
+
+export function isImageUrl(url = '') {
+  return /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(url);
+}
+
+export function getComplaintMedia(complaint) {
+  if (!complaint) return [];
+
+  const items = [];
+  if (complaint.productImageUrl) {
+    items.push({
+      id: `${complaint.id}-product-image`,
+      kind: 'product',
+      type: 'image',
+      url: getAssetUrl(complaint.productImageUrl),
+      label: 'Product photo',
+    });
+  }
+  if (complaint.productVideoUrl) {
+    items.push({
+      id: `${complaint.id}-product-video`,
+      kind: 'video',
+      type: 'video',
+      url: getAssetUrl(complaint.productVideoUrl),
+      label: 'Product video',
+    });
+  }
+  if (complaint.billImageUrl) {
+    items.push({
+      id: `${complaint.id}-bill-image`,
+      kind: 'bill',
+      type: 'image',
+      url: getAssetUrl(complaint.billImageUrl),
+      label: 'Bill / purchase proof',
+    });
+  }
+  if (complaint.proofUrl) {
+    const url = getAssetUrl(complaint.proofUrl);
+    if (isVideoUrl(url) || isImageUrl(url)) {
+      items.push({
+        id: `${complaint.id}-proof`,
+        kind: 'proof',
+        type: isVideoUrl(url) ? 'video' : 'image',
+        url,
+        label: complaint.proofName || 'Evidence',
+      });
+    }
+  }
+
+  return items;
+}
+
+export function collectComplaintMedia(complaints = []) {
+  const slides = [];
+  complaints.forEach((complaint) => {
+    getComplaintMedia(complaint).forEach((item) => {
+      slides.push({
+        ...item,
+        complaintId: complaint.id,
+        company: complaint.company,
+        title: complaint.title,
+      });
+    });
+  });
+  return slides;
+}
+
+export function formatFileSize(bytes) {
+  if (!bytes && bytes !== 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function validateMediaFile(file, kind) {
+  if (!file) return 'Please choose a file.';
+  const name = file.name || '';
+  if (kind === 'video') {
+    const allowed = ['video/mp4', 'video/webm', 'video/quicktime'];
+    if (!allowed.includes(file.type) && !/\.(mp4|mov|webm)$/i.test(name)) {
+      return 'Video must be MP4, MOV, or WEBM.';
+    }
+    if (file.size > VIDEO_MAX_BYTES) return 'Video must be 25MB or smaller.';
+    return '';
+  }
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!allowed.includes(file.type) && !/\.(jpg|jpeg|png|webp)$/i.test(name)) {
+    return 'Image must be JPG, JPEG, PNG, or WEBP.';
+  }
+  if (file.size > IMAGE_MAX_BYTES) return 'Image must be 10MB or smaller.';
+  return '';
+}

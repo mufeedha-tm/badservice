@@ -3,6 +3,7 @@ import {
   getComplaint,
   getUserComplaints,
   listComplaints,
+  listRankings,
   searchComplaints as searchComplaintList,
 } from '../services/complaintService.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -22,8 +23,13 @@ export async function getMyComplaints(request, response) {
   response.json({ success: true, data: complaints });
 }
 
+export async function getComplaintRankings(_request, response) {
+  const rankings = await listRankings();
+  response.json({ success: true, data: rankings });
+}
+
 export async function postComplaint(request, response) {
-  const complaint = await submitComplaint(request.body, request.user, request.file);
+  const complaint = await submitComplaint(request.body, request.user || null, request.file, request.files || {});
   response.status(201).json({ success: true, data: complaint });
 }
 

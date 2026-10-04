@@ -13,7 +13,7 @@ export default function AllMenuButton({ expanded, menuId, onClick, buttonRef }) 
         <span />
         <span />
       </span>
-      <span>All</span>
+      <span className="all-menu-button__label">All Categories</span>
     </button>
   );
 }

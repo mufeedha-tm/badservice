@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import cors from 'cors';
 import express from 'express';
 import { env } from './config/env.js';
+import { runMigrations } from './db/migrate.js';
+import { runSeed } from './db/seed.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFound } from './middleware/notFound.js';
 import apiRouter from './routes/index.js';
@@ -10,6 +12,9 @@ import healthRouter from './routes/healthRoutes.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+await runMigrations();
+await runSeed();
 
 const app = express();
 

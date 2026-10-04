@@ -1,8 +1,7 @@
 export default function Footer() {
   return (
     <footer className="site-footer">
-      © 2026 BadService.in - Amazon of Complaints | All Companies & Services Included |
-      Hospital | Vehicle | Hotel | Flight | Food | Banking
+      © {new Date().getFullYear()} BadService.in · Check before you buy. Check before you book. Check before you trust.
     </footer>
   );
 }

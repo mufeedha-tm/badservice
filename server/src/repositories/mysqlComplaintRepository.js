@@ -17,8 +17,20 @@ function mapComplaint(row) {
     companyId: row.companyId,
     category: row.categoryName,
     categoryId: row.categoryId,
+    type: row.complaintType || 'Product',
     subcategory: row.subcategory ?? '',
+    model: row.productModel ?? '',
+    seller: row.sellerName ?? '',
     location: row.location ?? '',
+    complainantName: row.complainantName ?? '',
+    complainantCity: row.complainantCity ?? '',
+    phoneVerified: Boolean(row.phoneVerified),
+    productImageUrl: row.productImageUrl ?? null,
+    productImageName: row.productImageName ?? null,
+    billImageUrl: row.billImageUrl ?? null,
+    billImageName: row.billImageName ?? null,
+    productVideoUrl: row.productVideoUrl ?? null,
+    productVideoName: row.productVideoName ?? null,
     proofUrl: row.proofUrl ?? null,
     proofName: row.proofName ?? null,
     userId: row.userId ?? null,
@@ -71,8 +83,20 @@ const baseQuery = `
     c.id,
     c.title,
     c.description,
+    c.complaint_type AS complaintType,
     c.subcategory,
+    c.product_model AS productModel,
+    c.seller_name AS sellerName,
     c.location,
+    c.complainant_name AS complainantName,
+    c.complainant_city AS complainantCity,
+    c.phone_verified AS phoneVerified,
+    c.product_image_url AS productImageUrl,
+    c.product_image_name AS productImageName,
+    c.bill_image_url AS billImageUrl,
+    c.bill_image_name AS billImageName,
+    c.product_video_url AS productVideoUrl,
+    c.product_video_name AS productVideoName,
     c.proof_url AS proofUrl,
     c.proof_name AS proofName,
     c.user_id AS userId,
@@ -119,7 +143,10 @@ const searchableComplaintSql = `
     NULLIF(co.name, ''),
     NULLIF(ca.name, ''),
     NULLIF(c.subcategory, ''),
+    NULLIF(c.product_model, ''),
+    NULLIF(c.seller_name, ''),
     NULLIF(c.location, ''),
+    NULLIF(c.complainant_city, ''),
     ${relativeCreatedAtLabelSql},
     NULLIF(c.badge_label, '')
   )
@@ -239,6 +266,112 @@ export async function search({
   return rows.map(mapComplaint);
 }
 
+export async function findRankings() {
+  const [companyRows] = await pool.execute(`
+    SELECT
+      co.id,
+      co.name,
+      co.slug,
+      ca.name AS categoryName,
+      ca.slug AS categorySlug,
+      COUNT(*) AS complaintCount,
+      MAX(c.created_at) AS latestAt
+    FROM complaints c
+    INNER JOIN companies co ON co.id = c.company_id
+    LEFT JOIN categories ca ON ca.id = c.category_id
+    GROUP BY co.id, co.name, co.slug, ca.name, ca.slug
+    ORDER BY complaintCount DESC, latestAt DESC
+    LIMIT 12
+  `);
+
+  const [productRows] = await pool.execute(`
+    SELECT
+      COALESCE(NULLIF(c.product_model, ''), co.name) AS productName,
+      co.name AS companyName,
+      co.id AS companyId,
+      ca.name AS categoryName,
+      COUNT(*) AS complaintCount,
+      MAX(c.created_at) AS latestAt
+    FROM complaints c
+    INNER JOIN companies co ON co.id = c.company_id
+    LEFT JOIN categories ca ON ca.id = c.category_id
+    GROUP BY COALESCE(NULLIF(c.product_model, ''), co.name), co.name, co.id, ca.name
+    ORDER BY complaintCount DESC, latestAt DESC
+    LIMIT 12
+  `);
+
+  const [categoryRows] = await pool.execute(`
+    SELECT
+      COALESCE(parent.id, ca.id) AS id,
+      COALESCE(parent.name, ca.name) AS name,
+      COALESCE(parent.slug, ca.slug) AS slug,
+      COUNT(*) AS complaintCount
+    FROM complaints c
+    INNER JOIN categories ca ON ca.id = c.category_id
+    LEFT JOIN categories parent ON parent.id = ca.parent_id
+    GROUP BY COALESCE(parent.id, ca.id), COALESCE(parent.name, ca.name), COALESCE(parent.slug, ca.slug)
+    ORDER BY complaintCount DESC, name ASC
+  `);
+
+  const companies = [];
+  for (const row of companyRows) {
+    const latest = await findLatestForCompany(row.id);
+    companies.push({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      category: row.categoryName || '',
+      categorySlug: row.categorySlug || '',
+      count: Number(row.complaintCount) || 0,
+      latestComplaint: latest,
+    });
+  }
+
+  const products = [];
+  for (const row of productRows) {
+    const latest = await findLatestForProduct(row.companyId, row.productName);
+    products.push({
+      name: row.productName,
+      company: row.companyName,
+      companyId: row.companyId,
+      category: row.categoryName || '',
+      count: Number(row.complaintCount) || 0,
+      latestComplaint: latest,
+    });
+  }
+
+  return {
+    companies,
+    products,
+    categories: categoryRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      count: Number(row.complaintCount) || 0,
+    })),
+  };
+}
+
+async function findLatestForCompany(companyId) {
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE c.company_id = ?
+    ORDER BY c.created_at DESC
+    LIMIT 1
+  `, [companyId]);
+  return rows[0] ? mapComplaint(rows[0]) : null;
+}
+
+async function findLatestForProduct(companyId, productName) {
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE c.company_id = ? AND COALESCE(NULLIF(c.product_model, ''), co.name) = ?
+    ORDER BY c.created_at DESC
+    LIMIT 1
+  `, [companyId, productName]);
+  return rows[0] ? mapComplaint(rows[0]) : null;
+}
+
 function escapeLike(value) {
   return value.replace(/[\\%_]/g, '\\$&');
 }
@@ -264,13 +397,29 @@ export async function create(complaint) {
           id,
           title,
           description,
+          complaint_type,
           company_id,
           category_id,
           subcategory,
+          product_model,
+          seller_name,
           location,
+          product_image_url,
+          product_image_name,
+          bill_image_url,
+          bill_image_name,
+          product_video_url,
+          product_video_name,
           proof_url,
           proof_name,
           user_id,
+          complainant_name,
+          complainant_phone,
+          complainant_email,
+          complainant_city,
+          complainant_address,
+          phone_verified,
+          otp_verified_at,
           status,
           created_at,
           similar_complaint_count,
@@ -278,19 +427,35 @@ export async function create(complaint) {
           badge_tone,
           action_label
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       complaint.id,
       complaint.title,
       complaint.description || null,
+      complaint.type || 'Product',
       company.id,
       category.id,
       complaint.subcategory || null,
+      complaint.model || null,
+      complaint.seller || null,
       complaint.location || null,
+      complaint.productImageUrl || null,
+      complaint.productImageName || null,
+      complaint.billImageUrl || null,
+      complaint.billImageName || null,
+      complaint.productVideoUrl || null,
+      complaint.productVideoName || null,
       complaint.proofUrl || null,
       complaint.proofName || null,
       complaint.userId || null,
+      complaint.complainantName || null,
+      complaint.complainantPhone || null,
+      complaint.complainantEmail || null,
+      complaint.complainantCity || null,
+      complaint.complainantAddress || null,
+      complaint.phoneVerified ? 1 : 0,
+      complaint.otpVerifiedAt ? new Date(complaint.otpVerifiedAt) : null,
       complaint.status || 'PENDING',
       createdAt,
       complaint.similarComplaintCount || 0,

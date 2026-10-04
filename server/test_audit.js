@@ -228,6 +228,7 @@ async function main() {
       method: 'POST',
       cookie: cookieA,
       body: {
+        type: 'Service',
         title: `Audit Complaint ${Date.now()}`,
         company: testCompanyName,
         category: 'Vehicles & Automotive',

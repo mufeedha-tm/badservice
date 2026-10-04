@@ -81,6 +81,21 @@ export async function getComplaint(id) {
   return response.data.data;
 }
 
+export async function sendOtp(phone) {
+  const response = await api.post('/otp/send', { phone });
+  return response.data.data;
+}
+
+export async function verifyOtp({ phone, otp }) {
+  const response = await api.post('/otp/verify', { phone, otp });
+  return response.data.data;
+}
+
+export async function getComplaintRankings() {
+  const response = await api.get('/complaints/rankings');
+  return response.data.data;
+}
+
 export async function searchComplaints({ q = '', category = '', subcategory = '', company = '', period = '', date = '', status = '', sort = '' } = {}) {
   const params = {};
   if (q) params.q = q;

@@ -1,4 +1,3 @@
-import AccountSection from './AccountSection.jsx';
 import AllMenuButton from './AllMenuButton.jsx';
 import FileComplaintButton from './FileComplaintButton.jsx';
 import Logo from './Logo.jsx';
@@ -15,7 +14,6 @@ export default function Header({ menuOpen, menuId, onMenuToggle, menuButtonRef, 
         buttonRef={menuButtonRef}
       />
       <SearchBar onSearch={onSearch} />
-      <AccountSection />
       <FileComplaintButton />
     </header>
   );

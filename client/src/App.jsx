@@ -8,15 +8,15 @@ import AccountPage from './pages/AccountPage.jsx';
 import FileComplaintPage from './pages/FileComplaintPage.jsx';
 import HelpPage from './pages/HelpPage.jsx';
 import HomePage from './pages/HomePage.jsx';
+import ComplaintsSearchPage from './pages/ComplaintsSearchPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
-import PlaceholderPage from './pages/PlaceholderPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/complaints" element={<HomePage />} />
+      <Route path="/complaints" element={<ComplaintsSearchPage />} />
       <Route path="/complaints/today" element={<ComplaintCollectionPage title="Today's Complaints" search={{ period: 'today', sort: 'latest' }} />} />
       <Route path="/complaints/most-complained" element={<ComplaintCollectionPage title="Most Complained Companies" search={{ sort: 'most-complained' }} />} />
       <Route path="/complaints/new" element={<ComplaintCollectionPage title="New Complaints" search={{ sort: 'latest' }} />} />

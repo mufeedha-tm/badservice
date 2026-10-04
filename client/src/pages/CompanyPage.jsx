@@ -1,52 +1,61 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ComplaintGrid from '../components/complaints/ComplaintGrid.jsx';
+import ComplaintMediaGallery from '../components/complaints/ComplaintMediaGallery.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
-import { getCompanies, searchComplaints } from '../services/api.js';
+import EmptyState from '../components/ui/EmptyState.jsx';
+import Skeleton from '../components/ui/Skeleton.jsx';
+import { getCompany, getErrorMessage } from '../services/api.js';
 
 export default function CompanyPage() {
   const { id } = useParams();
-  const [result, setResult] = useState({ status: 'loading', company: null, complaints: [] });
+  const [result, setResult] = useState({ status: 'loading', company: null, error: '' });
 
   useEffect(() => {
     let isCurrent = true;
-
-    getCompanies()
-      .then((companies) => {
-        const company = companies.find((entry) => entry.id === id);
-        if (!company) {
-          if (isCurrent) setResult({ status: 'not-found', company: null, complaints: [] });
-          return null;
-        }
-
-        return searchComplaints({ company: company.name }).then((complaints) => {
-          if (isCurrent) {
-            setResult({
-              status: complaints.length ? 'success' : 'empty',
-              company,
-              complaints,
-            });
-          }
-        });
+    getCompany(id)
+      .then((company) => {
+        if (isCurrent) setResult({ status: 'success', company, error: '' });
       })
-      .catch(() => {
-        if (isCurrent) setResult({ status: 'error', company: null, complaints: [] });
+      .catch((error) => {
+        if (!isCurrent) return;
+        setResult({
+          status: error.response?.status === 404 ? 'not-found' : 'error',
+          company: null,
+          error: getErrorMessage(error, 'Unable to load this company.'),
+        });
       });
-
     return () => {
       isCurrent = false;
     };
   }, [id]);
 
+  const complaints = result.company?.recentComplaints || [];
+  const featured = complaints.find((item) => item.productImageUrl || item.productVideoUrl || item.billImageUrl);
+
   return (
     <MainLayout>
       <section className="company-page" aria-labelledby="company-page-title">
-        {result.status === 'loading' && <p role="status">Loading company...</p>}
-        {result.status === 'error' && <p role="alert">Unable to load this company.</p>}
+        {result.status === 'loading' && <Skeleton className="skeleton-card" lines={5} />}
+        {result.status === 'error' && <p className="form-banner form-banner--error" role="alert">{result.error}</p>}
         {result.status === 'not-found' && <p role="status">Company not found.</p>}
-        {result.company && <h1 id="company-page-title">{result.company.name} Complaints</h1>}
-        {result.status === 'empty' && <p role="status">No complaints for this company yet.</p>}
-        {result.status === 'success' && <ComplaintGrid complaints={result.complaints} />}
+        {result.company && (
+          <>
+            <h1 id="company-page-title">{result.company.name} Complaints</h1>
+            <p className="company-page__count">
+              {result.company.complaintCount || 0} {(result.company.complaintCount || 0) === 1 ? 'complaint' : 'complaints'} on record
+            </p>
+            {featured && <ComplaintMediaGallery complaint={featured} />}
+            {complaints.length ? (
+              <ComplaintGrid complaints={complaints} />
+            ) : (
+              <EmptyState
+                title="No complaints have been submitted for this company yet."
+                message="If you had a problem with this brand, you can file a public complaint with evidence."
+              />
+            )}
+          </>
+        )}
         <Link className="company-page__back" to="/companies">Back to companies</Link>
       </section>
     </MainLayout>

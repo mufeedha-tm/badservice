@@ -1,13 +1,21 @@
 import { randomUUID } from 'node:crypto';
 import * as complaintRepository from '../repositories/mysqlComplaintRepository.js';
 import * as companyRepository from '../repositories/mysqlCompanyRepository.js';
+import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { isValidCategory } from './categoryService.js';
-import { isValidCompany } from './companyService.js';
-import { saveProof } from './storageService.js';
+import { consumeVerificationToken } from './otpService.js';
+import { saveComplaintMedia, saveProof } from './storageService.js';
+
+const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
 
 export function listComplaints() {
   return complaintRepository.findAll();
+}
+
+export function listRankings() {
+  return complaintRepository.findRankings();
 }
 
 export async function getComplaint(id) {
@@ -28,45 +36,56 @@ export function getUserComplaints(userId) {
   return complaintRepository.findByUserId(userId);
 }
 
-export async function createComplaint(input, user = null, file = null) {
-  if (!user || !user.id) {
-    throw new ApiError(401, 'You must be signed in to file a complaint.', 'AUTH_REQUIRED');
-  }
-
+export async function createComplaint(input, user = null, file = null, files = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new ApiError(400, 'A complaint object is required.', 'INVALID_COMPLAINT');
   }
 
-  const title = readRequiredText(input.title, 'title', 160);
-  const company = readRequiredText(input.company, 'company', 120);
+  const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
+  const complainantEmail = normalizeEmail(input.email);
+  const complainantCity = readRequiredText(input.city, 'city', 120);
+  const complainantAddress = readRequiredText(input.address, 'address', 500);
+  const phone = input.phone;
+  const verificationToken = input.verificationToken;
+  const verifiedPhone = await consumeVerificationToken(phone, verificationToken);
+
+  const complaintType = normalizeComplaintType(input.type);
+  const companyName = readRequiredText(input.company, 'company', 120);
   const category = readRequiredText(input.category, 'category', 100);
+  const title = readRequiredText(input.title, 'title', 160);
   const description = readRequiredText(input.description, 'description', 5000);
-  const location = readOptionalText(input.location, 'location', 120);
+  const location = readRequiredText(input.location, 'location', 120);
   const subcategory = readOptionalText(input.subcategory, 'subcategory', 100);
+  const model = readRequiredText(input.model, 'product/model', 150);
+  const seller = readRequiredText(input.seller, 'seller/shop', 150);
 
-  // Validate company existence and approval
-  const companyRecord = await companyRepository.findByName(company);
-  if (!companyRecord || companyRecord.status !== 'ACTIVE') {
-    throw new ApiError(400, `Company '${company}' is not registered. Please select an existing company or submit a company request.`, 'INVALID_COMPANY');
-  }
-
-  // Validate category existence
   if (!(await isValidCategory(category))) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
   }
 
+  const categoryRecord = await categoryRepository.findByName(category);
+  const companyRecord = await resolveCompany(companyName, categoryRecord?.id);
+
+  const productImage = pickUploadedFile(files, 'productImage') || file || null;
+  const billImage = pickUploadedFile(files, 'billImage') || null;
+  const productVideo = pickUploadedFile(files, 'productVideo') || null;
+  const legacyProof = pickUploadedFile(files, 'proof') || (file && file !== productImage ? file : null);
+
+  assertRequiredMedia(productImage, billImage, productVideo, complaintType);
+  assertMediaLimits(productImage, billImage, productVideo);
+
+  const productImageInfo = productImage ? await saveComplaintMedia(productImage, 'productImage') : null;
+  const billImageInfo = billImage ? await saveComplaintMedia(billImage, 'billImage') : null;
+  const productVideoInfo = productVideo ? await saveComplaintMedia(productVideo, 'productVideo') : null;
+
   let proofUrl = null;
   let proofName = null;
-
-  if (file) {
-    const saved = await saveProof(file);
+  if (legacyProof && legacyProof !== productImage && legacyProof !== billImage && legacyProof !== productVideo) {
+    const saved = await saveProof(legacyProof, 'legacy');
     if (saved) {
       proofUrl = saved.url;
       proofName = saved.name;
     }
-  } else if (input.proofUrl && typeof input.proofUrl === 'string') {
-    proofUrl = input.proofUrl.trim();
-    proofName = typeof input.proofName === 'string' ? input.proofName.trim() : null;
   }
 
   const createdAtLabel = 'Just now';
@@ -78,16 +97,102 @@ export async function createComplaint(input, user = null, file = null) {
     company: companyRecord.name,
     category,
     subcategory: subcategory || null,
-    ...(location && { location }),
+    model: model || null,
+    seller: seller || null,
+    location: location || null,
+    type: complaintType,
+    productImageUrl: productImageInfo?.url || null,
+    productImageName: productImageInfo?.name || null,
+    billImageUrl: billImageInfo?.url || null,
+    billImageName: billImageInfo?.name || null,
+    productVideoUrl: productVideoInfo?.url || null,
+    productVideoName: productVideoInfo?.name || null,
     proofUrl,
     proofName,
-    userId: user.id,
+    userId: user?.id || null,
+    complainantName,
+    complainantPhone: verifiedPhone,
+    complainantEmail,
+    complainantCity,
+    complainantAddress,
+    phoneVerified: true,
+    otpVerifiedAt: new Date().toISOString(),
     status: 'PENDING',
     createdAt: new Date().toISOString(),
     createdAtLabel,
     metadata: [companyRecord.name, category, location, createdAtLabel].filter(Boolean),
     actionLabel: 'View Details',
   });
+}
+
+async function resolveCompany(companyName, categoryId) {
+  const existing = await companyRepository.findByName(companyName);
+  if (existing) {
+    if (existing.status === 'DISABLED') {
+      throw new ApiError(400, `Company '${companyName}' is not available.`, 'INVALID_COMPANY');
+    }
+    return existing;
+  }
+
+  return companyRepository.createCompany({
+    name: companyName,
+    categoryId: categoryId || null,
+    status: 'PENDING',
+  });
+}
+
+function assertRequiredMedia(productImage, billImage, productVideo, complaintType) {
+  const photoLabel = complaintType === 'Service' ? 'service photo' : 'product photo';
+  const billLabel = complaintType === 'Service' ? 'bill or receipt' : 'bill or invoice';
+  const videoLabel = complaintType === 'Service' ? 'service evidence video' : 'product video';
+
+  if (!productImage) {
+    throw new ApiError(400, `A ${photoLabel} upload is required.`, 'MISSING_PRODUCT_IMAGE');
+  }
+  if (!billImage) {
+    throw new ApiError(400, `A ${billLabel} upload is required.`, 'MISSING_BILL_IMAGE');
+  }
+  if (!productVideo) {
+    throw new ApiError(400, `A ${videoLabel} upload is required.`, 'MISSING_PRODUCT_VIDEO');
+  }
+}
+
+function assertMediaLimits(productImage, billImage, productVideo) {
+  for (const file of [productImage, billImage]) {
+    if (file?.size > IMAGE_MAX_BYTES) {
+      throw new ApiError(400, 'Image files must be 10MB or smaller.', 'FILE_TOO_LARGE');
+    }
+    const imageType = file?.mimetype || '';
+    if (file && !['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(imageType)) {
+      throw new ApiError(400, 'Photos must be JPG, JPEG, PNG, or WEBP.', 'INVALID_FILE_TYPE');
+    }
+  }
+  if (productVideo?.size > VIDEO_MAX_BYTES) {
+    throw new ApiError(400, 'Video files must be 25MB or smaller.', 'FILE_TOO_LARGE');
+  }
+  if (productVideo && !['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'].includes(productVideo.mimetype)) {
+    throw new ApiError(400, 'Video must be MP4, MOV, or WEBM.', 'INVALID_FILE_TYPE');
+  }
+}
+
+function normalizeComplaintType(value) {
+  const type = typeof value === 'string' ? value.trim() : 'Product';
+  return type === 'Service' ? 'Service' : 'Product';
+}
+
+function pickUploadedFile(files, key) {
+  if (!files || typeof files !== 'object') return null;
+  const fileList = files[key];
+  if (!fileList || fileList.length === 0) return null;
+  return fileList[0];
+}
+
+function normalizeEmail(value) {
+  const email = readRequiredText(value, 'email', 254).toLocaleLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new ApiError(400, 'Enter a valid email address.', 'INVALID_EMAIL');
+  }
+  return email;
 }
 
 function readRequiredText(value, field, maxLength) {
