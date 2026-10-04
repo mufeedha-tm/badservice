@@ -130,7 +130,7 @@ export default function OtpVerification({
         </label>
       )}
 
-      {status && (
+      {status && !verified && (
         <small className="field-hint" role="status">
           {status}
         </small>
