@@ -120,3 +120,4 @@ The client will start at `http://localhost:5173` and proxy `/api` calls to the b
 - **Build Command**: `npm run build`
 - **Publish Directory**: `dist`
 - **Environment Variable**: `VITE_API_BASE_URL=https://your-render-app.onrender.com/api`
+- The Vite build copies `client/public/.htaccess` into `dist/`. Keep this file when uploading the build so direct links and page refreshes use the React app's route handling.
