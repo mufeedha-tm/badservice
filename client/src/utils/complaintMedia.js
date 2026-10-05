@@ -3,7 +3,8 @@ import { getAssetUrl } from '../services/api.js';
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
 export const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov';
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-export const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 15 * 1024 * 1024;
+export const VIDEO_MAX_DURATION_SECONDS = 15;
 
 export function isVideoUrl(url = '') {
   return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /\/product-videos\//i.test(url);
@@ -90,7 +91,7 @@ export function validateMediaFile(file, kind) {
     if (!allowed.includes(file.type) && !/\.(mp4|mov|webm)$/i.test(name)) {
       return 'Video must be MP4, MOV, or WEBM.';
     }
-    if (file.size > VIDEO_MAX_BYTES) return 'Video must be 25MB or smaller.';
+    if (file.size > VIDEO_MAX_BYTES) return 'Video must be 15MB or smaller.';
     return '';
   }
 
@@ -100,4 +101,45 @@ export function validateMediaFile(file, kind) {
   }
   if (file.size > IMAGE_MAX_BYTES) return 'Image must be 10MB or smaller.';
   return '';
+}
+
+export function readVideoDuration(file) {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+    let timeoutId;
+    let settled = false;
+    const cleanup = () => {
+      window.clearTimeout(timeoutId);
+      video.onloadedmetadata = null;
+      video.onerror = null;
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(objectUrl);
+    };
+    const finish = (callback, value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      callback(value);
+    };
+
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const duration = video.duration;
+      if (Number.isFinite(duration) && duration > 0) {
+        finish(resolve, duration);
+      } else {
+        finish(reject, new Error('Video duration is unavailable.'));
+      }
+    };
+    video.onerror = () => {
+      finish(reject, new Error('Video duration could not be read.'));
+    };
+    timeoutId = window.setTimeout(
+      () => finish(reject, new Error('Video duration check timed out.')),
+      10000,
+    );
+    video.src = objectUrl;
+  });
 }

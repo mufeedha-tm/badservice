@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   getCurrentAccount,
+  postAdminLogin,
   postLogin,
   postLogout,
   postRegister,
@@ -10,6 +11,7 @@ const authRouter = Router();
 
 authRouter.post('/auth/register', postRegister);
 authRouter.post('/auth/login', postLogin);
+authRouter.post('/auth/admin/login', postAdminLogin);
 authRouter.get('/auth/me', getCurrentAccount);
 authRouter.post('/auth/logout', postLogout);
 

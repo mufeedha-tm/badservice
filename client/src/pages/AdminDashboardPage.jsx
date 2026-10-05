@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { useAccount } from '../context/AccountContext.jsx';
 import {
@@ -12,16 +12,25 @@ import {
   getAdminCompanyRequests,
   getAdminStats,
   getAdminUsers,
+  getErrorMessage,
+  logoutAccount,
   getAssetUrl,
   rejectCompanyRequest,
   updateAdminCompanyStatus,
   updateAdminComplaintStatus,
   updateAdminUserRole,
   updateAdminUserStatus,
+  loginAdminAccount,
 } from '../services/api.js';
 
 export default function AdminDashboardPage() {
-  const { account, status: accountStatus } = useAccount();
+  const { account, status: accountStatus, setAccount } = useAccount();
+  const navigate = useNavigate();
+  const [adminUsername, setAdminUsername] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoginError, setAdminLoginError] = useState('');
+  const [adminLoggingIn, setAdminLoggingIn] = useState(false);
+  const [adminSigningOut, setAdminSigningOut] = useState(false);
 
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
@@ -226,6 +235,41 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function handleAdminLogin(event) {
+    event.preventDefault();
+    if (adminLoggingIn) return;
+    setAdminLoggingIn(true);
+    setAdminLoginError('');
+    try {
+      const result = await loginAdminAccount({ username: adminUsername.trim(), password: adminPassword });
+      if (result?.role !== 'ADMIN') {
+        await logoutAccount().catch(() => {});
+        setAdminLoginError('This account is not an administrator account.');
+        return;
+      }
+      setAccount(result);
+      setAdminPassword('');
+    } catch (error) {
+      setAdminLoginError(getErrorMessage(error, 'Admin login failed. Check your username and password.'));
+    } finally {
+      setAdminLoggingIn(false);
+    }
+  }
+
+  async function handleAdminSignOut() {
+    if (adminSigningOut) return;
+    setAdminSigningOut(true);
+    try {
+      await logoutAccount();
+      setAccount(null);
+      navigate('/');
+    } catch (error) {
+      showMessage(getErrorMessage(error, 'Unable to sign out. Please try again.'), 'error');
+    } finally {
+      setAdminSigningOut(false);
+    }
+  }
+
   async function handleToggleUserRole(userId, currentRole) {
     const nextRole = currentRole === 'ADMIN' ? 'USER' : 'ADMIN';
     if (!window.confirm(`Change this user's role to ${nextRole}?`)) return;
@@ -252,25 +296,42 @@ export default function AdminDashboardPage() {
   if (!account || account.role !== 'ADMIN') {
     return (
       <MainLayout>
-        <section style={{ padding: '3rem 1.5rem', textAlign: 'center', maxWidth: '600px', margin: '0 auto' }}>
-          <h1 style={{ color: '#d9534f' }}>🔒 Admin Access Required</h1>
-          <p style={{ margin: '1rem 0' }}>
-            This page is restricted to platform administrators. Please sign in with an administrator account to continue.
-          </p>
-          <Link
-            to="/account"
-            style={{
-              display: 'inline-block',
-              padding: '0.6rem 1.2rem',
-              background: '#232f3e',
-              color: '#fff',
-              textDecoration: 'none',
-              borderRadius: '4px',
-              fontWeight: 600,
-            }}
-          >
-            Go to Sign In
-          </Link>
+        <section className="admin-login-page">
+          <div className="admin-login-card">
+            <div className="admin-login-card__brand" aria-hidden="true">BS</div>
+            <span className="admin-login-card__eyebrow">BADService.in · ADMINISTRATION</span>
+            <h1>Welcome back</h1>
+            <p>Sign in to manage complaints, companies, requests and users.</p>
+            <form onSubmit={handleAdminLogin} className="admin-login-form">
+              <label className="field">
+                <span>Admin username</span>
+                <input
+                  type="text"
+                  value={adminUsername}
+                  onChange={(event) => setAdminUsername(event.target.value)}
+                  autoComplete="username"
+                  placeholder="Enter admin username"
+                  required
+                />
+              </label>
+              <label className="field">
+                <span>Password</span>
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(event) => setAdminPassword(event.target.value)}
+                  autoComplete="current-password"
+                  placeholder="Enter your admin password"
+                  required
+                />
+              </label>
+              {adminLoginError && <p className="form-banner form-banner--error" role="alert">{adminLoginError}</p>}
+              <button className="submit-button admin-login-submit" type="submit" disabled={adminLoggingIn}>
+                {adminLoggingIn ? 'Signing in…' : 'Sign in to dashboard'}
+              </button>
+            </form>
+            <p className="admin-login-card__note"><span aria-hidden="true">●</span> Secure access for authorized administrators</p>
+          </div>
         </section>
       </MainLayout>
     );
@@ -294,12 +355,22 @@ export default function AdminDashboardPage() {
           <div>
             <h1 style={{ margin: 0 }}>⚙️ Admin Dashboard</h1>
             <p style={{ margin: '0.25rem 0', color: '#666', fontSize: '0.9rem' }}>
-              Platform management &bull; Signed in as <strong>{account.email}</strong>
+              Manage complaints, companies, requests and users.
             </p>
           </div>
-          <Link to="/account" style={{ color: '#0066cc', textDecoration: 'none', fontSize: '0.9rem' }}>
-            &larr; Back to My Account
-          </Link>
+          <div className="admin-dashboard__top-actions">
+            <Link className="admin-dashboard__home-link" to="/">
+              <span aria-hidden="true">←</span> Return to Home
+            </Link>
+            <button
+              className="admin-dashboard__signout"
+              type="button"
+              onClick={handleAdminSignOut}
+              disabled={adminSigningOut}
+            >
+              {adminSigningOut ? 'Signing out…' : 'Sign out'}
+            </button>
+          </div>
         </div>
 
         {actionMessage.text && (

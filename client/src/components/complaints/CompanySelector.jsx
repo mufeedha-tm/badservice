@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 
-export default function CompanySelector({ companies, value, onChange, error, label, placeholder, onAddCompany }) {
+export default function CompanySelector({ companies, value, onChange, error, label, placeholder, onAddCompany, loading = false }) {
   const [open, setOpen] = useState(false);
   const matches = useMemo(() => {
     const query = value.trim().toLowerCase();
@@ -25,7 +25,8 @@ export default function CompanySelector({ companies, value, onChange, error, lab
           <button type="button" className="company-selector__add" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>+ Add Company</button>
         )}
       </div>
-      {open && (matches.length > 0 || value.trim()) && (
+      {loading && <small className="company-selector__loading">Loading companies…</small>}
+      {open && !loading && (matches.length > 0 || value.trim()) && (
         <ul className="company-selector__list" role="listbox">
           {matches.map((company) => (
             <li key={company.id}>

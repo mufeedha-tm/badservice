@@ -5,11 +5,13 @@ import * as categoryRepository from '../repositories/mysqlCategoryRepository.js'
 import { ApiError } from '../utils/ApiError.js';
 import { isValidCategory } from './categoryService.js';
 import { assertVerificationToken, consumeChallenge } from './otpService.js';
-import { saveComplaintMedia, saveProof } from './storageService.js';
+import { saveComplaintMedia } from './storageService.js';
 import { assertRealMediaFile } from '../middleware/upload.js';
+import { readVideoDurationSeconds, VideoMetadataError } from '../utils/videoDuration.js';
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+const VIDEO_MAX_BYTES = 15 * 1024 * 1024;
+const VIDEO_MAX_DURATION_SECONDS = 15;
 
 export function listComplaints() {
   return complaintRepository.findAll();
@@ -42,24 +44,39 @@ export async function createComplaint(input, user = null, file = null, files = {
     throw new ApiError(400, 'A complaint object is required.', 'INVALID_COMPLAINT');
   }
 
-  const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
-  const complainantEmail = normalizeEmail(input.email);
-  const complainantCity = readRequiredText(input.city, 'city', 120);
-  const complainantAddress = readRequiredText(input.address, 'address', 500);
-  const phone = input.phone;
+  // 1. Verification Token Check (Priority check for security)
   const verificationToken = input.verificationToken;
-  const verified = await assertVerificationToken(phone, verificationToken);
-  const verifiedPhone = verified.phone;
+  if (!verificationToken || typeof verificationToken !== 'string') {
+    throw new ApiError(401, 'Email verification is required before submitting a complaint.', 'OTP_REQUIRED');
+  }
 
+  const complainantEmail = normalizeEmail(input.email);
+  const verified = await assertVerificationToken(complainantEmail, verificationToken);
+
+  // 2. Personal & Contact Details Validation
+  const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
+  const complainantPhone = readRequiredPhone(input.phone);
+  const complainantCity = readRequiredText(input.city, 'city', 120);
+  const complainantAddress = readRequiredText(input.address, 'full address', 500);
+
+  // 3. Complaint Details Validation
   const complaintType = normalizeComplaintType(input.type);
-  const companyName = readRequiredText(input.company, 'company', 120);
+  const companyName = readRequiredText(input.company, complaintType === 'Service' ? 'service provider' : 'company / brand', 120);
   const category = readRequiredText(input.category, 'category', 100);
-  const title = readRequiredText(input.title, 'title', 160);
-  const description = readRequiredText(input.description, 'description', 5000);
-  const location = readRequiredText(input.location, 'location', 120);
+  const title = readRequiredText(input.title, 'complaint title', 160);
+  const description = readRequiredText(input.description, 'full complaint details', 5000);
+  const location = readRequiredText(input.location, 'shop / service location', 120);
   const subcategory = readOptionalText(input.subcategory, 'subcategory', 100);
-  const model = readRequiredText(input.model, 'product/model', 150);
-  const seller = readRequiredText(input.seller, 'seller/shop', 150);
+  const model = readRequiredText(
+    input.model || input.serviceDetails,
+    complaintType === 'Service' ? 'service details / purpose' : 'product / model',
+    150
+  );
+  const seller = readRequiredText(
+    input.seller || input.serviceProvider,
+    complaintType === 'Service' ? 'service provider' : 'seller / shop',
+    150
+  );
 
   if (!(await isValidCategory(category))) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
@@ -68,30 +85,35 @@ export async function createComplaint(input, user = null, file = null, files = {
   const categoryRecord = await categoryRepository.findByName(category);
   const companyRecord = await resolveCompany(companyName, categoryRecord?.id);
 
+  // 4. Evidence Media Validation (All 3 mandatory)
   const productImage = pickUploadedFile(files, 'productImage') || file || null;
   const billImage = pickUploadedFile(files, 'billImage') || null;
   const productVideo = pickUploadedFile(files, 'productVideo') || null;
-  const legacyProof = pickUploadedFile(files, 'proof') || (file && file !== productImage ? file : null);
 
   assertRequiredMedia(productImage, billImage, productVideo, complaintType);
   assertMediaLimits(productImage, billImage, productVideo);
   await assertRealMediaFile(productImage, 'image');
   await assertRealMediaFile(billImage, 'image');
   await assertRealMediaFile(productVideo, 'video');
-
-  const productImageInfo = productImage ? await saveComplaintMedia(productImage, 'productImage') : null;
-  const billImageInfo = billImage ? await saveComplaintMedia(billImage, 'billImage') : null;
-  const productVideoInfo = productVideo ? await saveComplaintMedia(productVideo, 'productVideo') : null;
-
-  let proofUrl = null;
-  let proofName = null;
-  if (legacyProof && legacyProof !== productImage && legacyProof !== billImage && legacyProof !== productVideo) {
-    const saved = await saveProof(legacyProof, 'legacy');
-    if (saved) {
-      proofUrl = saved.url;
-      proofName = saved.name;
-    }
+  let videoDuration;
+  try {
+    videoDuration = await readVideoDurationSeconds(productVideo.path);
+  } catch (error) {
+    if (!(error instanceof VideoMetadataError)) throw error;
+    throw new ApiError(400, 'Video duration could not be verified. Please upload a playable video.', 'INVALID_VIDEO_DURATION');
   }
+  if (videoDuration > VIDEO_MAX_DURATION_SECONDS) {
+    throw new ApiError(
+      400,
+      `Video must be ${VIDEO_MAX_DURATION_SECONDS} seconds or shorter.`,
+      'VIDEO_TOO_LONG'
+    );
+  }
+
+  // 5. Store Media via Storage Abstraction
+  const productImageInfo = await saveComplaintMedia(productImage, 'productImage');
+  const billImageInfo = await saveComplaintMedia(billImage, 'billImage');
+  const productVideoInfo = await saveComplaintMedia(productVideo, 'productVideo');
 
   const createdAtLabel = 'Just now';
 
@@ -112,16 +134,18 @@ export async function createComplaint(input, user = null, file = null, files = {
     billImageName: billImageInfo?.name || null,
     productVideoUrl: productVideoInfo?.url || null,
     productVideoName: productVideoInfo?.name || null,
-    proofUrl,
-    proofName,
+    proofUrl: null,
+    proofName: null,
     userId: user?.id || null,
     complainantName,
-    complainantPhone: verifiedPhone,
+    complainantPhone,
     complainantEmail,
     complainantCity,
     complainantAddress,
-    phoneVerified: true,
+    emailVerified: true,
+    phoneVerified: false,
     otpVerifiedAt: new Date().toISOString(),
+
     status: 'PENDING',
     createdAt: new Date().toISOString(),
     createdAtLabel,
@@ -129,6 +153,7 @@ export async function createComplaint(input, user = null, file = null, files = {
     actionLabel: 'View Details',
   });
 
+  // Consume verification challenge (single-use)
   await consumeChallenge(verified.challengeId);
   return created;
 }
@@ -142,17 +167,19 @@ async function resolveCompany(companyName, categoryId) {
     return existing;
   }
 
-  return companyRepository.createCompany({
-    name: companyName,
-    categoryId: categoryId || null,
-    status: 'PENDING',
-  });
+  // Company must be registered or approved
+  throw new ApiError(
+    400,
+    `Company '${companyName}' is not registered. Please use 'Request to Add a New Company' first.`,
+    'COMPANY_NOT_FOUND'
+  );
 }
 
 function assertRequiredMedia(productImage, billImage, productVideo, complaintType) {
-  const photoLabel = complaintType === 'Service' ? 'service photo' : 'product photo';
-  const billLabel = complaintType === 'Service' ? 'bill or receipt' : 'bill or invoice';
-  const videoLabel = complaintType === 'Service' ? 'service evidence video' : 'product video';
+  const isService = complaintType === 'Service';
+  const photoLabel = isService ? 'service photo' : 'product photo';
+  const billLabel = isService ? 'bill / receipt' : 'bill / purchase proof';
+  const videoLabel = isService ? 'service evidence video' : 'product video';
 
   if (!productImage) {
     throw new ApiError(400, `A ${photoLabel} upload is required.`, 'MISSING_PRODUCT_IMAGE');
@@ -176,7 +203,7 @@ function assertMediaLimits(productImage, billImage, productVideo) {
     }
   }
   if (productVideo?.size > VIDEO_MAX_BYTES) {
-    throw new ApiError(400, 'Video files must be 25MB or smaller.', 'FILE_TOO_LARGE');
+    throw new ApiError(400, 'Video files must be 15MB or smaller.', 'FILE_TOO_LARGE');
   }
   if (productVideo && !['video/mp4', 'video/webm', 'video/quicktime'].includes(productVideo.mimetype)) {
     throw new ApiError(400, 'Video must be MP4, MOV, or WEBM.', 'INVALID_FILE_TYPE');
@@ -196,11 +223,22 @@ function pickUploadedFile(files, key) {
 }
 
 function normalizeEmail(value) {
-  const email = readRequiredText(value, 'email', 254).toLocaleLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  const email = readRequiredText(value, 'email', 254).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
     throw new ApiError(400, 'Enter a valid email address.', 'INVALID_EMAIL');
   }
   return email;
+}
+
+function readRequiredPhone(value) {
+  if (!value || typeof value !== 'string') {
+    throw new ApiError(400, 'Mobile number is required.', 'INVALID_PHONE');
+  }
+  const cleaned = value.trim().replace(/[\s\-()]/g, '');
+  if (!/^(?:\+91|0)?[6-9]\d{9}$/.test(cleaned)) {
+    throw new ApiError(400, 'Please enter a valid 10-digit Indian mobile number.', 'INVALID_PHONE');
+  }
+  return cleaned.slice(-10);
 }
 
 function readRequiredText(value, field, maxLength) {

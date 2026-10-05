@@ -33,58 +33,38 @@ const videoMimeTypes = new Set([
   'video/mp4',
   'video/quicktime',
   'video/webm',
-  'video/x-msvideo',
 ]);
 const allowedImageExts = new Set(['.jpg', '.jpeg', '.png', '.webp']);
-const allowedVideoExts = new Set(['.mp4', '.mov', '.webm', '.avi']);
+const allowedVideoExts = new Set(['.mp4', '.mov', '.webm']);
 
-function buildStorageForFolder(folder) {
-  return multer.diskStorage({
-    destination(_req, _file, cb) {
-      cb(null, folder);
-    },
-    filename(_req, file, cb) {
-      const ext = path.extname(file.originalname).toLowerCase();
-      const uniqueSuffix = `${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
-      cb(null, uniqueSuffix);
-    },
-  });
-}
-
-function makeFileFilter({ allowImages = false, allowVideos = false, allowLegacyProof = false } = {}) {
+function makeComplaintFileFilter() {
   return function fileFilter(_req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const mimeAllowed =
-      (allowImages && imageMimeTypes.has(file.mimetype)) ||
-      (allowVideos && videoMimeTypes.has(file.mimetype)) ||
-      (allowLegacyProof && (file.mimetype === 'application/pdf' || allowedImageExts.has(ext) || allowedVideoExts.has(ext)));
-    const extAllowed =
-      (allowImages && allowedImageExts.has(ext)) ||
-      (allowVideos && allowedVideoExts.has(ext)) ||
-      (allowLegacyProof && (['.jpg', '.jpeg', '.png', '.webp', '.gif', '.pdf'].includes(ext) || allowedVideoExts.has(ext)));
+    const ext = path.extname(file.originalname || '').toLowerCase();
 
-    if (mimeAllowed || extAllowed) {
-      cb(null, true);
-      return;
+    if (file.fieldname === 'productImage' || file.fieldname === 'billImage') {
+      const isMimeValid = imageMimeTypes.has(file.mimetype);
+      const isExtValid = allowedImageExts.has(ext);
+
+      if (!isMimeValid && !isExtValid) {
+        return cb(new ApiError(400, 'Photos must be JPG, JPEG, PNG, or WEBP.', 'INVALID_FILE_TYPE'));
+      }
+      return cb(null, true);
     }
 
-    const allowedText = [
-      allowImages ? 'JPG, JPEG, PNG, WEBP' : '',
-      allowVideos ? 'MP4, MOV, WEBM' : '',
-      allowLegacyProof ? 'PDF, JPG, PNG, WEBP' : '',
-    ].filter(Boolean).join(', ');
+    if (file.fieldname === 'productVideo') {
+      const isMimeValid = videoMimeTypes.has(file.mimetype);
+      const isExtValid = allowedVideoExts.has(ext);
 
-    cb(new ApiError(400, `Invalid file type. Allowed types: ${allowedText || 'images and videos'}.`, 'INVALID_FILE_TYPE'));
+      if (!isMimeValid && !isExtValid) {
+        return cb(new ApiError(400, 'Video must be MP4, MOV, or WEBM.', 'INVALID_FILE_TYPE'));
+      }
+      return cb(null, true);
+    }
+
+    // Default reject
+    cb(new ApiError(400, `Unexpected upload field: ${file.fieldname}`, 'INVALID_UPLOAD_FIELD'));
   };
 }
-
-export const uploadProof = multer({
-  storage: buildStorageForFolder(uploadsDir),
-  fileFilter: makeFileFilter({ allowImages: true, allowLegacyProof: true }),
-  limits: {
-    fileSize: 10 * 1024 * 1024,
-  },
-});
 
 export const uploadComplaintMedia = multer({
   storage: multer.diskStorage({
@@ -93,13 +73,30 @@ export const uploadComplaintMedia = multer({
     },
     filename(_req, file, cb) {
       const ext = path.extname(file.originalname).toLowerCase();
-      const uniqueSuffix = `${Date.now()}-${randomBytes(8).toString('hex')}${ext}`;
+      // Generate randomized filename to protect privacy
+      const uniqueSuffix = `${Date.now()}-${randomBytes(12).toString('hex')}${ext}`;
       cb(null, uniqueSuffix);
     },
   }),
-  fileFilter: makeFileFilter({ allowImages: true, allowVideos: true }),
+  fileFilter: makeComplaintFileFilter(),
   limits: {
-    fileSize: 25 * 1024 * 1024,
+    fileSize: 15 * 1024 * 1024, // 15MB max
+  },
+});
+
+export const uploadProof = multer({
+  storage: multer.diskStorage({
+    destination(_req, _file, cb) {
+      cb(null, uploadsDir);
+    },
+    filename(_req, file, cb) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const uniqueSuffix = `${Date.now()}-${randomBytes(12).toString('hex')}${ext}`;
+      cb(null, uniqueSuffix);
+    },
+  }),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
   },
 });
 
@@ -119,6 +116,7 @@ export async function assertRealMediaFile(file, kind) {
   const isWebp = starts(0x52, 0x49, 0x46, 0x46) && header.slice(8, 12).toString() === 'WEBP';
   const isMp4Family = header.slice(4, 8).toString() === 'ftyp';
   const isWebm = starts(0x1a, 0x45, 0xdf, 0xa3);
+
   if (kind === 'image' && !(isJpeg || isPng || isWebp)) {
     throw new ApiError(400, 'The uploaded image is not a valid JPG, PNG, or WEBP file.', 'INVALID_MEDIA_CONTENT');
   }

@@ -1,11 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_BASE_URL || '/api',
-
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   withCredentials: true,
-
   headers: {
     Accept: 'application/json',
   },
@@ -18,23 +15,13 @@ export function getAssetUrl(path) {
     return path;
   }
 
-  const baseUrl =
-    import.meta.env.VITE_API_BASE_URL || '/api';
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+  const serverOrigin = baseUrl.replace(/\/api\/?$/, '');
 
-  const serverOrigin = baseUrl.replace(
-    /\/api\/?$/,
-    ''
-  );
-
-  return `${serverOrigin}${
-    path.startsWith('/') ? '' : '/'
-  }${path}`;
+  return `${serverOrigin}${path.startsWith('/') ? '' : '/'}${path}`;
 }
 
-export function getErrorMessage(
-  error,
-  defaultMessage = 'An unexpected error occurred.'
-) {
+export function getErrorMessage(error, defaultMessage = 'An unexpected error occurred.') {
   if (error?.response?.data?.error?.message) {
     return error.response.data.error.message;
   }
@@ -43,15 +30,12 @@ export function getErrorMessage(
     return error.response.data.message;
   }
 
-  if (
-    error?.message === 'Network Error' ||
-    (!error?.response && error?.request)
-  ) {
+  if (error?.message === 'Network Error' || (!error?.response && error?.request)) {
     return 'Unable to reach the server. Please check your network connection or try again later.';
   }
 
   if (error?.response?.status === 401) {
-    return 'Your phone verification has expired or is invalid. Please verify your phone number again.';
+    return 'Your email verification has expired or is invalid. Please verify your email again.';
   }
 
   if (error?.response?.status === 403) {
@@ -71,102 +55,67 @@ export function getErrorMessage(
 
 export async function getHealth() {
   const response = await api.get('/health');
-
   return response.data;
 }
 
 export async function getComplaints() {
   const response = await api.get('/complaints');
-
   return response.data.data;
 }
 
 export async function getMyComplaints() {
   const response = await api.get('/complaints/my');
-
   return response.data.data;
 }
 
 export async function getCategories() {
   const response = await api.get('/categories');
-
   return response.data.data;
 }
 
 export async function getCompanies() {
   const response = await api.get('/companies');
-
   return response.data.data;
 }
 
 export async function getCompany(id) {
-  const response = await api.get(
-    `/companies/${encodeURIComponent(id)}`
-  );
-
+  const response = await api.get(`/companies/${encodeURIComponent(id)}`);
   return response.data.data;
 }
 
 export async function getNavigation() {
   const response = await api.get('/navigation');
-
   return response.data.data;
 }
 
 export async function getComplaint(id) {
-  const response = await api.get(
-    `/complaints/${encodeURIComponent(id)}`
-  );
-
+  const response = await api.get(`/complaints/${encodeURIComponent(id)}`);
   return response.data.data;
 }
 
-/*
- * OTP
- *
- * The frontend does NOT communicate with MSG91 directly.
- * It communicates only with our Node/Express backend.
- *
- * React
- *   ↓
- * /api/otp/send
- *   ↓
- * Node/Express
- *   ↓
- * MSG91
- *   ↓
- * SMS
+/**
+ * Send a 6-digit email OTP verification code.
  */
-
-export async function sendOtp({ phone, email }) {
-  const response = await api.post(
-    '/otp/send',
-    {
-      phone,
-      email,
-    }
-  );
-
+export async function sendOtp({ email }) {
+  const response = await api.post('/otp/send', {
+    email,
+  });
   return response.data.data;
 }
 
-export async function verifyOtp({ phone, otp }) {
-  const response = await api.post(
-    '/otp/verify',
-    {
-      phone,
-      otp,
-    }
-  );
-
+/**
+ * Verify 6-digit email OTP verification code.
+ */
+export async function verifyOtp({ email, otp }) {
+  const response = await api.post('/otp/verify', {
+    email,
+    otp,
+  });
   return response.data.data;
 }
 
 export async function getComplaintRankings() {
-  const response = await api.get(
-    '/complaints/rankings'
-  );
-
+  const response = await api.get('/complaints/rankings');
   return response.data.data;
 }
 
@@ -181,7 +130,6 @@ export async function searchComplaints({
   sort = '',
 } = {}) {
   const params = {};
-
   if (q) params.q = q;
   if (category) params.category = category;
   if (subcategory) params.subcategory = subcategory;
@@ -191,242 +139,131 @@ export async function searchComplaints({
   if (status) params.status = status;
   if (sort) params.sort = sort;
 
-  const response = await api.get(
-    '/complaints/search',
-    { params }
-  );
-
+  const response = await api.get('/complaints/search', { params });
   return response.data.data;
 }
 
-export async function createComplaint(
-  complaint
-) {
-  const isFormData =
-    typeof FormData !== 'undefined' &&
-    complaint instanceof FormData;
-
-  const response = await api.post(
-    '/complaints',
-    complaint,
-    {
-      headers: isFormData
-        ? {
-            'Content-Type':
-              'multipart/form-data',
-          }
-        : undefined,
-    }
-  );
-
+export async function createComplaint(complaint) {
+  const isFormData = typeof FormData !== 'undefined' && complaint instanceof FormData;
+  const response = await api.post('/complaints', complaint, {
+    headers: isFormData
+      ? {
+          'Content-Type': 'multipart/form-data',
+        }
+      : undefined,
+  });
   return response.data.data;
 }
 
-// Company request (User submitted)
-
-export async function submitCompanyRequest({
-  companyName,
-  categoryId,
-  description,
-}) {
-  const response = await api.post(
-    '/company-requests',
-    {
-      companyName,
-      categoryId,
-      description,
-    }
-  );
-
+export async function submitCompanyRequest({ companyName, categoryId, description }) {
+  const response = await api.post('/company-requests', {
+    companyName,
+    categoryId,
+    description,
+  });
   return response.data.data;
 }
 
 // Authentication
-
-export async function registerAccount(
-  account
-) {
-  const response = await api.post(
-    '/auth/register',
-    account
-  );
-
+export async function registerAccount(account) {
+  const response = await api.post('/auth/register', account);
   return response.data.data;
 }
 
-export async function loginAccount(
-  credentials
-) {
-  const response = await api.post(
-    '/auth/login',
-    credentials
-  );
+export async function loginAccount(credentials) {
+  const response = await api.post('/auth/login', credentials);
+  return response.data.data;
+}
 
+export async function loginAdminAccount(credentials) {
+  const response = await api.post('/auth/admin/login', credentials);
   return response.data.data;
 }
 
 export async function getCurrentAccount() {
   const response = await api.get('/auth/me');
-
   return response.data.data;
 }
 
 export async function logoutAccount() {
-  const response = await api.post(
-    '/auth/logout'
-  );
-
+  const response = await api.post('/auth/logout');
   return response.data.data;
 }
 
 // Admin APIs
-
 export async function getAdminStats() {
-  const response = await api.get(
-    '/admin/stats'
-  );
-
+  const response = await api.get('/admin/stats');
   return response.data.data;
 }
 
-export async function getAdminCompanyRequests(
-  status = ''
-) {
-  const response = await api.get(
-    '/admin/company-requests',
-    {
-      params: { status },
-    }
-  );
-
+export async function getAdminCompanyRequests(status = '') {
+  const response = await api.get('/admin/company-requests', {
+    params: { status },
+  });
   return response.data.data;
 }
 
-export async function approveCompanyRequest(
-  id
-) {
-  const response = await api.post(
-    `/admin/company-requests/${encodeURIComponent(id)}/approve`
-  );
-
+export async function approveCompanyRequest(id) {
+  const response = await api.post(`/admin/company-requests/${encodeURIComponent(id)}/approve`);
   return response.data.data;
 }
 
-export async function rejectCompanyRequest(
-  id
-) {
-  const response = await api.post(
-    `/admin/company-requests/${encodeURIComponent(id)}/reject`
-  );
-
+export async function rejectCompanyRequest(id) {
+  const response = await api.post(`/admin/company-requests/${encodeURIComponent(id)}/reject`);
   return response.data.data;
 }
 
-export async function getAdminComplaints(
-  params = {}
-) {
-  const response = await api.get(
-    '/admin/complaints',
-    { params }
-  );
-
+export async function getAdminComplaints(params = {}) {
+  const response = await api.get('/admin/complaints', { params });
   return response.data.data;
 }
 
-export async function updateAdminComplaintStatus(
-  id,
-  status
-) {
-  const response = await api.patch(
-    `/admin/complaints/${encodeURIComponent(id)}/status`,
-    { status }
-  );
-
+export async function updateAdminComplaintStatus(id, status) {
+  const response = await api.patch(`/admin/complaints/${encodeURIComponent(id)}/status`, { status });
   return response.data.data;
 }
 
 export async function deleteAdminComplaint(id) {
-  const response = await api.delete(
-    `/admin/complaints/${encodeURIComponent(id)}`
-  );
-
+  const response = await api.delete(`/admin/complaints/${encodeURIComponent(id)}`);
   return response.data;
 }
 
 export async function getAdminCompanies() {
-  const response = await api.get(
-    '/admin/companies'
-  );
-
+  const response = await api.get('/admin/companies');
   return response.data.data;
 }
 
-export async function createAdminCompany({
-  name,
-  categoryId,
-  status,
-}) {
-  const response = await api.post(
-    '/admin/companies',
-    {
-      name,
-      categoryId,
-      status,
-    }
-  );
-
+export async function createAdminCompany({ name, categoryId, status }) {
+  const response = await api.post('/admin/companies', {
+    name,
+    categoryId,
+    status,
+  });
   return response.data.data;
 }
 
-export async function updateAdminCompanyStatus(
-  id,
-  status
-) {
-  const response = await api.patch(
-    `/admin/companies/${encodeURIComponent(id)}/status`,
-    { status }
-  );
-
+export async function updateAdminCompanyStatus(id, status) {
+  const response = await api.patch(`/admin/companies/${encodeURIComponent(id)}/status`, { status });
   return response.data.data;
 }
 
 export async function getAdminUsers() {
-  const response = await api.get(
-    '/admin/users'
-  );
-
+  const response = await api.get('/admin/users');
   return response.data.data;
 }
 
-export async function updateAdminUserStatus(
-  id,
-  status
-) {
-  const response = await api.patch(
-    `/admin/users/${encodeURIComponent(id)}/status`,
-    { status }
-  );
-
+export async function updateAdminUserStatus(id, status) {
+  const response = await api.patch(`/admin/users/${encodeURIComponent(id)}/status`, { status });
   return response.data.data;
 }
 
-export async function updateAdminUserRole(
-  id,
-  role
-) {
-  const response = await api.patch(
-    `/admin/users/${encodeURIComponent(id)}/role`,
-    { role }
-  );
-
+export async function updateAdminUserRole(id, role) {
+  const response = await api.patch(`/admin/users/${encodeURIComponent(id)}/role`, { role });
   return response.data.data;
 }
 
 export async function getAdminCategories() {
-  const response = await api.get(
-    '/admin/categories'
-  );
-
+  const response = await api.get('/admin/categories');
   return response.data.data;
 }
 

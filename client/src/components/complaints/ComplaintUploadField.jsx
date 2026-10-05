@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { formatFileSize, validateMediaFile } from '../../utils/complaintMedia.js';
+import {
+  formatFileSize,
+  readVideoDuration,
+  validateMediaFile,
+  VIDEO_MAX_DURATION_SECONDS,
+} from '../../utils/complaintMedia.js';
 
 export default function ComplaintUploadField({
   id,
@@ -14,6 +19,7 @@ export default function ComplaintUploadField({
   onRemove,
 }) {
   const [previewUrl, setPreviewUrl] = useState('');
+  const [isCheckingVideo, setIsCheckingVideo] = useState(false);
 
   useEffect(() => {
     if (!file) {
@@ -30,17 +36,41 @@ export default function ComplaintUploadField({
     return `${file.name} · ${file.type || kind} · ${formatFileSize(file.size)}`;
   }, [file, kind]);
 
-  function handleChange(event) {
-    const nextFile = event.target.files?.[0] || null;
+  async function handleChange(event) {
+    const input = event.currentTarget;
+    const nextFile = input.files?.[0] || null;
     if (!nextFile) {
       onChange(null);
       return;
     }
-    const validationError = validateMediaFile(nextFile, kind);
-    onChange(nextFile, validationError);
+    let validationError = validateMediaFile(nextFile, kind);
     if (validationError) {
-      event.target.value = '';
+      onChange(null, validationError);
+      input.value = '';
+      return;
     }
+
+    if (kind === 'video') {
+      setIsCheckingVideo(true);
+      try {
+        const duration = await readVideoDuration(nextFile);
+        if (duration > VIDEO_MAX_DURATION_SECONDS) {
+          validationError = `Video must be ${VIDEO_MAX_DURATION_SECONDS} seconds or shorter.`;
+        }
+      } catch {
+        validationError = 'Video duration could not be checked. Please choose a playable MP4, MOV, or WEBM file.';
+      } finally {
+        setIsCheckingVideo(false);
+      }
+    }
+
+    if (validationError) {
+      onChange(null, validationError);
+      input.value = '';
+      return;
+    }
+
+    onChange(nextFile, '');
   }
 
   return (
@@ -51,12 +81,13 @@ export default function ComplaintUploadField({
         type="file"
         accept={accept}
         onChange={handleChange}
+        disabled={isCheckingVideo}
         className="upload-card__input"
       />
       <label htmlFor={id || name} className="upload-card__label">
         <span className="upload-card__title">{label}</span>
-        <span className="upload-card__helper">{helper}</span>
-        {!file && <span className="upload-card__action">Upload</span>}
+        <span className="upload-card__helper">{isCheckingVideo ? 'Checking video duration…' : helper}</span>
+        {!file && <span className="upload-card__action">{isCheckingVideo ? 'Checking…' : 'Upload'}</span>}
       </label>
 
       {file && previewUrl && (

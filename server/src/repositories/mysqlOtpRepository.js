@@ -4,11 +4,43 @@ export async function insertChallenge(challenge) {
   await pool.execute(
     `
       INSERT INTO otp_challenges
-        (id, phone, email, code_hash, expires_at, attempt_count, created_at)
+        (id, email, phone, code_hash, expires_at, attempt_count, created_at)
       VALUES (?, ?, ?, ?, ?, 0, UTC_TIMESTAMP())
     `,
-    [challenge.id, challenge.phone, challenge.email, challenge.codeHash, challenge.expiresAt]
+    [
+      challenge.id,
+      challenge.email,
+      challenge.phone || null,
+      challenge.codeHash,
+      challenge.expiresAt,
+    ]
   );
+}
+
+export async function findLatestByEmail(email) {
+  const [rows] = await pool.execute(
+    `
+      SELECT
+        id,
+        email,
+        phone,
+        code_hash AS codeHash,
+        expires_at AS expiresAt,
+        verified_at AS verifiedAt,
+        attempt_count AS attemptCount,
+        verification_token_hash AS verificationTokenHash,
+        token_expires_at AS tokenExpiresAt,
+        consumed_at AS consumedAt,
+        created_at AS createdAt
+      FROM otp_challenges
+      WHERE email = ?
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [email]
+  );
+
+  return rows[0] || null;
 }
 
 export async function findLatestByPhone(phone) {
@@ -42,8 +74,8 @@ export async function findByVerificationTokenHash(tokenHash) {
     `
       SELECT
         id,
-        phone,
         email,
+        phone,
         code_hash AS codeHash,
         expires_at AS expiresAt,
         verified_at AS verifiedAt,

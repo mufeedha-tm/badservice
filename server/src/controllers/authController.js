@@ -2,6 +2,7 @@ import {
   endSession,
   getAccountForSession,
   getSessionDurationSeconds,
+  loginAdminAccount,
   loginAccount,
   registerAccount,
 } from '../services/authService.js';
@@ -17,6 +18,12 @@ export async function postRegister(request, response) {
 
 export async function postLogin(request, response) {
   const session = await loginAccount(request.body);
+  response.setHeader('Set-Cookie', createSessionCookie(session.token));
+  response.json({ success: true, data: session.account });
+}
+
+export async function postAdminLogin(request, response) {
+  const session = await loginAdminAccount(request.body);
   response.setHeader('Set-Cookie', createSessionCookie(session.token));
   response.json({ success: true, data: session.account });
 }

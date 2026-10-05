@@ -26,6 +26,8 @@ function normalizeItems(items) {
         label: item.label || '',
         title: item.title || '',
         company: item.company || '',
+        referenceNotice: item.referenceNotice || '',
+        maxDurationSeconds: Number.isFinite(item.maxDurationSeconds) ? item.maxDurationSeconds : null,
       };
     })
     .filter(Boolean);
@@ -92,6 +94,11 @@ export default function MediaCarousel({
               className={`media-carousel__slide${isActive ? ' is-active' : ''}`}
               hidden={!isActive}
             >
+              {item.referenceNotice && (
+                <span className="media-carousel__reference-label">
+                  {item.referenceNotice}
+                </span>
+              )}
               {item.type === 'placeholder' ? (
                 <div className="media-carousel__placeholder">
                   <span className="media-carousel__placeholder-icon" aria-hidden="true">{item.label === 'Product video' ? '▶' : '▣'}</span>
@@ -110,6 +117,23 @@ export default function MediaCarousel({
                   muted
                   preload="metadata"
                   onPlay={() => setPaused(true)}
+                  onTimeUpdate={(event) => {
+                    if (
+                      item.maxDurationSeconds
+                      && event.currentTarget.currentTime >= item.maxDurationSeconds
+                    ) {
+                      event.currentTarget.pause();
+                      event.currentTarget.currentTime = item.maxDurationSeconds;
+                    }
+                  }}
+                  onSeeking={(event) => {
+                    if (
+                      item.maxDurationSeconds
+                      && event.currentTarget.currentTime > item.maxDurationSeconds
+                    ) {
+                      event.currentTarget.currentTime = item.maxDurationSeconds;
+                    }
+                  }}
                 >
                   <source src={item.url} />
                 </video>

@@ -1,5 +1,7 @@
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
+import bcrypt from 'bcryptjs';
+import { env } from '../config/env.js';
 import * as authRepository from '../repositories/mysqlAuthRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 
@@ -81,6 +83,32 @@ export async function loginAccount(input) {
   }
 
   return createSession(user);
+}
+
+export async function loginAdminAccount(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ApiError(400, 'Admin login details are required.', 'INVALID_CREDENTIALS');
+  }
+
+  if (!env.adminPasswordHash || !/^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(env.adminPasswordHash)) {
+    throw new ApiError(503, 'Admin login is not configured on the server.', 'ADMIN_LOGIN_NOT_CONFIGURED');
+  }
+
+  const username = readText(input.username, 'Admin username', 80);
+  const password = readPassword(input.password);
+  const usernameMatches = username.toLocaleLowerCase() === env.adminUsername.toLocaleLowerCase();
+  const passwordMatches = await bcrypt.compare(password, env.adminPasswordHash);
+
+  if (!usernameMatches || !passwordMatches) {
+    throw new ApiError(401, 'Admin username or password is incorrect.', 'INVALID_ADMIN_CREDENTIALS');
+  }
+
+  const adminUser = await authRepository.findActiveAdminUser();
+  if (!adminUser) {
+    throw new ApiError(503, 'The active admin account is not configured.', 'ADMIN_ACCOUNT_NOT_CONFIGURED');
+  }
+
+  return createSession(adminUser);
 }
 
 export async function getAccountForSession(sessionToken) {

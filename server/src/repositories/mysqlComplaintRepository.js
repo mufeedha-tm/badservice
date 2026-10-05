@@ -23,8 +23,13 @@ function mapComplaint(row) {
     seller: row.sellerName ?? '',
     location: row.location ?? '',
     complainantName: row.complainantName ?? '',
+    complainantPhone: row.complainantPhone ?? '',
+    complainantEmail: row.complainantEmail ?? '',
     complainantCity: row.complainantCity ?? '',
+    complainantAddress: row.complainantAddress ?? '',
     phoneVerified: Boolean(row.phoneVerified),
+    emailVerified: Boolean(row.emailVerified ?? row.phoneVerified),
+    otpVerifiedAt: row.otpVerifiedAt ? new Date(row.otpVerifiedAt).toISOString() : null,
     productImageUrl: row.productImageUrl ?? null,
     productImageName: row.productImageName ?? null,
     billImageUrl: row.billImageUrl ?? null,
@@ -89,8 +94,13 @@ const baseQuery = `
     c.seller_name AS sellerName,
     c.location,
     c.complainant_name AS complainantName,
+    c.complainant_phone AS complainantPhone,
+    c.complainant_email AS complainantEmail,
     c.complainant_city AS complainantCity,
+    c.complainant_address AS complainantAddress,
     c.phone_verified AS phoneVerified,
+    c.email_verified AS emailVerified,
+    c.otp_verified_at AS otpVerifiedAt,
     c.product_image_url AS productImageUrl,
     c.product_image_name AS productImageName,
     c.bill_image_url AS billImageUrl,
@@ -419,6 +429,7 @@ export async function create(complaint) {
           complainant_city,
           complainant_address,
           phone_verified,
+          email_verified,
           otp_verified_at,
           status,
           created_at,
@@ -427,7 +438,7 @@ export async function create(complaint) {
           badge_tone,
           action_label
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       complaint.id,
@@ -455,6 +466,7 @@ export async function create(complaint) {
       complaint.complainantCity || null,
       complaint.complainantAddress || null,
       complaint.phoneVerified ? 1 : 0,
+      complaint.emailVerified ? 1 : 0,
       complaint.otpVerifiedAt ? new Date(complaint.otpVerifiedAt) : null,
       complaint.status || 'PENDING',
       createdAt,

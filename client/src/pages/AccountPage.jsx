@@ -9,9 +9,10 @@ export default function AccountPage() {
   const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const redirect = searchParams.get('redirect');
+  const requestedMode = searchParams.get('mode');
 
   const { account, setAccount, status } = useAccount();
-  const [mode, setMode] = useState('login');
+  const [mode, setMode] = useState(requestedMode === 'register' ? 'register' : 'login');
   const [form, setForm] = useState({
     name: '',
     email: '',

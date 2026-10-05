@@ -64,6 +64,27 @@ export async function findUserById(id) {
   return rows[0] || null;
 }
 
+export async function findActiveAdminUser() {
+  const [rows] = await pool.execute(`
+    SELECT
+      id,
+      name,
+      email,
+      phone,
+      role,
+      status,
+      password_salt AS passwordSalt,
+      password_hash AS passwordHash,
+      created_at AS createdAt
+    FROM users
+    WHERE role = 'ADMIN' AND status = 'ACTIVE'
+    ORDER BY created_at ASC, id ASC
+    LIMIT 1
+  `);
+
+  return rows[0] || null;
+}
+
 export async function insertUser(user) {
   try {
     const createdAt = user.createdAt ? new Date(user.createdAt) : new Date();

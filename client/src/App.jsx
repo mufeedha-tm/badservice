@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import ScrollToTop from './components/common/ScrollToTop.jsx';
 import CategoryPage from './pages/CategoryPage.jsx';
 import ComplaintDetailPage from './pages/ComplaintDetailPage.jsx';
 import ComplaintCollectionPage from './pages/ComplaintCollectionPage.jsx';
@@ -14,7 +15,10 @@ import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <ScrollToTop />
+      <Routes>
+
       <Route path="/" element={<HomePage />} />
       <Route path="/complaints" element={<ComplaintsSearchPage />} />
       <Route path="/complaints/today" element={<ComplaintCollectionPage title="Today's Complaints" search={{ period: 'today', sort: 'latest' }} />} />
@@ -31,5 +35,6 @@ export default function App() {
       <Route path="/help" element={<HelpPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
+    </>
   );
 }

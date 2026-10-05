@@ -9,125 +9,105 @@ import {
 import { env } from '../config/env.js';
 import * as otpRepository from '../repositories/mysqlOtpRepository.js';
 import { ApiError } from '../utils/ApiError.js';
-import { sendMsg91Otp } from './msg91Service.js';
+import { sendOtpEmail } from './gmailService.js';
 
-const OTP_TTL_MS = 10 * 60 * 1000;
+const OTP_TTL_MS = (env.otpTtlSeconds || 600) * 1000;
 const TOKEN_TTL_MS = 30 * 60 * 1000;
-const RESEND_COOLDOWN_MS = 60 * 1000;
-const MAX_ATTEMPTS = 5;
+const OTP_COOLDOWN_MS = (env.otpCooldownSeconds || 60) * 1000;
+const MAX_ATTEMPTS = env.otpMaxAttempts || 5;
 
 export async function sendOtp(input) {
-  const phone = normalizePhone(input?.phone);
   const email = normalizeEmail(input?.email);
+  const phone = input?.phone ? normalizePhoneOptional(input.phone) : null;
 
-  const latest = await otpRepository.findLatestByPhone(phone);
+  const latest = await otpRepository.findLatestByEmail(email);
 
   if (latest?.createdAt) {
-    const ageMs =
-      Date.now() - new Date(latest.createdAt).getTime();
+    const ageMs = Date.now() - new Date(latest.createdAt).getTime();
 
-    if (
-      ageMs < RESEND_COOLDOWN_MS &&
-      !latest.verifiedAt
-    ) {
-      const waitSeconds = Math.ceil(
-        (RESEND_COOLDOWN_MS - ageMs) / 1000
-      );
-
+    if (ageMs < OTP_COOLDOWN_MS && !latest.verifiedAt && !latest.consumedAt) {
+      const waitSeconds = Math.max(1, Math.ceil((OTP_COOLDOWN_MS - ageMs) / 1000));
       throw new ApiError(
         429,
-        `Please wait ${waitSeconds} seconds before requesting another OTP.`,
+        `Please wait ${waitSeconds} seconds before requesting another code.`,
         'OTP_RATE_LIMITED'
       );
     }
   }
 
   const code = String(randomInt(100000, 1000000));
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS);
 
-  const expiresAt = new Date(
-    Date.now() + OTP_TTL_MS
-  );
+  const challengeId = randomUUID();
+  const codeHash = hashValue(`${email}:${code}`);
 
   await otpRepository.insertChallenge({
-    id: randomUUID(),
-    phone,
+    id: challengeId,
     email,
-    codeHash: hashValue(`${phone}:${code}`),
-    expiresAt: expiresAt
-      .toISOString()
-      .slice(0, 19)
-      .replace('T', ' '),
+    phone,
+    codeHash,
+    expiresAt: expiresAt.toISOString().slice(0, 19).replace('T', ' '),
   });
 
   try {
-    if (env.otpMethod === 'msg91') {
-      await sendMsg91Otp(phone, code);
-    } else {
-      throw new Error(
-        'Unsupported OTP_METHOD. Use OTP_METHOD=msg91.'
-      );
-    }
+    await sendOtpEmail({ to: email, otp: code });
   } catch (error) {
-    console.error('MSG91 OTP delivery failed:', error);
+    // If sending fails, consume/invalidate challenge so user can retry cleanly without getting stuck
+    await otpRepository.markConsumed(challengeId).catch(() => {});
 
+    console.error('Email OTP delivery failed via Gmail API.');
     throw new ApiError(
       502,
-      'We could not send the verification SMS. Please try again.',
+      'We could not send the verification email. Please try again.',
       'OTP_DELIVERY_FAILED'
     );
   }
 
   return {
-    phone,
     email,
     expiresIn: OTP_TTL_MS / 1000,
-    delivery: 'sms',
-    message: `A 6-digit verification code was sent to ${maskPhone(phone)}.`,
+    cooldownSeconds: OTP_COOLDOWN_MS / 1000,
+    delivery: 'email',
+    message: `Verification code sent to ${email}.`,
   };
 }
 
-export async function verifyOtp(input) {
-  const phone = normalizePhone(input?.phone);
 
-  const code =
-    typeof input?.otp === 'string'
-      ? input.otp.trim()
-      : '';
+export async function verifyOtp(input) {
+  const email = normalizeEmail(input?.email);
+  const code = typeof input?.otp === 'string' ? input.otp.trim() : '';
 
   if (!/^\d{6}$/.test(code)) {
     throw new ApiError(
       400,
-      'Enter the 6-digit OTP sent to your phone.',
+      'Enter the 6-digit verification code sent to your email.',
       'INVALID_OTP'
     );
   }
 
-  const challenge =
-    await otpRepository.findLatestByPhone(phone);
+  const challenge = await otpRepository.findLatestByEmail(email);
 
   if (!challenge) {
     throw new ApiError(
       400,
-      'Request a new OTP before verifying.',
+      'Request a new verification code before verifying.',
       'OTP_NOT_FOUND'
     );
   }
 
-  if (challenge.consumedAt) {
+  if (challenge.consumedAt || challenge.verifiedAt) {
     throw new ApiError(
       400,
-      'This OTP has already been used. Request a new one.',
+      'This verification code has already been used. Please request a new code.',
       'OTP_CONSUMED'
     );
   }
 
-  if (
-    new Date(challenge.expiresAt).getTime() <
-    Date.now()
-  ) {
+
+  if (new Date(challenge.expiresAt).getTime() < Date.now()) {
     throw new ApiError(
       400,
-      'Verification code expired. Please request a new code.',
+      'This verification code has expired. Please request a new code.',
       'OTP_EXPIRED'
     );
   }
@@ -135,43 +115,27 @@ export async function verifyOtp(input) {
   if (challenge.attemptCount >= MAX_ATTEMPTS) {
     throw new ApiError(
       429,
-      'Too many incorrect attempts. Request a new code.',
+      'Too many incorrect attempts. Please request a new code.',
       'OTP_LOCKED'
     );
   }
 
-  const expected = Buffer.from(
-    challenge.codeHash,
-    'hex'
-  );
+  const expected = Buffer.from(challenge.codeHash, 'hex');
+  const actual = Buffer.from(hashValue(`${email}:${code}`), 'hex');
 
-  const actual = Buffer.from(
-    hashValue(`${phone}:${code}`),
-    'hex'
-  );
-
-  const matches =
-    expected.length === actual.length &&
-    timingSafeEqual(expected, actual);
+  const matches = expected.length === actual.length && timingSafeEqual(expected, actual);
 
   if (!matches) {
-    await otpRepository.incrementAttempts(
-      challenge.id
-    );
-
+    await otpRepository.incrementAttempts(challenge.id);
     throw new ApiError(
       400,
-      'Incorrect verification code. Please check your phone and try again.',
+      'Incorrect verification code. Please check the code and try again.',
       'OTP_MISMATCH'
     );
   }
 
-  const verificationToken =
-    randomBytes(32).toString('base64url');
-
-  const tokenExpiresAt = new Date(
-    Date.now() + TOKEN_TTL_MS
-  )
+  const verificationToken = randomBytes(32).toString('base64url');
+  const tokenExpiresAt = new Date(Date.now() + TOKEN_TTL_MS)
     .toISOString()
     .slice(0, 19)
     .replace('T', ' ');
@@ -183,43 +147,32 @@ export async function verifyOtp(input) {
   );
 
   return {
-    phone,
-    email: challenge.email || null,
+    email,
     verified: true,
     verificationToken,
     expiresIn: TOKEN_TTL_MS / 1000,
   };
 }
 
-export async function assertVerificationToken(
-  phone,
-  verificationToken
-) {
-  const normalizedPhone = normalizePhone(phone);
+export async function assertVerificationToken(email, verificationToken) {
+  const normalizedEmail = normalizeEmail(email);
 
-  if (
-    !verificationToken ||
-    typeof verificationToken !== 'string'
-  ) {
+  if (!verificationToken || typeof verificationToken !== 'string') {
     throw new ApiError(
       401,
-      'Phone verification is required before submitting a complaint.',
+      'Email verification is required before submitting a complaint.',
       'OTP_REQUIRED'
     );
   }
 
-  const challenge =
-    await otpRepository.findByVerificationTokenHash(
-      hashValue(verificationToken.trim())
-    );
+  const challenge = await otpRepository.findByVerificationTokenHash(
+    hashValue(verificationToken.trim())
+  );
 
-  if (
-    !challenge ||
-    challenge.phone !== normalizedPhone
-  ) {
+  if (!challenge || challenge.email?.toLowerCase() !== normalizedEmail) {
     throw new ApiError(
       401,
-      'Phone verification is invalid or expired. Verify the code again.',
+      'Email verification is invalid or expired. Please verify your email again.',
       'OTP_INVALID'
     );
   }
@@ -227,7 +180,7 @@ export async function assertVerificationToken(
   if (!challenge.verifiedAt) {
     throw new ApiError(
       401,
-      'Phone number has not been verified.',
+      'Email address has not been verified.',
       'OTP_NOT_VERIFIED'
     );
   }
@@ -235,44 +188,27 @@ export async function assertVerificationToken(
   if (challenge.consumedAt) {
     throw new ApiError(
       401,
-      'This verification has already been used. Verify the code again.',
+      'This verification has already been used. Please verify again.',
       'OTP_CONSUMED'
     );
   }
 
   if (
     !challenge.tokenExpiresAt ||
-    new Date(challenge.tokenExpiresAt).getTime() <
-      Date.now()
+    new Date(challenge.tokenExpiresAt).getTime() < Date.now()
   ) {
     throw new ApiError(
       401,
-      'Phone verification expired. Verify the code again.',
+      'Verification expired. Please request a new code.',
       'OTP_EXPIRED'
     );
   }
 
   return {
-    phone: normalizedPhone,
+    email: normalizedEmail,
     challengeId: challenge.id,
-    email: challenge.email || null,
+    phone: challenge.phone || null,
   };
-}
-
-export async function consumeVerificationToken(
-  phone,
-  verificationToken
-) {
-  const verified = await assertVerificationToken(
-    phone,
-    verificationToken
-  );
-
-  await otpRepository.markConsumed(
-    verified.challengeId
-  );
-
-  return verified.phone;
 }
 
 export async function consumeChallenge(challengeId) {
@@ -281,61 +217,31 @@ export async function consumeChallenge(challengeId) {
   }
 }
 
-function normalizePhone(value) {
-  if (!value || typeof value !== 'string') {
-    throw new ApiError(
-      400,
-      'Phone number is required.',
-      'INVALID_PHONE'
-    );
-  }
-
-  const cleaned = value
-    .trim()
-    .replace(/[\s\-()]/g, '');
-
-  if (
-    !/^(?:\+91|0)?[6-9]\d{9}$/.test(cleaned)
-  ) {
-    throw new ApiError(
-      400,
-      'Please enter a valid 10-digit Indian phone number.',
-      'INVALID_PHONE'
-    );
-  }
-
-  return cleaned.slice(-10);
-}
-
 function normalizeEmail(value) {
-  const email =
-    typeof value === 'string'
-      ? value.trim().toLowerCase()
-      : '';
+  if (!value || typeof value !== 'string') {
+    throw new ApiError(400, 'Email address is required.', 'INVALID_EMAIL');
+  }
 
-  if (
-    !email ||
-    !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)
-  ) {
-    throw new ApiError(
-      400,
-      'Please enter a valid email address.',
-      'INVALID_EMAIL'
-    );
+  const email = value.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+    throw new ApiError(400, 'Please enter a valid email address.', 'INVALID_EMAIL');
   }
 
   return email;
 }
 
-function hashValue(value) {
-  const secret =
-    env.otpSecret || 'badservice-dev-otp';
+function normalizePhoneOptional(value) {
+  if (!value || typeof value !== 'string') return null;
+  const cleaned = value.trim().replace(/[\s\-()]/g, '');
+  if (/^(?:\+91|0)?[6-9]\d{9}$/.test(cleaned)) {
+    return cleaned.slice(-10);
+  }
+  return cleaned;
+}
 
+function hashValue(value) {
+  const secret = env.otpSecret || 'badservice-dev-otp-secret';
   return createHash('sha256')
     .update(`${secret}:${value}`)
     .digest('hex');
-}
-
-function maskPhone(phone) {
-  return `${phone.slice(0, 2)}******${phone.slice(-2)}`;
 }

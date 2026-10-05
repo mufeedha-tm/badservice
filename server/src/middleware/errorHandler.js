@@ -6,23 +6,34 @@ export function errorHandler(error, _request, response, next) {
       success: false,
       error: {
         code: 'FILE_TOO_LARGE',
-        message: 'Uploaded file is too large. Images can be up to 10MB and videos up to 25MB.',
+        message: 'File is too large. Maximum allowed size: 15 MB.',
       },
     });
   }
 
   const statusCode = error.statusCode || error.status || 500;
   const isMalformedJson = error.type === 'entity.parse.failed';
+
+  if (statusCode === 500) {
+    console.error('[API Internal Server Error]:', error);
+  }
+
   const message = isMalformedJson
-    ? 'Malformed JSON request body'
-    : statusCode === 500 ? 'Internal server error' : error.message;
+    ? 'Malformed JSON request body.'
+    : statusCode === 500
+      ? 'Something went wrong. Please try again.'
+      : (error.message || 'Request failed.');
+
+  const code = error.code || (isMalformedJson
+    ? 'INVALID_JSON'
+    : statusCode === 500
+      ? 'INTERNAL_SERVER_ERROR'
+      : 'REQUEST_ERROR');
 
   response.status(statusCode).json({
     success: false,
     error: {
-      code: error.code || (isMalformedJson
-        ? 'INVALID_JSON'
-        : statusCode === 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_ERROR'),
+      code,
       message,
     },
   });
