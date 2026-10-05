@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getTranslation } from '../../utils/FileComplaintTranslations.js';
 
 function ComplaintFileIcon() {
   return (
@@ -10,10 +12,24 @@ function ComplaintFileIcon() {
 }
 
 export default function FileComplaintButton() {
+  const [lang, setLang] = useState(() => localStorage.getItem('badservice_lang') === 'ml' ? 'ml' : 'en');
+
+  useEffect(() => {
+    const updateLanguage = () => {
+      setLang(localStorage.getItem('badservice_lang') === 'ml' ? 'ml' : 'en');
+    };
+    window.addEventListener('badservice-language-change', updateLanguage);
+    window.addEventListener('storage', updateLanguage);
+    return () => {
+      window.removeEventListener('badservice-language-change', updateLanguage);
+      window.removeEventListener('storage', updateLanguage);
+    };
+  }, []);
+
   return (
     <Link className="file-complaint-button" to="/file-complaint">
       <ComplaintFileIcon />
-      <span>File Complaint</span>
+      <span>{getTranslation(lang, 'fileComplaintCta')}</span>
     </Link>
   );
 }

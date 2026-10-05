@@ -20,7 +20,7 @@ const emptyMedia = { productImage: null, billImage: null, productVideo: null };
 
 export default function FileComplaintPage() {
   const { account } = useAccount();
-  const [lang, setLang] = useState(() => localStorage.getItem('badservice_lang') || 'en');
+  const [lang, setLang] = useState(() => localStorage.getItem('badservice_lang') === 'ml' ? 'ml' : 'en');
   const t = (key) => getTranslation(lang, key);
 
   const [step, setStep] = useState(1);
@@ -70,6 +70,7 @@ export default function FileComplaintPage() {
   // Persist language
   useEffect(() => {
     localStorage.setItem('badservice_lang', lang);
+    window.dispatchEvent(new Event('badservice-language-change'));
   }, [lang]);
 
   // If user is already logged in, automatically populate identity details
@@ -140,7 +141,7 @@ export default function FileComplaintPage() {
       if (!form.seller.trim()) nextErrors.seller = t('errSeller');
     } else {
       if (!form.serviceType.trim()) nextErrors.serviceType = t('errServiceType');
-      if (!form.company.trim()) nextErrors.company = 'Service provider is required.';
+      if (!form.company.trim()) nextErrors.company = t('errServiceProvider');
       if (!form.model.trim()) nextErrors.model = t('errServiceDetails');
     }
     if (!form.location.trim()) nextErrors.location = t('errLocation');
@@ -169,7 +170,7 @@ export default function FileComplaintPage() {
   async function handleCompanyRequestSubmit(e) {
     e.preventDefault();
     if (!reqCompanyName.trim()) {
-      setReqError('Company name is required.');
+      setReqError(t('errCompanyNameRequired'));
       return;
     }
     setReqSubmitting(true);
@@ -180,7 +181,7 @@ export default function FileComplaintPage() {
         categoryId: reqCategoryId || 'others',
         description: reqDescription.trim(),
       });
-      setReqSuccess(`Request for "${reqCompanyName.trim()}" submitted! An admin will review and approve it.`);
+      setReqSuccess(`${t('companyRequestSubmittedPrefix')}${reqCompanyName.trim()}${t('companyRequestSubmittedSuffix')}`);
       setForm((prev) => ({ ...prev, company: reqCompanyName.trim() }));
       setTimeout(() => {
         setAddCompanyOpen(false);
@@ -191,6 +192,15 @@ export default function FileComplaintPage() {
     } finally {
       setReqSubmitting(false);
     }
+  }
+
+  function openCompanyRequest(companyName = '') {
+    setReqCompanyName(companyName);
+    setReqCategoryId(categories.find((category) => category.name === form.category)?.id || '');
+    setReqDescription('');
+    setReqError('');
+    setReqSuccess('');
+    setAddCompanyOpen(true);
   }
 
   async function handleSubmit(event) {
@@ -236,15 +246,15 @@ export default function FileComplaintPage() {
         <div className="complaint-form-shell">
           <div className="success-card">
             <p className="success-card__eyebrow">BadService.in</p>
-            <h1>✓ Complaint Submitted Successfully</h1>
-            <p>Your complaint has been received and is now under review with all uploaded evidence.</p>
-            <p className="success-card__id">Complaint ID: <strong>{submitted.id}</strong></p>
+            <h1>✓ {t('complaintSubmitted')}</h1>
+            <p>{t('complaintReceived')}</p>
+            <p className="success-card__id">{t('complaintId')}: <strong>{submitted.id}</strong></p>
             <div className="success-card__actions">
               <Link className="primary-cta" to={`/complaints/${encodeURIComponent(submitted.id)}`}>
-                View Complaint
+                {t('viewComplaint')}
               </Link>
               <Link className="ghost-cta" to="/">
-                Back to Home
+                {t('backHome')}
               </Link>
             </div>
           </div>
@@ -269,7 +279,6 @@ export default function FileComplaintPage() {
               <span>{t('lang')}</span>
               <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label={t('lang')}>
                 <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
                 <option value="ml">മലയാളം</option>
               </select>
             </label>
@@ -310,6 +319,7 @@ export default function FileComplaintPage() {
               {/* Email Address + Send OTP + Enter OTP + Verify */}
               <OtpVerification
                 email={identity.email}
+                phone={identity.phone}
                 onEmailChange={(val) => {
                   setIdentity((prev) => ({ ...prev, email: val }));
                   setOtpResult(null);
@@ -429,8 +439,11 @@ export default function FileComplaintPage() {
                     }}
                     error={errors.company}
                     label={`${t('company')} *`}
-                    placeholder={companiesLoading ? 'Loading companies…' : t('companySearchPlaceholder')}
-                    onAddCompany={() => setAddCompanyOpen(true)}
+                    placeholder={companiesLoading ? t('loadingCompanies') : t('companySearchPlaceholder')}
+                    onAddCompany={openCompanyRequest}
+                    addCompanyLabel={t('addCompany')}
+                    addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
+                    loadingLabel={t('loadingCompanies')}
                     loading={companiesLoading}
                   />
                 ) : (
@@ -450,44 +463,51 @@ export default function FileComplaintPage() {
 
               {form.type === 'Product' ? (
                 <>
-                  <label className="field field--full">
-                    <span>{t('productModel')} *</span>
-                    <input
-                      name="model"
-                      value={form.model}
-                      onChange={handleFieldChange}
-                      placeholder={t('modelPlaceholder')}
-                      className={errors.model ? 'is-invalid' : ''}
-                    />
-                    {errors.model && <small className="field-error">{errors.model}</small>}
-                  </label>
+                  <div className="complaint-form-grid">
+                    <label className="field">
+                      <span>{t('productModel')} *</span>
+                      <input
+                        name="model"
+                        value={form.model}
+                        onChange={handleFieldChange}
+                        placeholder={t('modelPlaceholder')}
+                        className={errors.model ? 'is-invalid' : ''}
+                      />
+                      {errors.model && <small className="field-error">{errors.model}</small>}
+                    </label>
 
-                  <label className="field field--full">
-                    <span>{t('seller')} *</span>
-                    <input
-                      name="seller"
-                      value={form.seller}
-                      onChange={handleFieldChange}
-                      placeholder={t('sellerPlaceholder')}
-                      className={errors.seller ? 'is-invalid' : ''}
-                    />
-                    {errors.seller && <small className="field-error">{errors.seller}</small>}
-                  </label>
+                    <label className="field">
+                      <span>{t('seller')} *</span>
+                      <input
+                        name="seller"
+                        value={form.seller}
+                        onChange={handleFieldChange}
+                        placeholder={t('sellerPlaceholder')}
+                        className={errors.seller ? 'is-invalid' : ''}
+                      />
+                      {errors.seller && <small className="field-error">{errors.seller}</small>}
+                    </label>
+                  </div>
                 </>
               ) : (
                 <>
                   <div className="complaint-form-grid">
-                    <label className="field">
-                      <span>{t('serviceProvider')} *</span>
-                      <input
-                        name="company"
-                        value={form.company}
-                        onChange={handleFieldChange}
-                        placeholder={t('serviceProviderPlaceholder')}
-                        className={errors.company ? 'is-invalid' : ''}
-                      />
-                      {errors.company && <small className="field-error">{errors.company}</small>}
-                    </label>
+                    <CompanySelector
+                      companies={companies}
+                      value={form.company}
+                      onChange={(company) => {
+                        setForm((prev) => ({ ...prev, company }));
+                        setErrors((prev) => ({ ...prev, company: '' }));
+                      }}
+                      error={errors.company}
+                      label={`${t('serviceProvider')} *`}
+                      placeholder={companiesLoading ? t('loadingCompanies') : t('serviceProviderPlaceholder')}
+                      onAddCompany={openCompanyRequest}
+                      addCompanyLabel={t('addCompany')}
+                      addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
+                      loadingLabel={t('loadingCompanies')}
+                      loading={companiesLoading}
+                    />
 
                     <label className="field">
                       <span>{t('serviceDetails')} *</span>
@@ -504,35 +524,37 @@ export default function FileComplaintPage() {
                 </>
               )}
 
-              <label className="field field--full">
-                <span>{t('incidentLocation')} *</span>
-                <input
-                  name="location"
-                  value={form.location}
-                  onChange={handleFieldChange}
-                  placeholder={t('locationPlaceholder')}
-                  className={errors.location ? 'is-invalid' : ''}
-                />
-                {errors.location && <small className="field-error">{errors.location}</small>}
-              </label>
+              <div className="complaint-form-grid">
+                <label className="field">
+                  <span>{t('incidentLocation')} *</span>
+                  <input
+                    name="location"
+                    value={form.location}
+                    onChange={handleFieldChange}
+                    placeholder={t('locationPlaceholder')}
+                    className={errors.location ? 'is-invalid' : ''}
+                  />
+                  {errors.location && <small className="field-error">{errors.location}</small>}
+                </label>
 
-              <label className="field field--full">
-                <span>{t('complaintTitle')} *</span>
-                <input
-                  name="title"
-                  value={form.title}
-                  onChange={handleFieldChange}
-                  placeholder={t('titlePlaceholder')}
-                  className={errors.title ? 'is-invalid' : ''}
-                />
-                {errors.title && <small className="field-error">{errors.title}</small>}
-              </label>
+                <label className="field">
+                  <span>{t('complaintTitle')} *</span>
+                  <input
+                    name="title"
+                    value={form.title}
+                    onChange={handleFieldChange}
+                    placeholder={t('titlePlaceholder')}
+                    className={errors.title ? 'is-invalid' : ''}
+                  />
+                  {errors.title && <small className="field-error">{errors.title}</small>}
+                </label>
+              </div>
 
               <label className="field field--full">
                 <span>{t('fullDetails')} *</span>
                 <textarea
                   name="description"
-                  rows={6}
+                  rows={4}
                   value={form.description}
                   onChange={handleFieldChange}
                   placeholder={t('detailsPlaceholder')}
@@ -641,7 +663,7 @@ export default function FileComplaintPage() {
                   type="button"
                   className="modal-close"
                   onClick={() => setAddCompanyOpen(false)}
-                  aria-label="Close"
+                  aria-label={t('closeDialog')}
                 >
                   ×
                 </button>
@@ -701,7 +723,7 @@ export default function FileComplaintPage() {
                     className="primary-cta"
                     disabled={reqSubmitting}
                   >
-                    {reqSubmitting ? 'Submitting…' : t('submitBrandReq')}
+                    {reqSubmitting ? t('submittingRequest') : t('submitBrandReq')}
                   </button>
                 </div>
               </form>

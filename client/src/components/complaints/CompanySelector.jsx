@@ -1,6 +1,18 @@
 import { useMemo, useState } from 'react';
 
-export default function CompanySelector({ companies, value, onChange, error, label, placeholder, onAddCompany, loading = false }) {
+export default function CompanySelector({
+  companies,
+  value,
+  onChange,
+  error,
+  label,
+  placeholder,
+  onAddCompany,
+  addCompanyLabel = '+ Add Company',
+  addCompanyOptionLabel = (companyName) => `+ Add “${companyName}”`,
+  loadingLabel = 'Loading companies…',
+  loading = false,
+}) {
   const [open, setOpen] = useState(false);
   const matches = useMemo(() => {
     const query = value.trim().toLowerCase();
@@ -22,10 +34,10 @@ export default function CompanySelector({ companies, value, onChange, error, lab
           onChange={(event) => onChange(event.target.value)}
         />
         {value.trim() && !hasExact && onAddCompany && (
-          <button type="button" className="company-selector__add" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>+ Add Company</button>
+          <button type="button" className="company-selector__add" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>{addCompanyLabel}</button>
         )}
       </div>
-      {loading && <small className="company-selector__loading">Loading companies…</small>}
+      {loading && <small className="company-selector__loading">{loadingLabel}</small>}
       {open && !loading && (matches.length > 0 || value.trim()) && (
         <ul className="company-selector__list" role="listbox">
           {matches.map((company) => (
@@ -36,7 +48,7 @@ export default function CompanySelector({ companies, value, onChange, error, lab
             </li>
           ))}
           {value.trim() && !hasExact && onAddCompany && (
-            <li className="company-selector__add-row"><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>+ Add “{value.trim()}”</button></li>
+            <li className="company-selector__add-row"><button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>{addCompanyOptionLabel(value.trim())}</button></li>
           )}
         </ul>
       )}

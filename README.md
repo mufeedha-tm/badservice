@@ -149,7 +149,7 @@ The File Complaint flow is a guided two-step form matching the reference design:
 - **Build Command**: `npm run build`
 - **Publish Directory**: `client/dist`
 - **Environment Variable**: `VITE_API_BASE_URL=https://your-render-service.onrender.com/api`
-- **SPA Routing**: The Vite build automatically bundles `client/public/.htaccess` into `dist/`. Keep `.htaccess` in your Hostinger `public_html` root to ensure client-side React routes reload seamlessly without 404 errors.
+- **SPA routing and fresh deployments**: Upload the complete contents of `client/dist`, including the hidden `.htaccess` file, to Hostinger's `public_html`. The rules provide React route fallbacks and prevent browsers from caching `index.html`, so each visit loads the latest hashed JavaScript and CSS assets. After the first deployment with these rules, purge Hostinger/CDN cache once and hard-refresh the browser.
 
 ---
 
