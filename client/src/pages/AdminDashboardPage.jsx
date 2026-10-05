@@ -57,7 +57,10 @@ export default function AdminDashboardPage() {
       loadStats();
       if (activeTab === 'requests') loadRequests(requestFilter);
       if (activeTab === 'complaints') loadComplaints();
-      if (activeTab === 'companies') loadCompanies();
+      if (activeTab === 'companies') {
+        loadCompanies();
+        loadCategories(false);
+      }
       if (activeTab === 'users') loadUsers();
       if (activeTab === 'categories') loadCategories();
     }
@@ -128,15 +131,15 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function loadCategories() {
-    setLoading(true);
+  async function loadCategories(showLoading = true) {
+    if (showLoading) setLoading(true);
     try {
       const data = await getAdminCategories();
       setCategories(data);
     } catch (err) {
       showMessage(err.response?.data?.error?.message || 'Error loading categories', 'error');
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }
 
