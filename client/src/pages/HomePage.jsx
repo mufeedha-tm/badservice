@@ -48,14 +48,18 @@ export default function HomePage() {
   const [todayComplaintPreviewError, setTodayComplaintPreviewError] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [categoryError, setCategoryError] = useState('');
 
   useEffect(() => {
     let current = true;
-    Promise.all([getCategories(), getComplaintRankings()])
-      .then(([categoryData, rankingData]) => {
-        if (!current) return;
-        setCategories((categoryData || []).filter((item) => !item.parentId));
-        setRankings(rankingData || { companies: [], products: [], categories: [] });
+    getCategories()
+      .then((categoryData) => {
+        if (current) setCategories((categoryData || []).filter((item) => !item.parentId));
+      })
+      .catch((err) => current && setCategoryError(getErrorMessage(err, 'We could not load categories.')));
+    getComplaintRankings()
+      .then((rankingData) => {
+        if (current) setRankings(rankingData || { companies: [], products: [], categories: [] });
       })
       .catch((err) => current && setError(getErrorMessage(err, 'We could not load the latest complaint data.')))
       .finally(() => current && setLoading(false));
@@ -189,6 +193,7 @@ export default function HomePage() {
 
         <section className="home-section">
           <div className="home-section__heading"><div><span className="home-section__eyebrow">04 · Browse by category</span><h2>Check the category that matters to you</h2><p>Start with a product or service area and explore the real complaint record.</p></div><Link to="/complaints">All complaints</Link></div>
+          {categoryError && <div className="notice notice--error" role="alert">{categoryError}</div>}
           <div className="category-modern-grid">
             {categories.slice(0, 8).map((item) => (
               <Link className="category-modern-card" key={item.id || item.name} to={`/categories/${encodeURIComponent(item.slug || item.id || item.name)}`}>

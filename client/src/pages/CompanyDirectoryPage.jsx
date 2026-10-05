@@ -10,19 +10,39 @@ export default function CompanyDirectoryPage() {
   const [result, setResult] = useState({ status: 'loading', companies: [], rankings: { companies: [] } });
   const [search, setSearch] = useState('');
   const [categories, setCategories] = useState([]);
+  const [rankingError, setRankingError] = useState('');
+  const [categoryError, setCategoryError] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [newCompany, setNewCompany] = useState({ name: '', categoryId: '', description: '' });
   const [addState, setAddState] = useState({ loading: false, message: '', error: '' });
 
   useEffect(() => {
     let isCurrent = true;
-    Promise.all([getCompanies(), getComplaintRankings(), getCategories()])
-      .then(([companies, rankings, categoryData]) => {
+    getCompanies()
+      .then((companies) => {
         if (!isCurrent) return;
-        setCategories(Array.isArray(categoryData) ? categoryData.filter((item) => !item.parentId) : []);
-        setResult({ status: companies.length ? 'success' : 'empty', companies, rankings: rankings || { companies: [] } });
+        setResult((current) => ({
+          ...current,
+          status: companies.length ? 'success' : 'empty',
+          companies,
+        }));
       })
-      .catch((error) => isCurrent && setResult({ status: 'error', companies: [], rankings: { companies: [] }, error: getErrorMessage(error, 'Unable to load companies right now.') }));
+      .catch((error) => isCurrent && setResult((current) => ({
+        ...current,
+        status: 'error',
+        error: getErrorMessage(error, 'Unable to load companies right now.'),
+      })));
+    getComplaintRankings()
+      .then((rankings) => isCurrent && setResult((current) => ({
+        ...current,
+        rankings: rankings || { companies: [] },
+      })))
+      .catch((error) => isCurrent && setRankingError(getErrorMessage(error, 'Unable to load complaint counts.')));
+    getCategories()
+      .then((categoryData) => isCurrent && setCategories(
+        Array.isArray(categoryData) ? categoryData.filter((item) => !item.parentId) : [],
+      ))
+      .catch((error) => isCurrent && setCategoryError(getErrorMessage(error, 'Unable to load company categories.')));
     return () => { isCurrent = false; };
   }, []);
 
@@ -61,6 +81,8 @@ export default function CompanyDirectoryPage() {
 
         {result.status === 'loading' && <p role="status">Loading companies...</p>}
         {result.status === 'error' && <p className="notice notice--error" role="alert">{result.error}</p>}
+        {rankingError && <p className="notice notice--error" role="alert">{rankingError}</p>}
+        {categoryError && <p className="notice notice--error" role="alert">{categoryError}</p>}
         {result.status === 'empty' && <p role="status">No companies are listed yet.</p>}
         {result.status === 'success' && filteredCompanies.length === 0 && <div className="company-directory-empty"><h2>No company matches “{search}”.</h2><p>You can still file a complaint and enter the company name while reporting the issue.</p><Link className="home-primary" to="/file-complaint">File a Complaint</Link></div>}
 

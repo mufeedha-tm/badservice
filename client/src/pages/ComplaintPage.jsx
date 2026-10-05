@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ComplaintGrid from '../components/complaints/ComplaintGrid.jsx';
+import ProductRankingCarousel from '../components/complaints/ProductRankingCarousel.jsx';
 import ComplaintToolbar from '../components/complaints/ComplaintToolbar.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -40,10 +41,10 @@ export default function ComplaintPage({ search, title = 'All Complaints' }) {
 
   return (
     <div className={isAllComplaints ? 'home-modern' : undefined}>
+      {isAllComplaints && <ProductRankingCarousel />}
       {isAllComplaints && (
         <section className="home-consumer-hero">
           <div className="home-consumer-hero__copy">
-            <span className="home-section__eyebrow">01 · Consumer watch</span>
             <h1>Know the problem<br />before you buy.</h1>
             <p>BadService.in turns real customer complaints into a simple consumer signal — so you can check brands, products and services before spending your money.</p>
             <div className="home-hero-actions">

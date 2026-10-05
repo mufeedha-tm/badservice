@@ -277,7 +277,7 @@ export async function search({
 }
 
 export async function findRankings() {
-  const [companyRows] = await pool.execute(`
+  const companyRowsQuery = pool.execute(`
     SELECT
       co.id,
       co.name,
@@ -294,7 +294,7 @@ export async function findRankings() {
     LIMIT 12
   `);
 
-  const [productRows] = await pool.execute(`
+  const productRowsQuery = pool.execute(`
     SELECT
       COALESCE(NULLIF(c.product_model, ''), co.name) AS productName,
       co.name AS companyName,
@@ -310,7 +310,7 @@ export async function findRankings() {
     LIMIT 12
   `);
 
-  const [categoryRows] = await pool.execute(`
+  const categoryRowsQuery = pool.execute(`
     SELECT
       COALESCE(parent.id, ca.id) AS id,
       COALESCE(parent.name, ca.name) AS name,
@@ -323,32 +323,32 @@ export async function findRankings() {
     ORDER BY complaintCount DESC, name ASC
   `);
 
-  const companies = [];
-  for (const row of companyRows) {
-    const latest = await findLatestForCompany(row.id);
-    companies.push({
-      id: row.id,
-      name: row.name,
-      slug: row.slug,
-      category: row.categoryName || '',
-      categorySlug: row.categorySlug || '',
-      count: Number(row.complaintCount) || 0,
-      latestComplaint: latest,
-    });
-  }
+  const [[companyRows], [productRows], [categoryRows]] = await Promise.all([
+    companyRowsQuery,
+    productRowsQuery,
+    categoryRowsQuery,
+  ]);
 
-  const products = [];
-  for (const row of productRows) {
+  const companies = companyRows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    slug: row.slug,
+    category: row.categoryName || '',
+    categorySlug: row.categorySlug || '',
+    count: Number(row.complaintCount) || 0,
+  }));
+
+  const products = await Promise.all(productRows.map(async (row) => {
     const latest = await findLatestForProduct(row.companyId, row.productName);
-    products.push({
+    return {
       name: row.productName,
       company: row.companyName,
       companyId: row.companyId,
       category: row.categoryName || '',
       count: Number(row.complaintCount) || 0,
       latestComplaint: latest,
-    });
-  }
+    };
+  }));
 
   return {
     companies,
@@ -360,16 +360,6 @@ export async function findRankings() {
       count: Number(row.complaintCount) || 0,
     })),
   };
-}
-
-async function findLatestForCompany(companyId) {
-  const [rows] = await pool.execute(`
-    ${baseQuery}
-    WHERE c.company_id = ?
-    ORDER BY c.created_at DESC
-    LIMIT 1
-  `, [companyId]);
-  return rows[0] ? mapComplaint(rows[0]) : null;
 }
 
 async function findLatestForProduct(companyId, productName) {
