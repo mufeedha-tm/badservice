@@ -63,6 +63,11 @@ function mapComplaint(row) {
     deleteRequested: Boolean(row.deleteRequested),
     deleteReason: row.deleteReason ?? null,
     deleteRequestedAt: row.deleteRequestedAt ? new Date(row.deleteRequestedAt).toISOString() : null,
+    isDeleted: Boolean(row.isDeleted),
+    deletedAt: row.deletedAt ? new Date(row.deletedAt).toISOString() : null,
+    deletedBy: row.deletedBy ?? null,
+    deleteAdminNote: row.deleteAdminNote ?? null,
+    statusNote: row.statusNote ?? '',
   };
 }
 
@@ -128,6 +133,11 @@ const baseQuery = `
     c.delete_requested AS deleteRequested,
     c.delete_reason AS deleteReason,
     c.delete_requested_at AS deleteRequestedAt,
+    c.is_deleted AS isDeleted,
+    c.deleted_at AS deletedAt,
+    c.deleted_by AS deletedBy,
+    c.delete_admin_note AS deleteAdminNote,
+    c.status_note AS statusNote,
     c.company_id AS companyId,
     c.category_id AS categoryId,
     co.name AS companyName,
@@ -177,6 +187,7 @@ const searchableComplaintSql = `
 export async function findAll() {
   const [rows] = await pool.execute(`
     ${baseQuery}
+    WHERE c.is_deleted = 0
     ORDER BY c.created_at DESC
   `);
 
@@ -187,6 +198,7 @@ export async function findPublicAll() {
   const [rows] = await pool.execute(`
     ${baseQuery}
     WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
     ORDER BY c.created_at DESC
   `);
   return rows.map(mapComplaint);
@@ -205,7 +217,9 @@ export async function findById(id) {
 export async function findPublicById(id) {
   const [rows] = await pool.execute(`
     ${baseQuery}
-    WHERE c.id = ? AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.id = ?
+      AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
     LIMIT 1
   `, [id]);
   return rows[0] ? mapComplaint(rows[0]) : null;
@@ -215,6 +229,7 @@ export async function findByUserId(userId) {
   const [rows] = await pool.execute(`
     ${baseQuery}
     WHERE c.user_id = ?
+      AND c.is_deleted = 0
     ORDER BY c.created_at DESC
   `, [userId]);
 
@@ -234,6 +249,8 @@ export async function search({
   limit = 100,
   publishedOnly = false,
   deleteRequested = false,
+  onlyDeleted = false,
+  includeDeleted = false,
 } = {}) {
   const normalizedQuery = q.trim().toLocaleLowerCase();
   const normalizedCategory = category.trim().toLocaleLowerCase();
@@ -242,6 +259,12 @@ export async function search({
   const normalizedStatus = status.trim().toUpperCase();
   const conditions = [];
   const parameters = [];
+
+  if (onlyDeleted) {
+    conditions.push('c.is_deleted = 1');
+  } else if (!includeDeleted) {
+    conditions.push('c.is_deleted = 0');
+  }
 
   if (deleteRequested) {
     conditions.push('c.delete_requested = 1');
@@ -330,6 +353,7 @@ export async function findRankings() {
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
     WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
     GROUP BY co.id, co.name, co.slug, ca.name, ca.slug
     ORDER BY complaintCount DESC, latestAt DESC
     LIMIT 12
@@ -347,6 +371,7 @@ export async function findRankings() {
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
     WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
     GROUP BY COALESCE(NULLIF(c.product_model, ''), co.name), co.name, co.id, ca.name
     ORDER BY complaintCount DESC, latestAt DESC
     LIMIT 12
@@ -362,15 +387,25 @@ export async function findRankings() {
     INNER JOIN categories ca ON ca.id = c.category_id
     LEFT JOIN categories parent ON parent.id = ca.parent_id
     WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
     GROUP BY COALESCE(parent.id, ca.id), COALESCE(parent.name, ca.name), COALESCE(parent.slug, ca.slug)
     ORDER BY complaintCount DESC, name ASC
   `);
 
-  const [[companyRows], [productRows], [categoryRows]] = await Promise.all([
-    companyRowsQuery,
-    productRowsQuery,
-    categoryRowsQuery,
+  const recentComplaintsQuery = pool.execute(`
+    ${baseQuery}
+    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.is_deleted = 0
+    ORDER BY c.created_at DESC
+    LIMIT 50
+  `);
+
+  const [[[companyRows], [productRows], [categoryRows]], [recentComplaintRows]] = await Promise.all([
+    Promise.all([companyRowsQuery, productRowsQuery, categoryRowsQuery]),
+    recentComplaintsQuery,
   ]);
+
+  const recentMapped = recentComplaintRows.map(mapComplaint);
 
   const companies = companyRows.map((row) => ({
     id: row.id,
@@ -381,17 +416,27 @@ export async function findRankings() {
     count: Number(row.complaintCount) || 0,
   }));
 
-  const products = await Promise.all(productRows.map(async (row) => {
-    const latest = await findLatestForProduct(row.companyId, row.productName);
-    return {
-      name: row.productName,
-      company: row.companyName,
-      companyId: row.companyId,
-      category: row.categoryName || '',
-      count: Number(row.complaintCount) || 0,
-      latestComplaint: latest,
-    };
-  }));
+  const products = await Promise.all(
+    productRows.map(async (row) => {
+      // Find in recent batch first, or fallback to single lookup
+      let latest = recentMapped.find(
+        (c) =>
+          c.companyId === row.companyId &&
+          (c.model === row.productName || c.company === row.productName)
+      );
+      if (!latest) {
+        latest = await findLatestForProduct(row.companyId, row.productName);
+      }
+      return {
+        name: row.productName,
+        company: row.companyName,
+        companyId: row.companyId,
+        category: row.categoryName || '',
+        count: Number(row.complaintCount) || 0,
+        latestComplaint: latest,
+      };
+    })
+  );
 
   return {
     companies,
@@ -565,22 +610,31 @@ export async function updateStatus(id, status) {
   return findById(id);
 }
 
-export async function remove(id) {
+export async function remove(id, adminId = null, reason = '') {
   const [result] = await pool.execute(
-    `DELETE FROM complaints WHERE id = ?`,
+    `UPDATE complaints SET is_deleted = 1, deleted_at = UTC_TIMESTAMP(), deleted_by = ?, delete_admin_note = ? WHERE id = ?`,
+    [adminId, reason || null, id]
+  );
+  return result.affectedRows > 0;
+}
+
+export async function restore(id) {
+  const [result] = await pool.execute(
+    `UPDATE complaints SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL, delete_admin_note = NULL, delete_requested = 0, delete_reason = NULL, delete_requested_at = NULL WHERE id = ?`,
     [id]
   );
   return result.affectedRows > 0;
 }
 
 export async function getStats() {
-  const [[complaintsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints`);
-  const [[pendingComplaints]] = await pool.execute(`SELECT COUNT(*) AS pending FROM complaints WHERE status = 'PENDING'`);
-  const [[resolvedComplaints]] = await pool.execute(`SELECT COUNT(*) AS resolved FROM complaints WHERE status = 'RESOLVED'`);
+  const [[complaintsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 0`);
+  const [[pendingComplaints]] = await pool.execute(`SELECT COUNT(*) AS pending FROM complaints WHERE status = 'PENDING' AND is_deleted = 0`);
+  const [[resolvedComplaints]] = await pool.execute(`SELECT COUNT(*) AS resolved FROM complaints WHERE status = 'RESOLVED' AND is_deleted = 0`);
   const [[companiesCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM companies WHERE status = 'ACTIVE'`);
   const [[usersCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM users`);
   const [[pendingRequestsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM company_requests WHERE status = 'PENDING'`);
-  const [[pendingDeleteCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE delete_requested = 1`);
+  const [[pendingDeleteCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE delete_requested = 1 AND is_deleted = 0`);
+  const [[deletedCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 1`);
 
   return {
     totalComplaints: complaintsCount.total,
@@ -590,5 +644,6 @@ export async function getStats() {
     totalUsers: usersCount.total,
     pendingCompanyRequests: pendingRequestsCount.total,
     pendingDeleteRequests: pendingDeleteCount.total,
+    deletedComplaints: deletedCount.total,
   };
 }

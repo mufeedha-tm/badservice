@@ -16,6 +16,7 @@ import {
   postApproveCompanyRequest,
   postRejectCompanyRequest,
   postRejectDeleteRequest,
+  postRestoreComplaint,
 } from '../controllers/adminController.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -37,6 +38,7 @@ adminRouter.get('/admin/complaints', getAdminComplaints);
 adminRouter.get('/admin/complaints/:id/bill', getAdminComplaintBill);
 adminRouter.patch('/admin/complaints/:id/status', patchComplaintStatus);
 adminRouter.post('/admin/complaints/:id/reject-delete', postRejectDeleteRequest);
+adminRouter.post('/admin/complaints/:id/restore', postRestoreComplaint);
 adminRouter.delete('/admin/complaints/:id', deleteComplaint);
 
 // Companies

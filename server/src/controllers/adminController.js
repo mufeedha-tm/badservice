@@ -40,7 +40,7 @@ export async function postRejectCompanyRequest(request, response) {
 }
 
 export async function getAdminComplaints(request, response) {
-  const { q, category, subcategory, company, status, sort, deleteRequested } = request.query;
+  const { q, category, subcategory, company, status, sort, deleteRequested, onlyDeleted, includeDeleted } = request.query;
   const complaints = await complaintRepository.search({
     q: q || '',
     category: category || '',
@@ -49,6 +49,8 @@ export async function getAdminComplaints(request, response) {
     status: status || '',
     sort: sort || '',
     deleteRequested: deleteRequested === 'true' || deleteRequested === '1',
+    onlyDeleted: onlyDeleted === 'true' || onlyDeleted === '1',
+    includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
   });
   response.json({ success: true, data: complaints.map(toAdminComplaint) });
 }
@@ -71,7 +73,7 @@ export async function getAdminComplaintBill(request, response, next) {
   if (!source) throw new ApiError(404, 'Bill image not found.', 'BILL_IMAGE_NOT_FOUND');
 
   response.set({
-    'Cache-Control': 'private, no-store',
+    'Cache-Control': 'private, max-age=86400, stale-while-revalidate=3600',
     'X-Content-Type-Options': 'nosniff',
     'Content-Disposition': `inline; filename="bill-image.${getBillExtension(complaint.billImageName)}"`,
     'Content-Type': getBillContentType(complaint.billImageName),
@@ -84,30 +86,29 @@ export async function getAdminComplaintBill(request, response, next) {
     return;
   }
 
+  // Fast direct redirect for remote authenticated URLs if accessible, or stream efficiently
+  if (source.url.startsWith('https://res.cloudinary.com')) {
+    return response.redirect(302, source.url);
+  }
+
   const imageResponse = await fetch(source.url);
   if (!imageResponse.ok || !imageResponse.body) {
     throw new ApiError(502, 'The bill image could not be retrieved from storage.', 'BILL_IMAGE_STORAGE_ERROR');
   }
 
-  const reader = imageResponse.body.getReader();
-  const chunks = [];
-  let size = 0;
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > BILL_IMAGE_MAX_BYTES) {
-      await reader.cancel();
-      throw new ApiError(502, 'The stored bill image exceeds the supported size.', 'BILL_IMAGE_TOO_LARGE');
-    }
-    chunks.push(Buffer.from(value));
-  }
-  response.end(Buffer.concat(chunks, size));
+  const { Readable } = await import('node:stream');
+  Readable.fromWeb(imageResponse.body).pipe(response);
 }
 
 export async function deleteComplaint(request, response) {
-  await complaintRepository.remove(request.params.id);
-  response.json({ success: true, message: 'Complaint deleted.' });
+  const { reason } = request.body || {};
+  await complaintRepository.remove(request.params.id, request.user?.id || null, reason || 'Deleted by administrator');
+  response.json({ success: true, message: 'Complaint removed and safely preserved in database.' });
+}
+
+export async function postRestoreComplaint(request, response) {
+  await complaintRepository.restore(request.params.id);
+  response.json({ success: true, message: 'Complaint restored to active status.' });
 }
 
 export async function getAdminCompanies(_request, response) {

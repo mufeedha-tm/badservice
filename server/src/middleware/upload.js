@@ -62,6 +62,15 @@ function makeComplaintFileFilter() {
       return cb(null, true);
     }
 
+    if (file.fieldname === 'media' || file.fieldname === 'file') {
+      const isImg = imageMimeTypes.has(file.mimetype) || allowedImageExts.has(ext);
+      const isVid = videoMimeTypes.has(file.mimetype) || allowedVideoExts.has(ext);
+      if (isImg || isVid) {
+        return cb(null, true);
+      }
+      return cb(new ApiError(400, 'File must be an image (JPG, PNG, WEBP) or video (MP4, MOV, WEBM).', 'INVALID_FILE_TYPE'));
+    }
+
     // Default reject
     cb(new ApiError(400, `Unexpected upload field: ${file.fieldname}`, 'INVALID_UPLOAD_FIELD'));
   };
@@ -69,8 +78,9 @@ function makeComplaintFileFilter() {
 
 export const uploadComplaintMedia = multer({
   storage: multer.diskStorage({
-    destination(_req, file, cb) {
-      cb(null, getComplaintUploadFolder(file.fieldname));
+    destination(req, file, cb) {
+      const type = req.body?.mediaType || req.query?.mediaType || file.fieldname;
+      cb(null, getComplaintUploadFolder(type));
     },
     filename(_req, file, cb) {
       const ext = path.extname(file.originalname).toLowerCase();

@@ -13,26 +13,52 @@ import {
   getCompanies,
   getErrorMessage,
   submitCompanyRequest,
+  uploadDraftMedia,
 } from '../services/api.js';
 import { IMAGE_ACCEPT, VIDEO_ACCEPT } from '../utils/complaintMedia.js';
 import { getTranslation } from '../utils/FileComplaintTranslations.js';
 
 const emptyMedia = { productImage: null, billImage: null, productVideo: null };
 
+export const PRODUCT_CATEGORIES = [
+  'Mobiles & Smartphones',
+  'Computers & Laptops',
+  'TV & Electronics',
+  'Fashion & Apparel',
+  'Vehicles & Automotive',
+  'Home & Kitchen Appliances',
+  'Audio & Accessories',
+  'Other Products',
+];
+
+export const SERVICE_CATEGORIES = [
+  'Hospital & Healthcare',
+  'Hotel, Resort & Stay',
+  'Flights & Trains',
+  'Restaurants & Food',
+  'Banking & Finance',
+  'Telecom & Internet',
+  'Vehicle Service & Repair',
+  'Appliance Repair & Service',
+  'Courier & Delivery',
+  'Education & Coaching',
+  'Other Professional Services',
+];
+
 export const SERVICE_TYPE_OPTIONS = [
   { value: 'Hospital', label: 'Hospital / Clinic / Medical', icon: '🏥', category: 'Hospital & Healthcare' },
-  { value: 'Hotel', label: 'Hotel / Resort / Stay', icon: '🏨', category: 'Hotel & Travel' },
+  { value: 'Hotel', label: 'Hotel / Resort / Stay', icon: '🏨', category: 'Hotel, Resort & Stay' },
   { value: 'Flight', label: 'Flight / Airline', icon: '✈️', category: 'Flights & Trains' },
   { value: 'Train', label: 'Train / Railway', icon: '🚆', category: 'Flights & Trains' },
   { value: 'Restaurant', label: 'Restaurant / Dining', icon: '🍽️', category: 'Restaurants & Food' },
-  { value: 'Food Delivery', label: 'Food Delivery', icon: '🛵', category: 'Restaurants & Food' },
-  { value: 'Vehicle Service', label: 'Vehicle Service / Garage / Repair', icon: '🚗', category: 'Vehicles & Automotive' },
-  { value: 'Bank', label: 'Bank / Loan / Finance', icon: '🏦', category: 'Banking' },
-  { value: 'Telecom', label: 'Telecom / Mobile Network / ISP', icon: '📞', category: 'Telecom' },
-  { value: 'Appliance Repair', label: 'Appliance Repair / Service Center', icon: '📺', category: 'TV & Electronics' },
-  { value: 'Courier / Delivery', label: 'Courier / Parcel Delivery', icon: '📦', category: 'Hotel & Travel' },
-  { value: 'Education', label: 'Education / Coaching / College', icon: '🎓', category: 'Hospital & Healthcare' },
-  { value: 'Other Services', label: 'Other Professional Services', icon: '🛠️', category: 'TV & Electronics' },
+  { value: 'Food Delivery', label: 'Food Delivery (Swiggy, Zomato, etc.)', icon: '🛵', category: 'Restaurants & Food' },
+  { value: 'Vehicle Service', label: 'Vehicle Service / Garage / Repair', icon: '🚗', category: 'Vehicle Service & Repair' },
+  { value: 'Bank', label: 'Bank / Loan / Finance / UPI', icon: '🏦', category: 'Banking & Finance' },
+  { value: 'Telecom', label: 'Telecom / Mobile Network / ISP', icon: '📞', category: 'Telecom & Internet' },
+  { value: 'Appliance Repair', label: 'Appliance Repair / Service Center', icon: '📺', category: 'Appliance Repair & Service' },
+  { value: 'Courier / Delivery', label: 'Courier / Parcel Delivery', icon: '📦', category: 'Courier & Delivery' },
+  { value: 'Education', label: 'Education / Coaching / College', icon: '🎓', category: 'Education & Coaching' },
+  { value: 'Other Services', label: 'Other Professional Services', icon: '🛠️', category: 'Other Professional Services' },
 ];
 
 const USER_IDENTITY_KEY = 'badservice_user_identity';
@@ -151,6 +177,68 @@ export default function FileComplaintPage() {
 
   const [mediaFiles, setMediaFiles] = useState(emptyMedia);
 
+  // Autosave and Loading % State (Points 4 & 5)
+  const [uploadProgress, setUploadProgress] = useState({
+    productImage: 0,
+    billImage: 0,
+    productVideo: 0,
+  });
+  const [uploadStatus, setUploadStatus] = useState({
+    productImage: 'idle',
+    billImage: 'idle',
+    productVideo: 'idle',
+  });
+  const [uploadedMedia, setUploadedMedia] = useState(() => {
+    try {
+      const saved = localStorage.getItem('badservice_complaint_uploaded_media');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  function handleMediaSelect(kind, file, validationError = '') {
+    if (validationError) {
+      setErrors((prev) => ({ ...prev, [kind]: validationError }));
+      return;
+    }
+    setErrors((prev) => ({ ...prev, [kind]: '' }));
+    setMediaFiles((prev) => ({ ...prev, [kind]: file }));
+
+    if (!file) {
+      setUploadedMedia((prev) => {
+        const next = { ...prev };
+        delete next[kind];
+        try { localStorage.setItem('badservice_complaint_uploaded_media', JSON.stringify(next)); } catch {}
+        return next;
+      });
+      setUploadStatus((prev) => ({ ...prev, [kind]: 'idle' }));
+      setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+      return;
+    }
+
+    // Immediate background autosave with live percentage
+    setUploadStatus((prev) => ({ ...prev, [kind]: 'uploading' }));
+    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+
+    uploadDraftMedia(file, kind, (percent) => {
+      setUploadProgress((prev) => ({ ...prev, [kind]: percent }));
+    })
+      .then((data) => {
+        setUploadedMedia((prev) => {
+          const next = { ...prev, [kind]: data };
+          try { localStorage.setItem('badservice_complaint_uploaded_media', JSON.stringify(next)); } catch {}
+          return next;
+        });
+        setUploadStatus((prev) => ({ ...prev, [kind]: 'done' }));
+        setUploadProgress((prev) => ({ ...prev, [kind]: 100 }));
+      })
+      .catch((err) => {
+        console.warn('Media autosave error:', err);
+        setUploadStatus((prev) => ({ ...prev, [kind]: 'error' }));
+      });
+  }
+
   // Company request modal / inline state
   const [addCompanyOpen, setAddCompanyOpen] = useState(false);
   const [reqCompanyName, setReqCompanyName] = useState('');
@@ -231,10 +319,7 @@ export default function FileComplaintPage() {
     setForm((prev) => {
       let nextCategory = prev.category;
       if (match?.category) {
-        const found = categories.find(
-          (c) => c.name.toLowerCase() === match.category.toLowerCase()
-        );
-        nextCategory = found ? found.name : match.category;
+        nextCategory = match.category;
       }
       return { ...prev, serviceType: nextServiceType, category: nextCategory };
     });
@@ -296,10 +381,10 @@ export default function FileComplaintPage() {
     if (!form.description.trim()) nextErrors.description = t('errDescReq');
     else if (form.description.trim().length < 20) nextErrors.description = t('errDescLen');
 
-    // All 3 evidence files are strictly mandatory
-    if (!mediaFiles.productImage) nextErrors.productImage = t('errProductImage');
-    if (!mediaFiles.billImage) nextErrors.billImage = t('errBillImage');
-    if (!mediaFiles.productVideo) nextErrors.productVideo = t('errProductVideo');
+    // All 3 evidence files are strictly mandatory (either File object or autosaved media)
+    if (!mediaFiles.productImage && !uploadedMedia.productImage) nextErrors.productImage = t('errProductImage');
+    if (!mediaFiles.billImage && !uploadedMedia.billImage) nextErrors.billImage = t('errBillImage');
+    if (!mediaFiles.productVideo && !uploadedMedia.productVideo) nextErrors.productVideo = t('errProductVideo');
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -355,36 +440,96 @@ export default function FileComplaintPage() {
   async function handleSubmit(event) {
     event.preventDefault();
     if (!validateStep2() || isSubmitting) return;
+
+    // Check if any file is still actively uploading
+    const isUploading = Object.values(uploadStatus).some((s) => s === 'uploading');
+    if (isUploading) {
+      setSubmitError('Please wait a moment while evidence files finish autosaving to the server…');
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError('');
 
     try {
-      const formData = new FormData();
-      formData.append('fullName', identity.fullName.trim());
-      formData.append('email', identity.email.trim());
-      formData.append('phone', identity.phone.trim());
-      formData.append('city', identity.city.trim());
-      formData.append('address', identity.address.trim());
-      formData.append('verificationToken', otpResult.verificationToken);
-      formData.append('verificationMethod', 'phone');
-      formData.append('type', form.type);
-      formData.append('category', form.category.trim());
-      formData.append('company', form.company.trim());
-      formData.append('serviceType', form.serviceType.trim());
-      formData.append('model', form.model.trim());
-      formData.append('seller', (form.type === 'Service' ? form.company : form.seller).trim());
-      formData.append('location', form.location.trim());
-      formData.append('title', form.title.trim());
-      formData.append('description', form.description.trim());
-      formData.append('productImage', mediaFiles.productImage);
-      formData.append('billImage', mediaFiles.billImage);
-      formData.append('productVideo', mediaFiles.productVideo);
+      let complaint;
+      // If all 3 media files are already autosaved on server, submit instantaneously via fast JSON!
+      if (uploadedMedia.productImage?.url && uploadedMedia.billImage?.url && uploadedMedia.productVideo?.url) {
+        const payload = {
+          fullName: identity.fullName.trim(),
+          email: identity.email.trim(),
+          phone: identity.phone.trim(),
+          city: identity.city.trim(),
+          address: identity.address.trim(),
+          verificationToken: otpResult.verificationToken,
+          verificationMethod: 'phone',
+          type: form.type,
+          category: form.category.trim(),
+          company: form.company.trim(),
+          serviceType: form.serviceType.trim(),
+          model: form.model.trim(),
+          seller: (form.type === 'Service' ? form.company : form.seller).trim(),
+          location: form.location.trim(),
+          title: form.title.trim(),
+          description: form.description.trim(),
+          productImageUrl: uploadedMedia.productImage.url,
+          productImageName: uploadedMedia.productImage.name,
+          billImageUrl: uploadedMedia.billImage.url,
+          billImageName: uploadedMedia.billImage.name,
+          productVideoUrl: uploadedMedia.productVideo.url,
+          productVideoName: uploadedMedia.productVideo.name,
+        };
+        complaint = await createComplaint(payload);
+      } else {
+        // Fallback to multipart FormData
+        const formData = new FormData();
+        formData.append('fullName', identity.fullName.trim());
+        formData.append('email', identity.email.trim());
+        formData.append('phone', identity.phone.trim());
+        formData.append('city', identity.city.trim());
+        formData.append('address', identity.address.trim());
+        formData.append('verificationToken', otpResult.verificationToken);
+        formData.append('verificationMethod', 'phone');
+        formData.append('type', form.type);
+        formData.append('category', form.category.trim());
+        formData.append('company', form.company.trim());
+        formData.append('serviceType', form.serviceType.trim());
+        formData.append('model', form.model.trim());
+        formData.append('seller', (form.type === 'Service' ? form.company : form.seller).trim());
+        formData.append('location', form.location.trim());
+        formData.append('title', form.title.trim());
+        formData.append('description', form.description.trim());
 
-      const complaint = await createComplaint(formData);
+        if (uploadedMedia.productImage?.url) {
+          formData.append('productImageUrl', uploadedMedia.productImage.url);
+          formData.append('productImageName', uploadedMedia.productImage.name);
+        } else if (mediaFiles.productImage) {
+          formData.append('productImage', mediaFiles.productImage);
+        }
+
+        if (uploadedMedia.billImage?.url) {
+          formData.append('billImageUrl', uploadedMedia.billImage.url);
+          formData.append('billImageName', uploadedMedia.billImage.name);
+        } else if (mediaFiles.billImage) {
+          formData.append('billImage', mediaFiles.billImage);
+        }
+
+        if (uploadedMedia.productVideo?.url) {
+          formData.append('productVideoUrl', uploadedMedia.productVideo.url);
+          formData.append('productVideoName', uploadedMedia.productVideo.name);
+        } else if (mediaFiles.productVideo) {
+          formData.append('productVideo', mediaFiles.productVideo);
+        }
+
+        complaint = await createComplaint(formData);
+      }
+
       try {
         localStorage.removeItem(COMPLAINT_DRAFT_KEY);
         localStorage.removeItem(COMPLAINT_STEP_KEY);
+        localStorage.removeItem('badservice_complaint_uploaded_media');
       } catch {}
+
       setStep(1);
       setSubmitted(complaint);
       window.scrollTo({ top: 0, behavior: 'instant' });
@@ -597,9 +742,9 @@ export default function FileComplaintPage() {
                         className={errors.category ? 'is-invalid' : ''}
                       >
                         <option value="">{t('selectCategory')}</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id || cat.name} value={cat.name}>
-                            {cat.name}
+                        {PRODUCT_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
                           </option>
                         ))}
                       </select>
@@ -701,22 +846,11 @@ export default function FileComplaintPage() {
                         className={errors.serviceType ? 'is-invalid' : ''}
                       >
                         <option value="">{t('selectServiceType')}</option>
-                        {form.category && SERVICE_TYPE_OPTIONS.some((opt) => opt.category.toLowerCase() === form.category.toLowerCase()) && (
-                          <optgroup label={`Recommended for ${form.category}`}>
-                            {SERVICE_TYPE_OPTIONS.filter((opt) => opt.category.toLowerCase() === form.category.toLowerCase()).map((opt) => (
-                              <option key={opt.value} value={opt.value}>
-                                {opt.icon} {opt.label}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label={form.category ? 'Other Service Types' : 'All Service Types'}>
-                          {SERVICE_TYPE_OPTIONS.filter((opt) => !form.category || opt.category.toLowerCase() !== form.category.toLowerCase()).map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.icon} {opt.label}
-                            </option>
-                          ))}
-                        </optgroup>
+                        {SERVICE_TYPE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.icon} {opt.label}
+                          </option>
+                        ))}
                       </select>
                       {errors.serviceType && <small className="field-error">{errors.serviceType}</small>}
                     </label>
@@ -730,9 +864,9 @@ export default function FileComplaintPage() {
                         className={errors.category ? 'is-invalid' : ''}
                       >
                         <option value="">{t('selectCategory')}</option>
-                        {categories.map((cat) => (
-                          <option key={cat.id || cat.name} value={cat.name}>
-                            {cat.name}
+                        {SERVICE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
                           </option>
                         ))}
                       </select>
@@ -812,11 +946,11 @@ export default function FileComplaintPage() {
                 </>
               )}
 
-              {/* MANDATORY EVIDENCE SECTION */}
+              {/* MANDATORY EVIDENCE SECTION WITH AUTOSAVE & PROGRESS % */}
               <div className="evidence-section">
                 <div className="evidence-section__header">
                   <h3>{t('requiredEvidence')}</h3>
-                  <p>{t('evidenceNotice')}</p>
+                  <p>{t('evidenceNotice')} — <strong>⚡ Files autosave instantly as you select them for ultra-fast complaint submission!</strong></p>
                 </div>
 
                 <div className="evidence-upload-grid">
@@ -830,11 +964,11 @@ export default function FileComplaintPage() {
                     kind="image"
                     file={mediaFiles.productImage}
                     error={errors.productImage}
-                    onChange={(file, err) => {
-                      setMediaFiles((prev) => ({ ...prev, productImage: file }));
-                      setErrors((prev) => ({ ...prev, productImage: err || '' }));
-                    }}
-                    onRemove={() => setMediaFiles((prev) => ({ ...prev, productImage: null }))}
+                    uploadProgress={uploadProgress.productImage}
+                    uploadStatus={uploadStatus.productImage}
+                    isAutosaved={Boolean(uploadedMedia.productImage)}
+                    onChange={(file, err) => handleMediaSelect('productImage', file, err)}
+                    onRemove={() => handleMediaSelect('productImage', null)}
                   />
 
                   {/* 2. Bill / Purchase Proof */}
@@ -847,11 +981,11 @@ export default function FileComplaintPage() {
                     kind="image"
                     file={mediaFiles.billImage}
                     error={errors.billImage}
-                    onChange={(file, err) => {
-                      setMediaFiles((prev) => ({ ...prev, billImage: file }));
-                      setErrors((prev) => ({ ...prev, billImage: err || '' }));
-                    }}
-                    onRemove={() => setMediaFiles((prev) => ({ ...prev, billImage: null }))}
+                    uploadProgress={uploadProgress.billImage}
+                    uploadStatus={uploadStatus.billImage}
+                    isAutosaved={Boolean(uploadedMedia.billImage)}
+                    onChange={(file, err) => handleMediaSelect('billImage', file, err)}
+                    onRemove={() => handleMediaSelect('billImage', null)}
                   />
 
                   {/* 3. Product / Service Video */}
@@ -864,11 +998,11 @@ export default function FileComplaintPage() {
                     kind="video"
                     file={mediaFiles.productVideo}
                     error={errors.productVideo}
-                    onChange={(file, err) => {
-                      setMediaFiles((prev) => ({ ...prev, productVideo: file }));
-                      setErrors((prev) => ({ ...prev, productVideo: err || '' }));
-                    }}
-                    onRemove={() => setMediaFiles((prev) => ({ ...prev, productVideo: null }))}
+                    uploadProgress={uploadProgress.productVideo}
+                    uploadStatus={uploadStatus.productVideo}
+                    isAutosaved={Boolean(uploadedMedia.productVideo)}
+                    onChange={(file, err) => handleMediaSelect('productVideo', file, err)}
+                    onRemove={() => handleMediaSelect('productVideo', null)}
                   />
                 </div>
               </div>

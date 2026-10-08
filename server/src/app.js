@@ -26,8 +26,12 @@ app.use(express.urlencoded({ extended: true }));
 // Bill photos are served only through the authenticated admin endpoint.
 app.use('/uploads/complaints/bills', (_request, response) => response.sendStatus(404));
 
-// Serve public complaint evidence and legacy proof files statically.
-app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
+// Serve public complaint evidence and legacy proof files statically with caching.
+app.use('/uploads', express.static(path.resolve(__dirname, '../uploads'), {
+  maxAge: '7d',
+  etag: true,
+  lastModified: true,
+}));
 
 // Health check at root /health for Render/monitoring
 app.use(healthRouter);

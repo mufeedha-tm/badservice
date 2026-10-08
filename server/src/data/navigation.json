@@ -1,6 +1,7 @@
 {
   "secondaryNavigationItems": [
     { "label": "All Complaints", "to": "/complaints", "icon": "📋" },
+    { "label": "Track Status", "to": "/track", "icon": "📍" },
     { "label": "Companies", "to": "/companies", "icon": "🏢" },
     { "label": "Today's Complaints", "to": "/complaints/today", "icon": "📅" },
     { "label": "Most Complained", "to": "/complaints/most-complained", "icon": "🔥" },

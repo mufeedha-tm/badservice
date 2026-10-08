@@ -13,6 +13,7 @@ import ComplaintsSearchPage from './pages/ComplaintsSearchPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
 import TermsPage from './pages/TermsPage.jsx';
+import TrackComplaintPage from './pages/TrackComplaintPage.jsx';
 
 export default function App() {
   return (
@@ -30,6 +31,7 @@ export default function App() {
       <Route path="/companies" element={<CompanyDirectoryPage />} />
       <Route path="/companies/:id" element={<CompanyPage />} />
       <Route path="/file-complaint" element={<FileComplaintPage />} />
+      <Route path="/track" element={<TrackComplaintPage />} />
       <Route path="/account" element={<AccountPage />} />
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/categories/:slug" element={<CategoryPage />} />

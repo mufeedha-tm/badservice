@@ -9,6 +9,7 @@ import companyRequestRouter from './companyRequestRoutes.js';
 import adminRouter from './adminRoutes.js';
 import healthRouter from './healthRoutes.js';
 import navigationRouter from './navigationRoutes.js';
+import commentRouter from './commentRoutes.js';
 
 const apiRouter = Router();
 
@@ -22,5 +23,6 @@ apiRouter.use(categoryRouter);
 apiRouter.use(companyRouter);
 apiRouter.use(companyRequestRouter);
 apiRouter.use(adminRouter);
+apiRouter.use(commentRouter);
 
 export default apiRouter;

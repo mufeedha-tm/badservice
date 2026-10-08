@@ -218,9 +218,47 @@ export async function runMigrations() {
   await addColumnIfNotExists('complaints', 'delete_requested', 'TINYINT(1) NOT NULL DEFAULT 0');
   await addColumnIfNotExists('complaints', 'delete_reason', 'VARCHAR(500) NULL');
   await addColumnIfNotExists('complaints', 'delete_requested_at', 'DATETIME NULL');
+  await addColumnIfNotExists('complaints', 'is_deleted', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await addColumnIfNotExists('complaints', 'deleted_at', 'DATETIME NULL');
+  await addColumnIfNotExists('complaints', 'deleted_by', 'CHAR(36) NULL');
+  await addColumnIfNotExists('complaints', 'delete_admin_note', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'status_note', 'VARCHAR(500) NULL');
   await addColumnIfNotExists('complaints', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+  await addColumnIfNotExists('complaints', 'update_requested', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await addColumnIfNotExists('complaints', 'update_note', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'update_requested_at', 'DATETIME NULL');
+  await addColumnIfNotExists('complaints', 'status_changed_at', 'DATETIME NULL');
+  await addIndexIfNotExists('complaints', 'idx_complaints_deleted', '(is_deleted)');
 
-  console.log('Migrating otp_challenges table...');
+  // 5.1 Comments table for user replies on complaints
+  console.log('Migrating comments table...');
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id CHAR(36) PRIMARY KEY,
+      complaint_id CHAR(36) NOT NULL,
+      author_name VARCHAR(80) NOT NULL,
+      author_email VARCHAR(254) NULL,
+      body TEXT NOT NULL,
+      parent_id CHAR(36) NULL,
+      status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'APPROVED',
+      created_at DATETIME NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (complaint_id) REFERENCES complaints(id) ON DELETE CASCADE,
+      FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  `);
+
+  await addColumnIfNotExists('comments', 'parent_id', 'CHAR(36) NULL');
+  await addColumnIfNotExists('comments', 'status', "ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'APPROVED'");
+  await addColumnIfNotExists('comments', 'created_at', 'DATETIME NOT NULL');
+  await addColumnIfNotExists('comments', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+  try {
+    await pool.query('ALTER TABLE comments MODIFY author_email VARCHAR(254) NULL');
+    await pool.query("ALTER TABLE comments MODIFY status ENUM('PENDING', 'APPROVED', 'REJECTED') NOT NULL DEFAULT 'APPROVED'");
+  } catch (_e) {}
+  await addIndexIfNotExists('comments', 'idx_comments_complaint', '(complaint_id)');
+  await addIndexIfNotExists('comments', 'idx_comments_parent', '(parent_id)');
   await pool.query(`
     CREATE TABLE IF NOT EXISTS otp_challenges (
       id CHAR(36) PRIMARY KEY,

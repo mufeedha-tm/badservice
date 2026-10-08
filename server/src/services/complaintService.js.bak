@@ -1,25 +1,128 @@
 import { randomUUID } from 'node:crypto';
-import * as complaintRepository from '../repositories/mysqlComplaintRepository.js';
-import * as companyRepository from '../repositories/mysqlCompanyRepository.js';
-import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
+import pool from '../config/database.js';
+import * as complaintRepository from './mysqlComplaintRepository.js';
+import * as commentRepository from './commentRepository.js';
 import { ApiError } from '../utils/ApiError.js';
-import { isValidCategory } from './categoryService.js';
-import {
-  assertPhoneVerificationToken,
-  assertVerificationToken,
-  consumeChallenge,
-} from './otpService.js';
-import { saveComplaintMedia } from './storageService.js';
-import { assertRealMediaFile } from '../middleware/upload.js';
-import { readVideoDurationSeconds, VideoMetadataError } from '../utils/videoDuration.js';
-import {
-  compressVideoForLimit,
-  MAX_ORIGINAL_VIDEO_BYTES,
-  MAX_VIDEO_BYTES,
-} from './videoCompressionService.js';
 
-const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-const VIDEO_MAX_DURATION_SECONDS = 30;
+function toPublicComplaint(complaint) {
+  if (!complaint) return complaint;
+  const { id, title, description, type, company, companyId, category, categoryId, subcategory, model, seller, location, complaint_type: complaintType, service_type: serviceType, badgeLabel, badgeTone, similarComplaintCount, actionLabel, createdAt, createdAtLabel, metadata, productImageUrl, productVideoUrl } = complaint;
+  return {
+    id,
+    title,
+    description,
+    type: complaintType || type || 'Product',
+    company,
+    companyId,
+    category,
+    categoryId,
+    subcategory,
+    model,
+    seller,
+    location,
+    complaintType,
+    serviceType,
+    badge: badgeLabel ? { label: badgeLabel, tone: badgeTone ?? '' } : null,
+    similarComplaintCount,
+    actionLabel,
+    createdAt,
+    createdAtLabel,
+    metadata,
+    productImageUrl,
+    productVideoUrl,
+  };
+}
+
+export async function listComplaints() {
+  const complaints = await complaintRepository.findPublicAll();
+  return complaints.map(toPublicComplaint);
+}
+
+export async function listRankings() {
+  const rankings = await complaintRepository.findRankings();
+  return {
+    ...rankings,
+    products: rankings.products.map((product) => ({
+      ...product,
+      latestComplaint: toPublicComplaint(product.latestComplaint),
+    })),
+  };
+}
+
+export async function getComplaint(id, user = null) {
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
+
+  const isPubliclyVisible = ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
+  const isOwner = user && complaint.userId === user.id;
+  const isAdmin = user && user.role === 'ADMIN';
+
+  if (!isPubliclyVisible && !isOwner && !isAdmin) {
+    throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
+  }
+
+  return toPublicComplaint(complaint);
+}
+
+export function searchComplaints(filters) {
+  return complaintRepository.search({ ...filters, publishedOnly: true })
+    .then((complaints) => complaints.map(toPublicComplaint));
+}
+
+export async function getUserComplaints(userId) {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication required to view your complaints.', 'AUTH_REQUIRED');
+  }
+  const complaints = await complaintRepository.findByUserId(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export async function getMyComplaints(userId) {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication required.', 'AUTH_REQUIRED');
+  }
+  const complaints = await complaintRepository.findByUserId(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export async function requestComplaintDeletion(id, user, reason = '') {
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  if (user.role !== 'ADMIN' && complaint.userId !== user.id) {
+    throw new ApiError(403, 'You can only request deletion for your own complaint.', 'FORBIDDEN');
+  }
+  const result = await complaintRepository.requestDeletion(id, user.id, reason || null);
+  return toPublicComplaint(result);
+}
+
+export async function cancelDeleteRequest(id) {
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  const result = await complaintRepository.cancelDeleteRequest(id);
+  return toPublicComplaint(result);
+}
+
+export async function updateComplaintStatus(id, userId, status, userEmail = null) {
+  const allowedStatuses = ['PENDING', 'APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED'];
+  if (!allowedStatuses.includes(status)) {
+    throw new ApiError(400, `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`, 'INVALID_STATUS');
+  }
+
+  const requiresApproval = ['COMPANY_RESPONDED', 'RESOLVED'].includes(status);
+  const updated = await complaintRepository.updateStatus(id, status, requiresApproval);
+
+  // If a complaint transitions to APPROVED or COMPANY_RESPONDED and userEmail is provided, notify the user
+  if ((status === 'APPROVED' || status === 'COMPANY_RESPONDED') && userEmail) {
+    await complaintRepository.logStatusChange(id, status, userId, userEmail);
+  }
+
+  return toPublicComplaint(updated);
+}
+
+export async function getComplaintWithUserUpdate(userId) {
+  const complaints = await complaintRepository.findByUserIdWithUpdate(userId);
+  return complaints.map(toPublicComplaint);
+}
 
 export function listComplaints() {
   return complaintRepository.findPublicAll().then((complaints) => complaints.map(toPublicComplaint));
@@ -141,77 +244,32 @@ export async function createComplaint(input, user = null, file = null, files = {
   const categoryRecord = await categoryRepository.findByName(category);
   const companyRecord = await resolveCompany(companyName, categoryRecord?.id);
 
-  // 4. Evidence Media Validation (All 3 mandatory - can be pre-uploaded URLs or multipart files)
+  // 4. Evidence Media Validation (All 3 mandatory)
   const productImage = pickUploadedFile(files, 'productImage') || file || null;
   const billImage = pickUploadedFile(files, 'billImage') || null;
   let productVideo = pickUploadedFile(files, 'productVideo') || null;
 
-  const hasProductImage = Boolean(productImage || input.productImageUrl);
-  const hasBillImage = Boolean(billImage || input.billImageUrl);
-  const hasProductVideo = Boolean(productVideo || input.productVideoUrl);
-
-  if (!hasProductImage) {
-    throw new ApiError(400, `A ${complaintType === 'Service' ? 'service photo' : 'product photo'} upload is required.`, 'MISSING_PRODUCT_IMAGE');
+  assertRequiredMedia(productImage, billImage, productVideo, complaintType);
+  assertMediaLimits(productImage, billImage, productVideo);
+  await assertRealMediaFile(productImage, 'image');
+  await assertRealMediaFile(billImage, 'image');
+  await assertRealMediaFile(productVideo, 'video');
+  let videoDuration = 30;
+  try {
+    videoDuration = await readVideoDurationSeconds(productVideo.path);
+  } catch (error) {
+    if (!(error instanceof VideoMetadataError)) throw error;
+    videoDuration = 30;
   }
-  if (!hasBillImage) {
-    throw new ApiError(400, `A ${complaintType === 'Service' ? 'bill / receipt' : 'bill / purchase proof'} upload is required.`, 'MISSING_BILL_IMAGE');
-  }
-  if (!hasProductVideo) {
-    throw new ApiError(400, `A ${complaintType === 'Service' ? 'service evidence video' : 'product video'} upload is required.`, 'MISSING_PRODUCT_VIDEO');
-  }
-
-  let productImageInfo = null;
-  if (input.productImageUrl) {
-    productImageInfo = {
-      url: input.productImageUrl,
-      name: input.productImageName || 'product-photo',
-      publicId: input.productImagePublicId || null,
-      version: input.productImageVersion || null,
-    };
-  } else if (productImage) {
-    if (productImage.size > IMAGE_MAX_BYTES) throw new ApiError(400, 'Image exceeds 10 MB.', 'FILE_TOO_LARGE');
-    await assertRealMediaFile(productImage, 'image');
-    productImageInfo = await saveComplaintMedia(productImage, 'productImage');
+  productVideo = await compressVideoForLimit(productVideo, videoDuration);
+  if (productVideo.size > MAX_VIDEO_BYTES) {
+    throw new ApiError(422, 'Video could not be reduced to 15 MB or smaller.', 'VIDEO_COMPRESSION_LIMIT');
   }
 
-  let billImageInfo = null;
-  if (input.billImageUrl) {
-    billImageInfo = {
-      url: input.billImageUrl,
-      name: input.billImageName || 'purchase-proof',
-      publicId: input.billImagePublicId || null,
-      version: input.billImageVersion || null,
-    };
-  } else if (billImage) {
-    if (billImage.size > IMAGE_MAX_BYTES) throw new ApiError(400, 'Bill exceeds 10 MB.', 'FILE_TOO_LARGE');
-    await assertRealMediaFile(billImage, 'image');
-    billImageInfo = await saveComplaintMedia(billImage, 'billImage');
-  }
-
-  let productVideoInfo = null;
-  if (input.productVideoUrl) {
-    productVideoInfo = {
-      url: input.productVideoUrl,
-      name: input.productVideoName || 'product-video',
-      publicId: input.productVideoPublicId || null,
-      version: input.productVideoVersion || null,
-    };
-  } else if (productVideo) {
-    if (productVideo.size > MAX_ORIGINAL_VIDEO_BYTES) throw new ApiError(400, 'Video exceeds 1 GB.', 'FILE_TOO_LARGE');
-    await assertRealMediaFile(productVideo, 'video');
-    let videoDuration = 30;
-    try {
-      videoDuration = await readVideoDurationSeconds(productVideo.path);
-    } catch (error) {
-      if (!(error instanceof VideoMetadataError)) throw error;
-      videoDuration = 30;
-    }
-    productVideo = await compressVideoForLimit(productVideo, videoDuration);
-    if (productVideo.size > MAX_VIDEO_BYTES) {
-      throw new ApiError(422, 'Video could not be reduced to 15 MB or smaller.', 'VIDEO_COMPRESSION_LIMIT');
-    }
-    productVideoInfo = await saveComplaintMedia(productVideo, 'productVideo');
-  }
+  // 5. Store Media via Storage Abstraction
+  const productImageInfo = await saveComplaintMedia(productImage, 'productImage');
+  const billImageInfo = await saveComplaintMedia(billImage, 'billImage');
+  const productVideoInfo = await saveComplaintMedia(productVideo, 'productVideo');
 
   const createdAtLabel = 'Just now';
 
@@ -259,84 +317,137 @@ export async function createComplaint(input, user = null, file = null, files = {
   return toPublicComplaint(created);
 }
 
-export async function processDraftMediaUpload(file, mediaType) {
-  if (!file) throw new ApiError(400, 'No file was uploaded.', 'MISSING_FILE');
-  const validTypes = ['productImage', 'billImage', 'productVideo'];
-  if (!validTypes.includes(mediaType)) {
-    throw new ApiError(400, 'Invalid media type.', 'INVALID_MEDIA_TYPE');
+export async function requestComplaintDeletion(id, user, reason = '') {
+  if (!user) {
+    throw new ApiError(401, 'Authentication required to request deletion.', 'AUTH_REQUIRED');
   }
-
-  if (mediaType === 'productImage' || mediaType === 'billImage') {
-    if (file.size > IMAGE_MAX_BYTES) {
-      throw new ApiError(400, 'Image file exceeds maximum 10 MB limit.', 'FILE_TOO_LARGE');
-    }
-    await assertRealMediaFile(file, 'image');
-    const saved = await saveComplaintMedia(file, mediaType);
-    return {
-      url: saved.url,
-      name: saved.name,
-      mediaType,
-      publicId: saved.publicId || null,
-      version: saved.version || null,
-      size: file.size,
-    };
-  }
-
-  if (mediaType === 'productVideo') {
-    if (file.size > MAX_ORIGINAL_VIDEO_BYTES) {
-      throw new ApiError(400, 'Video file exceeds maximum 1 GB limit.', 'FILE_TOO_LARGE');
-    }
-    await assertRealMediaFile(file, 'video');
-    let videoDuration = 30;
-    try {
-      videoDuration = await readVideoDurationSeconds(file.path);
-    } catch (error) {
-      if (!(error instanceof VideoMetadataError)) throw error;
-      videoDuration = 30;
-    }
-    if (videoDuration > VIDEO_MAX_DURATION_SECONDS) {
-      throw new ApiError(400, `Video must be ${VIDEO_MAX_DURATION_SECONDS} seconds or less. Recorded duration: ${Math.round(videoDuration)}s.`, 'VIDEO_DURATION_EXCEEDED');
-    }
-    const compressed = await compressVideoForLimit(file, videoDuration);
-    if (compressed.size > MAX_VIDEO_BYTES) {
-      throw new ApiError(422, 'Video could not be reduced to 15 MB or smaller.', 'VIDEO_COMPRESSION_LIMIT');
-    }
-    const saved = await saveComplaintMedia(compressed, 'productVideo');
-    return {
-      url: saved.url,
-      name: saved.name,
-      mediaType,
-      publicId: saved.publicId || null,
-      version: saved.version || null,
-      size: compressed.size,
-    };
-  }
-}
-
-export async function requestComplaintDeletion(id, user = null, reason = '', contactInfo = '') {
   const complaint = await complaintRepository.findById(id);
   if (!complaint) {
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
-  if (user && user.role !== 'ADMIN' && complaint.userId && complaint.userId !== user.id) {
-    throw new ApiError(403, 'You can only request deletion for complaints you submitted.', 'FORBIDDEN');
+  if (complaint.userId !== user.id && user.role !== 'ADMIN') {
+    throw new ApiError(403, 'You can only request deletion for complaints you filed.', 'FORBIDDEN');
   }
-  const fullReason = [reason, contactInfo ? `(Contact: ${contactInfo})` : ''].filter(Boolean).join(' ');
-  return complaintRepository.requestDeletion(id, fullReason || 'User requested deletion from website');
+  return complaintRepository.requestDeletion(id, reason);
 }
 
-export async function cancelComplaintDeletion(id, user = null) {
+export async function cancelUserDeleteRequest(id, user) {
   const complaint = await complaintRepository.findById(id);
   if (!complaint) {
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
-  if (user && user.role !== 'ADMIN' && complaint.userId && complaint.userId !== user.id) {
-    throw new ApiError(403, 'You can only cancel deletion for complaints you submitted.', 'FORBIDDEN');
+  if (complaint.userId !== user.id) {
+    throw new ApiError(403, 'You can only cancel deletion for your own complaint.', 'FORBIDDEN');
   }
   return complaintRepository.cancelDeleteRequest(id);
 }
 
-async function resolveCompany(companyName, categoryId) {
+export async function requestComplaintUpdate(id, userId, status, note = '') {
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+  if (complaint.userId !== userId) {
+    throw new ApiError(403, 'You can only update your own complaint.', 'FORBIDDEN');
+  }
+
+  // Update the complaint status and store the update note
+  const [result] = await pool.execute(
+    `UPDATE complaints 
+     SET status = ?, updated_at = UTC_TIMESTAMP(), 
+         update_requested = 1, update_note = ?, update_requested_at = UTC_TIMESTAMP()
+     WHERE id = ? AND user_id = ?`,
+    [status, note, id, userId]
+  );
+
+  if (result.affectedRows === 0) {
+    throw new ApiError(404, 'Complaint not found or you are not the owner.', 'COMPLAINT_NOT_FOUND');
+  }
+
+  // Log the status change for notification purposes
+  await complaintRepository.logStatusChange(id, status, userId);
+
+  return complaintRepository.findById(id);
+}
+
+export async function getMyComplaints(userId) {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication required.', 'AUTH_REQUIRED');
+  }
+  const complaints = await complaintRepository.findByUserId(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export async function getComplaintWithUserUpdate(userId) {
+  const complaints = await complaintRepository.findByUserIdWithUpdate(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export function listComplaints() {
+  return complaintRepository.findPublicAll().then((complaints) => complaints.map(toPublicComplaint));
+}
+
+export async function listRankings() {
+  const rankings = await complaintRepository.findRankings();
+  return {
+    ...rankings,
+    products: rankings.products.map((product) => ({
+      ...product,
+      latestComplaint: toPublicComplaint(product.latestComplaint),
+    })),
+  };
+}
+
+export async function getComplaint(id, user = null) {
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
+
+  const isPubliclyVisible = ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
+  const isOwner = user && complaint.userId === user.id;
+  const isAdmin = user && user.role === 'ADMIN';
+
+  if (!isPubliclyVisible && !isOwner && !isAdmin) {
+    throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
+  }
+
+  return toPublicComplaint(complaint);
+}
+
+export function searchComplaints(filters) {
+  return complaintRepository.search({ ...filters, publishedOnly: true })
+    .then((complaints) => complaints.map(toPublicComplaint));
+}
+
+export async function getUserComplaints(userId) {
+  if (!userId) {
+    throw new ApiError(401, 'Authentication required to view your complaints.', 'AUTH_REQUIRED');
+  }
+  const complaints = await complaintRepository.findByUserId(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export function toPublicComplaint(complaint) {
+  if (!complaint) return complaint;
+  const {
+    billImageUrl: _billImageUrl,
+    billImageName: _billImageName,
+    billImagePublicId: _billImagePublicId,
+    billImageVersion: _billImageVersion,
+    proofUrl: _proofUrl,
+    proofName: _proofName,
+    complainantPhone: _complainantPhone,
+    complainantEmail: _complainantEmail,
+    complainantAddress: _complainantAddress,
+    phoneVerified: _phoneVerified,
+    emailVerified: _emailVerified,
+    otpVerifiedAt: _otpVerifiedAt,
+    userId: _userId,
+    ...publicComplaint
+  } = complaint;
+  return publicComplaint;
+}
+
+export async function createComplaint(input, user = null, file = null, files = {}) {
   const existing = await companyRepository.findByName(companyName);
   if (existing) {
     if (existing.status === 'DISABLED') {

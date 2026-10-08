@@ -17,6 +17,9 @@ export default function ComplaintUploadField({
   error,
   onChange,
   onRemove,
+  uploadProgress = null,
+  uploadStatus = 'idle', // 'idle' | 'uploading' | 'done' | 'error'
+  isAutosaved = false,
 }) {
   const [previewUrl, setPreviewUrl] = useState('');
   const [isCheckingVideo, setIsCheckingVideo] = useState(false);
@@ -33,8 +36,8 @@ export default function ComplaintUploadField({
 
   const selectedMeta = useMemo(() => {
     if (!file) return '';
-    return `${file.name} · ${file.type || kind} · ${formatFileSize(file.size)}`;
-  }, [file, kind]);
+    return `${file.name} · ${formatFileSize(file.size)}`;
+  }, [file]);
 
   async function handleChange(event) {
     const input = event.currentTarget;
@@ -94,6 +97,38 @@ export default function ComplaintUploadField({
           ) : (
             <img src={previewUrl} alt={`${label} preview`} />
           )}
+        </div>
+      )}
+
+      {/* Progress Bar & Status Indicator */}
+      {uploadStatus === 'uploading' && (
+        <div style={{ marginTop: '8px', padding: '0 4px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 600, color: '#e65100', marginBottom: '4px' }}>
+            <span>⏳ Autosaving to server…</span>
+            <span>{uploadProgress || 0}%</span>
+          </div>
+          <div style={{ width: '100%', height: '6px', background: '#e0e0e0', borderRadius: '3px', overflow: 'hidden' }}>
+            <div
+              style={{
+                width: `${uploadProgress || 0}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg, #ff9800, #e65100)',
+                transition: 'width 0.2s ease',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {isAutosaved && uploadStatus === 'done' && (
+        <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#2e7d32', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+          <span>✓</span> <span>Autosaved on server (Instant submission ready)</span>
+        </div>
+      )}
+
+      {uploadStatus === 'error' && (
+        <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#c62828', fontWeight: 600 }}>
+          ⚠️ Upload issue: will retry on submit
         </div>
       )}
 

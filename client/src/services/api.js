@@ -236,13 +236,64 @@ export async function updateAdminComplaintStatus(id, status) {
   return response.data.data;
 }
 
-export async function deleteAdminComplaint(id) {
-  const response = await api.delete(`/admin/complaints/${encodeURIComponent(id)}`);
+export async function uploadDraftMedia(file, mediaType, onProgress = null) {
+  const formData = new FormData();
+  formData.append('media', file);
+  formData.append('mediaType', mediaType);
+  const response = await api.post('/complaints/upload-media', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percent);
+      }
+    },
+  });
+  return response.data.data;
+}
+
+export async function trackComplaint(query) {
+  const response = await api.get(`/complaints/track/${encodeURIComponent(query)}`);
+  return response.data.data;
+}
+
+export async function getComments(complaintId) {
+  const response = await api.get(`/complaints/${encodeURIComponent(complaintId)}/comments`);
+  return response.data.data;
+}
+
+export async function postComment(complaintId, { authorName, authorEmail, body, parentId = null }) {
+  const response = await api.post(`/complaints/${encodeURIComponent(complaintId)}/comments`, {
+    authorName,
+    authorEmail,
+    body,
+    parentId,
+  });
+  return response.data.data;
+}
+
+export async function deleteComment(id) {
+  const response = await api.delete(`/comments/${encodeURIComponent(id)}`);
   return response.data;
 }
 
-export async function requestDeleteComplaint(id, reason = '') {
-  const response = await api.post(`/complaints/${encodeURIComponent(id)}/request-delete`, { reason });
+export async function deleteAdminComplaint(id, reason = '') {
+  const response = await api.delete(`/admin/complaints/${encodeURIComponent(id)}`, { data: { reason } });
+  return response.data;
+}
+
+export async function restoreAdminComplaint(id) {
+  const response = await api.post(`/admin/complaints/${encodeURIComponent(id)}/restore`);
+  return response.data;
+}
+
+export async function requestDeleteComplaint(id, reason = '', contactInfo = '') {
+  const response = await api.post(`/complaints/${encodeURIComponent(id)}/request-delete`, { reason, contactInfo });
+  return response.data.data;
+}
+
+export async function cancelDeleteComplaint(id) {
+  const response = await api.post(`/complaints/${encodeURIComponent(id)}/cancel-delete`);
   return response.data.data;
 }
 

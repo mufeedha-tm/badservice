@@ -3,9 +3,11 @@ import {
   getComplaintById,
   getComplaints,
   getComplaintRankings,
-  getMyComplaints,
   postComplaint,
   postRequestDeleteComplaint,
+  postCancelDeleteRequest,
+  postDraftMediaUpload,
+  trackComplaintStatus,
 } from '../controllers/complaintController.js';
 import { attachUser, requireAuth } from '../middleware/auth.js';
 import { uploadComplaintMedia } from '../middleware/upload.js';
@@ -14,8 +16,14 @@ const complaintRouter = Router();
 
 complaintRouter.get('/complaints', getComplaints);
 complaintRouter.get('/complaints/rankings', getComplaintRankings);
-complaintRouter.get('/complaints/my', requireAuth, getMyComplaints);
-complaintRouter.post('/complaints/:id/request-delete', requireAuth, postRequestDeleteComplaint);
+complaintRouter.get('/complaints/track/:query', trackComplaintStatus);
+complaintRouter.post(
+  '/complaints/upload-media',
+  uploadComplaintMedia.single('media'),
+  postDraftMediaUpload
+);
+complaintRouter.post('/complaints/:id/request-delete', attachUser, postRequestDeleteComplaint);
+complaintRouter.post('/complaints/:id/cancel-delete', attachUser, postCancelDeleteRequest);
 complaintRouter.post(
   '/complaints',
   attachUser,
