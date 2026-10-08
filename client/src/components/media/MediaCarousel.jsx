@@ -115,7 +115,7 @@ export default function MediaCarousel({
                   controls
                   playsInline
                   muted
-                  preload="metadata"
+                  preload="none"
                   onPlay={() => setPaused(true)}
                   onTimeUpdate={(event) => {
                     if (

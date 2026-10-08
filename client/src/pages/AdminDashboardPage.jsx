@@ -16,6 +16,7 @@ import {
   logoutAccount,
   getAssetUrl,
   rejectCompanyRequest,
+  rejectAdminDeleteRequest,
   updateAdminCompanyStatus,
   updateAdminComplaintStatus,
   updateAdminUserRole,
@@ -43,10 +44,12 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState({ text: '', type: '' });
 
-  // Filters
+  // Filters & Review Modal
   const [requestFilter, setRequestFilter] = useState('PENDING');
   const [complaintFilter, setComplaintFilter] = useState('');
   const [complaintSearch, setComplaintSearch] = useState('');
+  const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
+  const [selectedComplaint, setSelectedComplaint] = useState(null);
 
   // Add Company Admin Form
   const [newCompany, setNewCompany] = useState({ name: '', categoryId: '', status: 'ACTIVE' });
@@ -92,12 +95,13 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function loadComplaints() {
+  async function loadComplaints(onlyDelete = deleteRequestOnly) {
     setLoading(true);
     try {
       const data = await getAdminComplaints({
         status: complaintFilter,
         q: complaintSearch,
+        deleteRequested: onlyDelete ? 'true' : '',
       });
       setComplaints(data);
     } catch (err) {
@@ -174,6 +178,9 @@ export default function AdminDashboardPage() {
       setComplaints((prev) =>
         prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
       );
+      if (selectedComplaint?.id === id) {
+        setSelectedComplaint((prev) => ({ ...prev, status: newStatus }));
+      }
       loadStats();
     } catch (err) {
       showMessage(err.response?.data?.error?.message || 'Update failed', 'error');
@@ -186,9 +193,43 @@ export default function AdminDashboardPage() {
       await deleteAdminComplaint(id);
       showMessage('Complaint deleted successfully.');
       setComplaints((prev) => prev.filter((c) => c.id !== id));
+      if (selectedComplaint?.id === id) {
+        setSelectedComplaint(null);
+      }
       loadStats();
     } catch (err) {
       showMessage(err.response?.data?.error?.message || 'Delete failed', 'error');
+    }
+  }
+
+  async function handleApproveDeleteRequest(id) {
+    if (!window.confirm('Approve this deletion request? The complaint will be permanently removed from the website and database.')) return;
+    try {
+      await deleteAdminComplaint(id);
+      showMessage('Delete request approved. Complaint permanently removed.');
+      setComplaints((prev) => prev.filter((c) => c.id !== id));
+      if (selectedComplaint?.id === id) {
+        setSelectedComplaint(null);
+      }
+      loadStats();
+    } catch (err) {
+      showMessage(err.response?.data?.error?.message || 'Delete approval failed', 'error');
+    }
+  }
+
+  async function handleRejectDeleteRequest(id) {
+    try {
+      await rejectAdminDeleteRequest(id);
+      showMessage('Delete request rejected. Complaint remains active.', 'info');
+      setComplaints((prev) =>
+        prev.map((c) => (c.id === id ? { ...c, deleteRequested: false, deleteReason: null } : c))
+      );
+      if (selectedComplaint?.id === id) {
+        setSelectedComplaint((prev) => ({ ...prev, deleteRequested: false, deleteReason: null }));
+      }
+      loadStats();
+    } catch (err) {
+      showMessage(err.response?.data?.error?.message || 'Rejection failed', 'error');
     }
   }
 
@@ -569,10 +610,33 @@ export default function AdminDashboardPage() {
         {activeTab === 'complaints' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h2 style={{ margin: 0 }}>Complaints Management</h2>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <h2 style={{ margin: 0 }}>Complaints Management</h2>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !deleteRequestOnly;
+                    setDeleteRequestOnly(next);
+                    loadComplaints(next);
+                  }}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    background: deleteRequestOnly ? '#dc3545' : '#f8f9fa',
+                    color: deleteRequestOnly ? '#fff' : '#495057',
+                    border: '1px solid ' + (deleteRequestOnly ? '#dc3545' : '#ced4da'),
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  ⚠️ Delete Requests {stats?.pendingDeleteRequests > 0 ? `(${stats.pendingDeleteRequests})` : ''}
+                </button>
+              </div>
+
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <input
-                  placeholder="Search title, company..."
+                  placeholder="Search title, company, person..."
                   value={complaintSearch}
                   onChange={(e) => setComplaintSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && loadComplaints()}
@@ -585,13 +649,14 @@ export default function AdminDashboardPage() {
                 >
                   <option value="">All Statuses</option>
                   <option value="PENDING">PENDING</option>
+                  <option value="APPROVED">APPROVED</option>
                   <option value="UNDER_REVIEW">UNDER_REVIEW</option>
                   <option value="COMPANY_RESPONDED">COMPANY_RESPONDED</option>
                   <option value="RESOLVED">RESOLVED</option>
                   <option value="REJECTED">REJECTED</option>
                 </select>
                 <button
-                  onClick={loadComplaints}
+                  onClick={() => loadComplaints()}
                   style={{ padding: '0.3rem 0.8rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   Filter
@@ -602,7 +667,7 @@ export default function AdminDashboardPage() {
             {loading && <p>Loading complaints...</p>}
             {!loading && complaints.length === 0 && (
               <p style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '6px' }}>
-                No complaints found matching criteria.
+                {deleteRequestOnly ? 'No pending delete requests.' : 'No complaints found matching criteria.'}
               </p>
             )}
 
@@ -611,36 +676,65 @@ export default function AdminDashboardPage() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
                   <thead>
                     <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Title</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Company</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Category</th>
+                      <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
+                      <th style={{ padding: '0.6rem 0.8rem' }}>Type & Brand</th>
+                      <th style={{ padding: '0.6rem 0.8rem' }}>Complainant</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Proof</th>
+                      <th style={{ padding: '0.6rem 0.8rem' }}>Bill (admin only)</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Status</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {complaints.map((c) => (
-                      <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '0.6rem 0.8rem', maxWidth: '280px' }}>
-                          <Link to={`/complaints/${encodeURIComponent(c.id)}`} target="_blank" style={{ color: '#0066cc', fontWeight: 500, textDecoration: 'none' }}>
+                      <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : 'transparent' }}>
+                        <td style={{ padding: '0.6rem 0.8rem', maxWidth: '260px' }}>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedComplaint(c)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: '#0066cc',
+                              fontWeight: 600,
+                              textAlign: 'left',
+                              cursor: 'pointer',
+                              fontSize: '0.9rem',
+                            }}
+                          >
                             {c.title}
-                          </Link>
+                          </button>
                           {c.location && <small style={{ display: 'block', color: '#666' }}>📍 {c.location}</small>}
+                          {c.deleteRequested && (
+                            <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                              ⚠️ DELETE REQUESTED
+                            </span>
+                          )}
                         </td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>{c.company}</td>
+                        <td style={{ padding: '0.6rem 0.8rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 600, color: c.type === 'Service' ? '#856404' : '#004085', background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', padding: '1px 5px', borderRadius: '3px', marginRight: '4px' }}>
+                            {c.type || 'Product'}
+                          </span>
+                          <strong>{c.company}</strong>
+                          {c.serviceType && <small style={{ display: 'block', color: '#555' }}>Type: {c.serviceType}</small>}
+                          {c.category && <small style={{ display: 'block', color: '#888' }}>{c.category}</small>}
+                        </td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                          {c.category}
-                          {c.subcategory && <small style={{ display: 'block', color: '#666' }}>({c.subcategory})</small>}
+                          <div>{c.complainantName || 'Anonymous'}</div>
+                          {c.complainantPhone && (
+                            <small style={{ color: '#555' }}>
+                              📞 {c.complainantPhone} {c.phoneVerified ? '✓' : ''}
+                            </small>
+                          )}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                           {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                          {c.proofUrl ? (
-                            <a href={getAssetUrl(c.proofUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc' }}>
-                              📎 View
+                          {c.billImageUrl ? (
+                            <a href={getAssetUrl(c.billImageUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontWeight: 500 }}>
+                              🔒 View Bill
                             </a>
                           ) : (
                             <span style={{ color: '#aaa' }}>None</span>
@@ -655,9 +749,11 @@ export default function AdminDashboardPage() {
                               fontSize: '0.8rem',
                               borderRadius: '4px',
                               fontWeight: 600,
+                              background: c.status === 'APPROVED' ? '#e8f5e9' : c.status === 'PENDING' ? '#fff8e1' : '#f5f5f5',
                             }}
                           >
                             <option value="PENDING">PENDING</option>
+                            <option value="APPROVED">APPROVED</option>
                             <option value="UNDER_REVIEW">UNDER_REVIEW</option>
                             <option value="COMPANY_RESPONDED">COMPANY_RESPONDED</option>
                             <option value="RESOLVED">RESOLVED</option>
@@ -665,17 +761,374 @@ export default function AdminDashboardPage() {
                           </select>
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem' }}>
-                          <button
-                            onClick={() => handleDeleteComplaint(c.id)}
-                            style={{ padding: '0.2rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-                          >
-                            Delete
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedComplaint(c)}
+                              style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                            >
+                              🔍 Review
+                            </button>
+                            {c.status === 'PENDING' && (
+                              <button
+                                type="button"
+                                onClick={() => handleComplaintStatusChange(c.id, 'APPROVED')}
+                                style={{ padding: '0.25rem 0.5rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                              >
+                                ✓ Approve
+                              </button>
+                            )}
+                            {c.deleteRequested && (
+                              <button
+                                type="button"
+                                onClick={() => handleApproveDeleteRequest(c.id)}
+                                style={{ padding: '0.25rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                title="Approve deletion request and permanently delete this complaint"
+                              >
+                                Approve Delete
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComplaint(c.id)}
+                              style={{ padding: '0.25rem 0.4rem', background: '#eee', color: '#dc3545', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* FULL DETAILS COMPLAINT REVIEW MODAL */}
+            {selectedComplaint && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0,0,0,0.65)',
+                  zIndex: 9999,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem',
+                }}
+                onClick={() => setSelectedComplaint(null)}
+              >
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: '8px',
+                    width: '100%',
+                    maxWidth: '900px',
+                    maxHeight: '90vh',
+                    overflowY: 'auto',
+                    padding: '1.5rem',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.3)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #eee', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                    <div>
+                      <span style={{ fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase', color: '#666' }}>
+                        Complaint ID: {selectedComplaint.id}
+                      </span>
+                      <h2 style={{ margin: '0.25rem 0 0 0', fontSize: '1.25rem', color: '#111' }}>
+                        {selectedComplaint.title}
+                      </h2>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedComplaint(null)}
+                      style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#888' }}
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  {/* Deletion Request Alert (if user requested deletion) */}
+                  {selectedComplaint.deleteRequested && (
+                    <div style={{ background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', padding: '1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
+                      <h4 style={{ margin: '0 0 0.35rem 0', color: '#721c24' }}>
+                        ⚠️ User Submitted a Delete Request
+                      </h4>
+                      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>
+                        <strong>Reason:</strong> {selectedComplaint.deleteReason || 'User requested deletion'}
+                      </p>
+                      {selectedComplaint.deleteRequestedAt && (
+                        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: '#666' }}>
+                          Requested at: {new Date(selectedComplaint.deleteRequestedAt).toLocaleString()}
+                        </p>
+                      )}
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => handleApproveDeleteRequest(selectedComplaint.id)}
+                          style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                        >
+                          ✓ Approve Delete Request (Permanently Delete)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRejectDeleteRequest(selectedComplaint.id)}
+                          style={{ padding: '0.4rem 0.8rem', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                        >
+                          ✗ Reject Delete Request (Keep Complaint)
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Top Status & Quick Approve Banner */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8f9fa', padding: '0.75rem 1rem', borderRadius: '6px', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Current Status:</span>
+                      <span
+                        style={{
+                          padding: '0.2rem 0.6rem',
+                          borderRadius: '4px',
+                          fontSize: '0.8rem',
+                          fontWeight: 700,
+                          background: selectedComplaint.status === 'APPROVED' ? '#d4edda' : selectedComplaint.status === 'PENDING' ? '#fff3cd' : '#e2e3e5',
+                          color: selectedComplaint.status === 'APPROVED' ? '#155724' : selectedComplaint.status === 'PENDING' ? '#856404' : '#383d41',
+                        }}
+                      >
+                        {selectedComplaint.status}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {selectedComplaint.status === 'PENDING' && (
+                        <button
+                          type="button"
+                          onClick={() => handleComplaintStatusChange(selectedComplaint.id, 'APPROVED')}
+                          style={{
+                            padding: '0.45rem 1rem',
+                            background: '#28a745',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                          }}
+                        >
+                          ✓ Approve & Publish to Website
+                        </button>
+                      )}
+                      {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(selectedComplaint.status) && (
+                        <Link
+                          to={`/complaints/${encodeURIComponent(selectedComplaint.id)}`}
+                          target="_blank"
+                          style={{
+                            padding: '0.45rem 0.8rem',
+                            background: '#0066cc',
+                            color: '#fff',
+                            textDecoration: 'none',
+                            borderRadius: '4px',
+                            fontWeight: 600,
+                            fontSize: '0.82rem',
+                          }}
+                        >
+                          View Public Page ↗
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Two column grid for details */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem', marginBottom: '1.25rem' }}>
+                    {/* Column 1: Complainant Details */}
+                    <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', background: '#fafbfc' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e', borderBottom: '1px solid #ddd', paddingBottom: '0.4rem' }}>
+                        👤 Complainant Information
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.88rem' }}>
+                        <div><strong>Full Name:</strong> {selectedComplaint.complainantName || 'Not specified'}</div>
+                        <div>
+                          <strong>Phone:</strong> {selectedComplaint.complainantPhone || 'Not specified'}
+                          {selectedComplaint.phoneVerified && <span style={{ color: '#28a745', marginLeft: '6px', fontWeight: 600 }}>✓ Phone Verified</span>}
+                        </div>
+                        <div><strong>Email:</strong> {selectedComplaint.complainantEmail || 'None'}</div>
+                        <div><strong>City:</strong> {selectedComplaint.complainantCity || 'Not specified'}</div>
+                        <div><strong>Address:</strong> {selectedComplaint.complainantAddress || 'Not specified'}</div>
+                        <div><strong>Submitted:</strong> {selectedComplaint.createdAt ? new Date(selectedComplaint.createdAt).toLocaleString() : 'N/A'}</div>
+                      </div>
+                    </div>
+
+                    {/* Column 2: Complaint Details */}
+                    <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', background: '#fafbfc' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e', borderBottom: '1px solid #ddd', paddingBottom: '0.4rem' }}>
+                        📋 Complaint Particulars
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.88rem' }}>
+                        <div><strong>Complaint Type:</strong> {selectedComplaint.type || 'Product'}</div>
+                        <div><strong>Main Category:</strong> {selectedComplaint.category || 'N/A'}</div>
+                        {selectedComplaint.serviceType && (
+                          <div><strong>Service Type:</strong> {selectedComplaint.serviceType}</div>
+                        )}
+                        <div>
+                          <strong>{selectedComplaint.type === 'Service' ? 'Service Provider:' : 'Company / Brand:'}</strong>{' '}
+                          {selectedComplaint.company}
+                        </div>
+                        <div>
+                          <strong>{selectedComplaint.type === 'Service' ? 'Purpose / Service Details:' : 'Product / Model:'}</strong>{' '}
+                          {selectedComplaint.model || 'N/A'}
+                        </div>
+                        {selectedComplaint.seller && (
+                          <div><strong>Seller / Shop:</strong> {selectedComplaint.seller}</div>
+                        )}
+                        <div><strong>Location:</strong> {selectedComplaint.location || 'N/A'}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Full Complaint Description */}
+                  <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem', background: '#fff' }}>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#232f3e' }}>📝 Full Complaint Description</h4>
+                    <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: '#333' }}>
+                      {selectedComplaint.description || 'No description provided.'}
+                    </p>
+                  </div>
+
+                  {/* Evidences Section: Bill, Photo, Video */}
+                  <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem', background: '#fff' }}>
+                    <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e' }}>
+                      📎 Uploaded Evidence & Verification Files
+                    </h4>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                      {/* 1. Bill (Admin only) */}
+                      <div style={{ border: '1px solid #ffc107', borderRadius: '6px', padding: '0.75rem', background: '#fffdf6' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.85rem' }}>🔒 Purchase Proof / Bill</strong>
+                          <span style={{ fontSize: '0.7rem', color: '#856404', background: '#fff3cd', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                            Admin Only
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: '#666', margin: '0 0 0.5rem 0' }}>
+                          Visible only in admin dashboard. Never displayed on public website.
+                        </p>
+                        {selectedComplaint.billImageUrl ? (
+                          <div>
+                            <img
+                              src={getAssetUrl(selectedComplaint.billImageUrl)}
+                              alt="Bill Evidence"
+                              style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', background: '#f5f5f5', borderRadius: '4px', border: '1px solid #eee' }}
+                            />
+                            <a
+                              href={getAssetUrl(selectedComplaint.billImageUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#0066cc', fontWeight: 600 }}
+                            >
+                              Open Full Size ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '0.82rem', color: '#999', margin: 0 }}>No bill image attached.</p>
+                        )}
+                      </div>
+
+                      {/* 2. Photo (Public Website Carousel) */}
+                      <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem', background: '#fafafa' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.85rem' }}>
+                            📸 {selectedComplaint.type === 'Service' ? 'Service Photo' : 'Product Photo'}
+                          </strong>
+                          <span style={{ fontSize: '0.7rem', color: '#155724', background: '#d4edda', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                            Public Carousel
+                          </span>
+                        </div>
+                        {selectedComplaint.productImageUrl ? (
+                          <div>
+                            <img
+                              src={getAssetUrl(selectedComplaint.productImageUrl)}
+                              alt="Product Evidence"
+                              style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', background: '#fff', borderRadius: '4px', border: '1px solid #eee' }}
+                            />
+                            <a
+                              href={getAssetUrl(selectedComplaint.productImageUrl)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#0066cc', fontWeight: 600 }}
+                            >
+                              Open Full Size ↗
+                            </a>
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '0.82rem', color: '#999', margin: 0 }}>No photo attached.</p>
+                        )}
+                      </div>
+
+                      {/* 3. Video (Public Website Carousel) */}
+                      <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem', background: '#fafafa' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.85rem' }}>
+                            🎥 {selectedComplaint.type === 'Service' ? 'Service Video' : 'Product Video'}
+                          </strong>
+                          <span style={{ fontSize: '0.7rem', color: '#155724', background: '#d4edda', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
+                            Public Carousel
+                          </span>
+                        </div>
+                        {selectedComplaint.productVideoUrl ? (
+                          <div>
+                            <video
+                              controls
+                              src={getAssetUrl(selectedComplaint.productVideoUrl)}
+                              style={{ width: '100%', maxHeight: '180px', background: '#000', borderRadius: '4px' }}
+                            />
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '0.82rem', color: '#999', margin: 0 }}>No video attached.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Modal Footer Controls */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #eee', paddingTop: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Change Status:</label>
+                      <select
+                        value={selectedComplaint.status || 'PENDING'}
+                        onChange={(e) => handleComplaintStatusChange(selectedComplaint.id, e.target.value)}
+                        style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem', borderRadius: '4px' }}
+                      >
+                        <option value="PENDING">PENDING</option>
+                        <option value="APPROVED">APPROVED</option>
+                        <option value="UNDER_REVIEW">UNDER_REVIEW</option>
+                        <option value="COMPANY_RESPONDED">COMPANY_RESPONDED</option>
+                        <option value="RESOLVED">RESOLVED</option>
+                        <option value="REJECTED">REJECTED</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteComplaint(selectedComplaint.id)}
+                        style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Delete Complaint
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedComplaint(null)}
+                        style={{ padding: '0.4rem 0.8rem', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>

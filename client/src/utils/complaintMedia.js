@@ -4,7 +4,8 @@ export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.we
 export const VIDEO_ACCEPT = 'video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov';
 export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 export const VIDEO_MAX_BYTES = 15 * 1024 * 1024;
-export const VIDEO_MAX_DURATION_SECONDS = 15;
+export const VIDEO_MAX_ORIGINAL_BYTES = 1024 * 1024 * 1024;
+export const VIDEO_MAX_DURATION_SECONDS = 30;
 
 export function isVideoUrl(url = '') {
   return /\.(mp4|webm|ogg|mov)(\?.*)?$/i.test(url) || /\/product-videos\//i.test(url);
@@ -36,28 +37,6 @@ export function getComplaintMedia(complaint) {
       label: 'Product video',
     });
   }
-  if (complaint.billImageUrl) {
-    items.push({
-      id: `${complaint.id}-bill-image`,
-      kind: 'bill',
-      type: 'image',
-      url: getAssetUrl(complaint.billImageUrl),
-      label: 'Bill / purchase proof',
-    });
-  }
-  if (complaint.proofUrl) {
-    const url = getAssetUrl(complaint.proofUrl);
-    if (isVideoUrl(url) || isImageUrl(url)) {
-      items.push({
-        id: `${complaint.id}-proof`,
-        kind: 'proof',
-        type: isVideoUrl(url) ? 'video' : 'image',
-        url,
-        label: complaint.proofName || 'Evidence',
-      });
-    }
-  }
-
   return items;
 }
 
@@ -91,7 +70,7 @@ export function validateMediaFile(file, kind) {
     if (!allowed.includes(file.type) && !/\.(mp4|mov|webm)$/i.test(name)) {
       return 'Video must be MP4, MOV, or WEBM.';
     }
-    if (file.size > VIDEO_MAX_BYTES) return 'Video must be 15MB or smaller.';
+    if (file.size > VIDEO_MAX_ORIGINAL_BYTES) return 'Video must be 1GB or smaller.';
     return '';
   }
 

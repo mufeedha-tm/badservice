@@ -35,7 +35,7 @@ export function getErrorMessage(error, defaultMessage = 'An unexpected error occ
   }
 
   if (error?.response?.status === 401) {
-    return 'Your email verification has expired or is invalid. Please verify your email again.';
+    return 'Your verification has expired or is invalid. Please verify again.';
   }
 
   if (error?.response?.status === 403) {
@@ -68,9 +68,15 @@ export async function getMyComplaints() {
   return response.data.data;
 }
 
+let pendingCategoriesPromise = null;
 export async function getCategories() {
-  const response = await api.get('/categories');
-  return response.data.data;
+  if (pendingCategoriesPromise) return pendingCategoriesPromise;
+  pendingCategoriesPromise = api.get('/categories')
+    .then((response) => response.data.data)
+    .finally(() => {
+      setTimeout(() => { pendingCategoriesPromise = null; }, 5000);
+    });
+  return pendingCategoriesPromise;
 }
 
 export async function getCompanies() {
@@ -83,9 +89,15 @@ export async function getCompany(id) {
   return response.data.data;
 }
 
+let pendingNavigationPromise = null;
 export async function getNavigation() {
-  const response = await api.get('/navigation');
-  return response.data.data;
+  if (pendingNavigationPromise) return pendingNavigationPromise;
+  pendingNavigationPromise = api.get('/navigation')
+    .then((response) => response.data.data)
+    .finally(() => {
+      setTimeout(() => { pendingNavigationPromise = null; }, 5000);
+    });
+  return pendingNavigationPromise;
 }
 
 export async function getComplaint(id) {
@@ -94,29 +106,30 @@ export async function getComplaint(id) {
 }
 
 /**
- * Send a 6-digit email OTP verification code.
+ * Send a 6-digit OTP to an email address or phone number.
  */
-export async function sendOtp({ email }) {
-  const response = await api.post('/otp/send', {
-    email,
-  });
+export async function sendOtp({ email, phone }) {
+  const response = await api.post('/otp/send', phone ? { phone } : { email });
   return response.data.data;
 }
 
 /**
- * Verify 6-digit email OTP verification code.
+ * Verify a 6-digit OTP using its email address or phone number.
  */
-export async function verifyOtp({ email, otp }) {
-  const response = await api.post('/otp/verify', {
-    email,
-    otp,
-  });
+export async function verifyOtp({ email, phone, otp }) {
+  const response = await api.post('/otp/verify', phone ? { phone, otp } : { email, otp });
   return response.data.data;
 }
 
+let pendingRankingsPromise = null;
 export async function getComplaintRankings() {
-  const response = await api.get('/complaints/rankings');
-  return response.data.data;
+  if (pendingRankingsPromise) return pendingRankingsPromise;
+  pendingRankingsPromise = api.get('/complaints/rankings')
+    .then((response) => response.data.data)
+    .finally(() => {
+      setTimeout(() => { pendingRankingsPromise = null; }, 5000);
+    });
+  return pendingRankingsPromise;
 }
 
 export async function searchComplaints({
@@ -226,6 +239,16 @@ export async function updateAdminComplaintStatus(id, status) {
 export async function deleteAdminComplaint(id) {
   const response = await api.delete(`/admin/complaints/${encodeURIComponent(id)}`);
   return response.data;
+}
+
+export async function requestDeleteComplaint(id, reason = '') {
+  const response = await api.post(`/complaints/${encodeURIComponent(id)}/request-delete`, { reason });
+  return response.data.data;
+}
+
+export async function rejectAdminDeleteRequest(id) {
+  const response = await api.post(`/admin/complaints/${encodeURIComponent(id)}/reject-delete`);
+  return response.data.data;
 }
 
 export async function getAdminCompanies() {

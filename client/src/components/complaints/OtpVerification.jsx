@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { getErrorMessage, sendOtp, verifyOtp } from '../../services/api.js';
 
 export default function OtpVerification({
-  email,
-  onEmailChange,
+  phone,
+  onPhoneChange,
   verified,
   onVerified,
   t,
@@ -17,6 +17,7 @@ export default function OtpVerification({
   const [requestError, setRequestError] = useState('');
   const [countdown, setCountdown] = useState(0);
   const timerRef = useRef(null);
+  const verificationInProgressRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -39,8 +40,8 @@ export default function OtpVerification({
   }
 
   async function handleSendOtp() {
-    if (!email || !email.trim()) {
-      setRequestError(t('errEmail'));
+    if (!phone || !phone.trim()) {
+      setRequestError(t('errPhoneReq'));
       return;
     }
 
@@ -49,10 +50,17 @@ export default function OtpVerification({
     setStatusMessage('');
 
     try {
-      await sendOtp({ email: email.trim() });
+      const result = await sendOtp({ phone: phone.trim() });
       setSent(true);
       startCountdown(60);
-      setStatusMessage(`OTP sent to ${email.trim()}`);
+      if (result.testCode) {
+        window.alert(`${t('otpTestCode')} ${result.testCode}`);
+      }
+      setStatusMessage(
+        result.testCode
+          ? `${t('otpDemoSent')} ${result.testCode})`
+          : result.message || `${t('otpSent')} ${phone.trim()}`
+      );
     } catch (err) {
       setRequestError(getErrorMessage(err, t('otpSendFailed')));
     } finally {
@@ -60,22 +68,25 @@ export default function OtpVerification({
     }
   }
 
-  async function handleVerifyOtp() {
-    if (!otp || otp.length !== 6) {
+  async function handleVerifyOtp(code = otp) {
+    if (!code || code.length !== 6) {
       setRequestError('Enter the 6-digit verification code.');
       return;
     }
+    if (verificationInProgressRef.current) return;
 
+    verificationInProgressRef.current = true;
     setIsVerifying(true);
     setRequestError('');
     try {
-      const result = await verifyOtp({ email: email.trim(), otp: otp.trim() });
+      const result = await verifyOtp({ phone: phone.trim(), otp: code.trim() });
       if (timerRef.current) clearInterval(timerRef.current);
       onVerified(result);
-      setStatusMessage('✓ Email verified');
+      setStatusMessage(`✓ ${t('otpVerified')}`);
     } catch (err) {
       setRequestError(getErrorMessage(err, t('otpVerifyFailed')));
     } finally {
+      verificationInProgressRef.current = false;
       setIsVerifying(false);
     }
   }
@@ -83,30 +94,32 @@ export default function OtpVerification({
   return (
     <div className="otp-reference-fields">
       <label className="field">
-        <span>{t('email')} *</span>
+        <span>{t('mobile')} *</span>
         <div className="otp-inline-row">
           <input
-            name="email"
-            type="email"
-            value={email}
+            name="phone"
+            type="tel"
+            value={phone}
             onChange={(e) => {
-              onEmailChange(e.target.value);
+              onPhoneChange(e.target.value);
+              if (timerRef.current) clearInterval(timerRef.current);
               setSent(false);
               setOtp('');
               setStatusMessage('');
               setRequestError('');
+              setCountdown(0);
             }}
             disabled={verified}
-            autoComplete="email"
-            placeholder={t('emailPlaceholder')}
-            className={error && !email ? 'is-invalid' : ''}
+            autoComplete="tel"
+            placeholder={t('phonePlaceholder')}
+            className={error && !phone ? 'is-invalid' : ''}
             required
           />
           <button
             type="button"
             className="otp-reference-button"
             onClick={handleSendOtp}
-            disabled={isSending || verified || !email?.trim() || countdown > 0}
+            disabled={isSending || verified || !phone?.trim() || countdown > 0}
           >
             {isSending
               ? t('sendingOtp')
@@ -121,7 +134,9 @@ export default function OtpVerification({
 
       {sent && !verified && (
         <div className="otp-status-notice">
-          <span className="otp-status-text">OTP sent to <strong>{email}</strong></span>
+          <span className="otp-status-text">
+            {statusMessage || `${t('otpSent')} ${phone}`}
+          </span>
           {countdown > 0 ? (
             <span className="otp-countdown-text">
               {t('resendAvailableIn')}<strong>{countdown}s</strong>
@@ -143,7 +158,12 @@ export default function OtpVerification({
               autoComplete="one-time-code"
               placeholder={t('otpPlaceholder')}
               value={otp}
-              onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              onChange={(e) => {
+                const nextOtp = e.target.value.replace(/\D/g, '').slice(0, 6);
+                setOtp(nextOtp);
+                setRequestError('');
+                if (nextOtp.length === 6) handleVerifyOtp(nextOtp);
+              }}
               maxLength={6}
               disabled={!sent}
               className={requestError ? 'is-invalid' : ''}
@@ -162,7 +182,7 @@ export default function OtpVerification({
 
       {verified && (
         <div className="otp-verified-badge" role="status">
-          ✓ {t('otpVerified')}
+          {statusMessage || `✓ ${t('otpVerified')}`}
         </div>
       )}
 

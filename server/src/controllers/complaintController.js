@@ -4,6 +4,7 @@ import {
   getUserComplaints,
   listComplaints,
   listRankings,
+  requestComplaintDeletion,
   searchComplaints as searchComplaintList,
 } from '../services/complaintService.js';
 import { ApiError } from '../utils/ApiError.js';
@@ -14,13 +15,19 @@ export async function getComplaints(_request, response) {
 }
 
 export async function getComplaintById(request, response) {
-  const complaint = await getComplaint(request.params.id);
+  const complaint = await getComplaint(request.params.id, request.user || null);
   response.json({ success: true, data: complaint });
 }
 
 export async function getMyComplaints(request, response) {
   const complaints = await getUserComplaints(request.user.id);
   response.json({ success: true, data: complaints });
+}
+
+export async function postRequestDeleteComplaint(request, response) {
+  const { reason } = request.body || {};
+  const result = await requestComplaintDeletion(request.params.id, request.user, reason);
+  response.json({ success: true, data: result });
 }
 
 export async function getComplaintRankings(_request, response) {

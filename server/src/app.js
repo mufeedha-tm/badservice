@@ -23,7 +23,10 @@ app.use(cors({ origin: [env.clientOrigin, "http://localhost:5173"], credentials:
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded proof files statically
+// Bill photos are served only through the authenticated admin endpoint.
+app.use('/uploads/complaints/bills', (_request, response) => response.sendStatus(404));
+
+// Serve public complaint evidence and legacy proof files statically.
 app.use('/uploads', express.static(path.resolve(__dirname, '../uploads')));
 
 // Health check at root /health for Render/monitoring

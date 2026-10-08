@@ -2,12 +2,11 @@ import MediaCarousel from './MediaCarousel.jsx';
 import { getComplaintMedia } from '../../utils/complaintMedia.js';
 
 /**
- * A consistent three-slide evidence rail used across complaints, product cards,
+ * A consistent two-slide evidence rail used across complaints, product cards,
  * company, and category views.
  * Slide 1: Actual uploaded product/service photo
  * Slide 2: Actual uploaded product/service video
- * Slide 3: Actual uploaded bill/purchase proof
- * Missing evidence displays a neutral "Evidence unavailable" placeholder.
+ * Bill evidence is private and is available only to admins.
  */
 export default function EvidenceCarousel({
   complaint,
@@ -23,7 +22,6 @@ export default function EvidenceCarousel({
 
   const photoLabel = isService ? 'Service photo' : 'Product photo';
   const videoLabel = isService ? 'Service video' : 'Product video';
-  const billLabel = isService ? 'Purchase proof' : 'Purchase proof';
 
   const items = [
     byKind.get('product') || {
@@ -41,14 +39,6 @@ export default function EvidenceCarousel({
       placeholderTitle: videoLabel,
       placeholderText: 'Customer video will appear here after it is submitted and verified.',
       kind: 'video-missing',
-    },
-    byKind.get('bill') || {
-      id: `${source.id || productName}-bill-missing`,
-      type: 'placeholder',
-      label: billLabel,
-      placeholderTitle: 'Purchase proof',
-      placeholderText: 'The original bill or purchase proof will appear here when submitted.',
-      kind: 'bill-missing',
     },
   ];
 

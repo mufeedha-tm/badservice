@@ -1,59 +1,77 @@
-# BadService.in — Production Consumer Complaint Platform
+# BadService.in
 
-A modern, trustworthy consumer complaint and resolution platform built with **React** (frontend) and **Node.js/Express** (backend), using **MySQL** as the production source of truth.
+BadService.in is a consumer complaint website for submitting product and service complaints, browsing approved complaints, and managing submissions through an administrator dashboard.
 
----
+## Current website features
 
-## 🏗️ Architecture
+- A React single-page website with complaint, company, category, search, account, terms and conditions, and administrator pages.
+- A two-step complaint form with phone-number OTP verification. Email is optional for filing a complaint.
+- Product and service complaint forms with location suggestions and required photo, purchase proof, and video uploads.
+- Complaints start as `PENDING`. Only approved complaints are shown in public complaint lists, search results, rankings, and detail pages.
+- Public complaint pages show the product or service photo and video. Purchase proof is private and accessible through an authenticated admin-only endpoint.
+- An administrator dashboard for reviewing complaints, approving or rejecting them, updating approved complaint statuses, managing company requests, and viewing platform information.
 
-- **Frontend (`client/`)**: React 19, Vite, React Router v6, Axios, Plain CSS. Hosted on **Hostinger**.
-- **Backend (`server/`)**: Express REST API, MySQL2 connection pool with utf8mb4 encoding, Google Gmail API OAuth2 email delivery, Scrypt password hashing, HttpOnly session cookies, Multer with storage abstraction (Local/Cloudinary). Hosted on **Render**.
-- **Email OTP Provider**: Google Gmail API (`googleapis`) for secure 6-digit email verification with 60-second cooldown and cryptographic tokens.
-- **Database**: MySQL 8.0 on Hostinger Cloud with connection pooling, foreign keys, and indexes.
+## Technology
 
----
+- **Frontend (`client/`)**: React 19, Vite, React Router, Axios, and CSS.
+- **Backend (`server/`)**: Node.js ES modules, Express, MySQL, Multer, FFmpeg, and optional Cloudinary storage.
+- **Database**: MySQL.
+- **Authentication**: Server-side sessions using an HttpOnly session cookie; admin routes require an authenticated administrator account.
 
-## 🚀 Getting Started Locally
+## Run locally
 
-### 1. Prerequisites
-- Node.js (v18+)
-- MySQL Database
+### Prerequisites
 
-### 2. Backend Setup
+- Node.js 18 or later
+- MySQL
+
+### Backend
+
 ```bash
-cd "new prjct/server"
+cd server
 npm install
+```
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your MySQL credentials and Gmail API OAuth2 credentials
+Copy `server/.env.example` to `server/.env` and configure the database connection and secure secrets. Then run:
 
-# Run database migrations and seed data (both are idempotent)
+```bash
 npm run db:migrate
 npm run db:seed
-
-# Start development server
 npm run dev
 ```
 
-The backend starts on port `5000` (or `process.env.PORT`).
+The API listens on port `5000` by default, or the port specified by `PORT`.
 
-### 3. Frontend Setup
+### Frontend
+
+In another terminal:
+
 ```bash
-cd "new prjct/client"
+cd client
 npm install
 npm run dev
 ```
 
-The client starts at `http://localhost:5173` and proxies `/api` calls to the backend.
+Vite serves the site at `http://localhost:5173`. Set `VITE_API_BASE_URL` if the API is not available at the configured `/api` path.
 
----
+## Phone OTP
 
-## 📧 Gmail API OAuth2 Email OTP Configuration
+The complaint form verifies the phone number, not email. In non-production environments, the backend generates a test OTP and returns it to the client for display in the demo alert. This is for development/testing only; it does not send an SMS.
 
-OTP emails are sent through the Gmail API using the OAuth2 refresh token. In Google Cloud Console, enable the Gmail API and create OAuth2 credentials. Grant the `https://www.googleapis.com/auth/gmail.send` scope and generate a refresh token for the Gmail account that will send mail. Configure the matching redirect URI in both Google Cloud and the application. The sender address must belong to the authorized Gmail account.
+Phone OTP delivery is deliberately unavailable when `NODE_ENV=production` until an SMS provider is configured. Before enabling production complaint submissions, connect an SMS provider in the backend OTP service and do not expose production OTP codes in API responses or alerts.
 
-Set these variables in the backend environment (Render for production). Never commit or expose the client secret or refresh token:
+Email OTP support remains in the backend for compatibility with the existing email OTP API. Gmail API OAuth credentials are needed only if that email-based flow is used; email is not required by the phone-verified complaint form.
+
+Configure OTP behavior with:
+
+```env
+OTP_SECRET=replace-with-a-long-random-secret
+OTP_TTL_SECONDS=600
+OTP_RESEND_COOLDOWN_SECONDS=60
+OTP_MAX_ATTEMPTS=5
+```
+
+If email OTP is needed, configure the Gmail API OAuth credentials in `server/.env`:
 
 ```env
 GMAIL_CLIENT_ID=your_google_oauth_client_id
@@ -61,117 +79,77 @@ GMAIL_CLIENT_SECRET=your_google_oauth_client_secret
 GMAIL_REDIRECT_URI=your_registered_oauth_redirect_uri
 GMAIL_REFRESH_TOKEN=your_google_oauth_refresh_token
 GMAIL_SENDER_EMAIL=your_authorized_gmail_address
-OTP_SECRET=your_cryptographically_random_secret_here
-OTP_TTL_SECONDS=600
-OTP_RESEND_COOLDOWN_SECONDS=60
-OTP_MAX_ATTEMPTS=5
 ```
 
-After deploying the backend, request an OTP on the File Complaint page or via `POST /api/otp/send`. The API response never includes the OTP.
+Never commit database passwords, session secrets, OTP secrets, or provider credentials.
 
----
+## Complaint submissions and uploads
 
-## 📝 File Complaint & Evidence Upload System
+The complaint form collects contact details and complaint information, including product/service type, company or provider, category, model or service details, seller/provider, location, title, and description. Required evidence:
 
-The File Complaint flow is a guided two-step form matching the reference design:
+| Upload | Accepted types | Limit |
+|---|---|---:|
+| Product/service photo | JPG, JPEG, PNG, WEBP | 10 MB |
+| Bill or purchase proof | JPG, JPEG, PNG, WEBP | 10 MB |
+| Product/service video | MP4, MOV, WEBM | Maximum 30 seconds; original up to 1 GB |
 
-### Step 1: Your Details & In-Form Authentication
-- **Existing User Recognition**: If already logged in, automatically displays `✓ Signed in as [Name]` with an option to switch accounts. Pre-fills contact details. Does not force the user to re-register.
-- **In-Form Switcher**: If logged out, provides a compact `[Sign In] [Create Account]` tab switch inside the card. Authenticating preserves all current form inputs and auto-fills account data without page redirects.
-- **Email Verification**: User enters their email address and clicks **Send OTP**.
-  - A 60-second cooldown timer starts.
-  - User submits the 6-digit code.
-  - Upon verification, an encrypted single-use `verificationToken` (valid 30 minutes) is issued and bound to the email.
-  - The complaint record stores `email_verified = 1` and `phone_verified = 0`.
+Videos at or below 15 MB are stored unchanged. Videos larger than 15 MB are automatically compressed by the backend with FFmpeg to 15 MB or less before storage. Compression scales large frames to at most 1280×720 and re-encodes video/audio to MP4. The compressed file is the one saved and referenced by the complaint. An upload can still fail if it cannot be reduced below the final size limit.
 
-### Step 2: Complaint Details & Mandatory Evidence
-- **Product vs. Service Dynamic Toggle**:
-  - Switching toggles between product fields (Category, Brand, Product/Model, Seller/Shop) and service fields (Category, Service Provider, Service Details/Purpose).
-- **Mandatory 3 Evidence Uploads**:
-  Every complaint must supply all three files:
-  1. **Product / Service Photo**: JPG, JPEG, PNG, or WEBP (up to 10MB).
-  2. **Bill / Purchase Proof / Receipt**: JPG, JPEG, PNG, or WEBP (up to 10MB).
-  3. **Product / Service Video**: MP4, MOV, or WEBM (up to 15MB).
-- **Privacy & Security**:
-  - Uploaded files are assigned random UUID/hash filenames on disk to prevent personal data leaks.
-  - Binary magic byte headers are strictly validated on the server (`upload.js`) to reject disguised executables, AVIs, or GIFs.
+Multer must allow the original video (up to 1 GB) to reach the compression service; the final stored video is limited to 15 MB. The server validates uploaded media content and enforces the 30-second duration limit in addition to checking the filename and MIME type.
 
----
+## Moderation and evidence privacy
 
-## 🛡️ Authentication & Authorization Security
+- A new complaint is saved with the `PENDING` status and is not publicly listed.
+- An administrator must set its status to `APPROVED` before it appears publicly. `COMPANY_RESPONDED` and `RESOLVED` are public statuses for complaints that have passed approval.
+- Public responses omit complainant contact details, purchase proof URLs, and legacy proof URLs.
+- Bill images are not served by the public static upload path. Admins retrieve them through the authenticated admin complaint bill endpoint.
+- Local uploads are stored under `server/uploads/complaints/`. Cloudinary can be configured for persistent storage; bill images use authenticated Cloudinary delivery.
 
-- **Roles**:
-  - `USER`: Can file complaints, submit company requests, view personal complaints under `/complaints/my`, and edit profile.
-  - `ADMIN`: Has full access to `/admin` to approve/reject company requests, manage complaints, and view platform metrics.
-- **Default Admin Account**:
-  - `mufeedha059@gmail.com` is configured with the `ADMIN` role.
-- **Security Protections**:
-  - Passwords hashed using Node.js `scrypt` with unique 16-byte random salts.
-  - HttpOnly cookies (`badservice_session`) with `SameSite=Lax` (or `None; Secure` in production).
-  - Role-based middleware (`requireRole('ADMIN')`) guarantees standard users receive `403 Forbidden` on admin endpoints.
+## Admin access
 
----
+Admin access is managed through the backend authentication and role system. Configure the admin account according to the existing authentication setup and keep admin credentials and session secrets private. Admin APIs are protected by authentication and role checks.
 
-## 🌐 Production Deployment
+## Deployment notes
 
-### Render (Backend API)
-- **Runtime**: Node.js
-- **Build Command**: `npm install`
-- **Start Command**: `npm start`
-- **Health Check Path**: `/health` (also available at `/api/health`)
-- **Host Binding**: `0.0.0.0` (via `PORT` environment variable)
-- **Required Environment Variables**:
-  ```env
-  PORT=5000
-  NODE_ENV=production
-  PRODUCTION=true
-  CLIENT_ORIGIN=https://badservice.in
-  DB_HOST=your-mysql-host
-  DB_PORT=3306
-  DB_USER=your-mysql-user
-  DB_PASSWORD=your-mysql-password
-  DB_NAME=your-mysql-database
-  GMAIL_CLIENT_ID=your_google_oauth_client_id
-  GMAIL_CLIENT_SECRET=your_google_oauth_client_secret
-  GMAIL_REDIRECT_URI=your_registered_oauth_redirect_uri
-  GMAIL_REFRESH_TOKEN=your_google_oauth_refresh_token
-  GMAIL_SENDER_EMAIL=your_authorized_gmail_address
-  OTP_METHOD=email
-  OTP_TTL_SECONDS=600
-  OTP_RESEND_COOLDOWN_SECONDS=60
-  OTP_MAX_ATTEMPTS=5
-  SESSION_SECRET=your_secure_session_secret
-  # Optional Cloudinary Storage (recommended for Render's ephemeral disk):
-  CLOUDINARY_URL=cloudinary://api_key:api_secret@cloud_name
-  ```
+### Backend
 
-### Hostinger (Frontend)
-- **Build Command**: `npm run build`
-- **Publish Directory**: `client/dist`
-- **Environment Variable**: `VITE_API_BASE_URL=https://your-render-service.onrender.com/api`
-- **SPA routing and fresh deployments**: Upload the complete contents of `client/dist`, including the hidden `.htaccess` file, to Hostinger's `public_html`. The rules provide React route fallbacks and prevent browsers from caching `index.html`, so each visit loads the latest hashed JavaScript and CSS assets. After the first deployment with these rules, purge Hostinger/CDN cache once and hard-refresh the browser.
+Deploy the `server/` application with:
 
----
+- Install command: `npm install`
+- Start command: `npm start`
+- Health check: `/health` (also available at `/api/health`)
+- Environment variables: `NODE_ENV`, `PORT`, `CLIENT_ORIGIN`, `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `SESSION_SECRET`, and `OTP_SECRET`.
+- Install/run the FFmpeg binary provided by the `ffmpeg-static` dependency in the deployment environment.
+- Configure a real SMS provider before setting production phone OTP live.
 
-## 🧪 Automated Production Test Suite
+For persistent media on an ephemeral server filesystem, configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` (or `CLOUDINARY_URL`). Verify that authenticated assets can be delivered using the configured Cloudinary account.
 
-Run the full automated test suite against the backend API and database:
+### Frontend
+
+Build the client with:
+
 ```bash
-cd "new prjct/server"
-node test_audit.js
+cd client
+npm install
+npm run build
 ```
-The audit suite validates:
-- Health check endpoints
-- Navigation & catalog consistency
-- Category hierarchy (Two Wheeler vs Cars isolation)
-- Email OTP generation, 60s cooldown rate limiting, code verification, single-use token invalidation
-- In-form user registration and authentication
-- 403 Forbidden checks on admin routes for normal users
-- Company addition requests and admin approval workflow
-- 401 rejection for complaints without verification tokens
-- 400 rejection for complaints missing mandatory evidence files
-- Successful complaint creation with 3 valid evidence files
-- Truth in verification (`email_verified = 1`, `phone_verified = 0`)
-- Single-use token consumption preventing replay attacks
-- User complaint privacy isolation (User B cannot view User A's complaints)
-- Admin status updates and automatic cleanup of test data
+
+Deploy the contents of `client/dist` and set `VITE_API_BASE_URL` to the deployed API base URL, for example `https://your-api.example.com/api`. Configure the host to serve the SPA entry point for client-side routes such as `/terms` and complaint details.
+
+## Checks
+
+Build the frontend:
+
+```bash
+cd client
+npm run build
+```
+
+Run the backend audit script:
+
+```bash
+cd server
+npm test
+```
+
+The audit script uses the configured database and may exercise external email delivery. Run it against a test database and test credentials, not production data.

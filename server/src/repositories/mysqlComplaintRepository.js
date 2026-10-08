@@ -34,6 +34,8 @@ function mapComplaint(row) {
     productImageName: row.productImageName ?? null,
     billImageUrl: row.billImageUrl ?? null,
     billImageName: row.billImageName ?? null,
+    billImagePublicId: row.billImagePublicId ?? null,
+    billImageVersion: row.billImageVersion ?? null,
     productVideoUrl: row.productVideoUrl ?? null,
     productVideoName: row.productVideoName ?? null,
     proofUrl: row.proofUrl ?? null,
@@ -57,6 +59,10 @@ function mapComplaint(row) {
       : null,
     similarComplaintCount: row.similarComplaintCount || 0,
     actionLabel: row.actionLabel || 'View Details',
+    serviceType: row.serviceType ?? '',
+    deleteRequested: Boolean(row.deleteRequested),
+    deleteReason: row.deleteReason ?? null,
+    deleteRequestedAt: row.deleteRequestedAt ? new Date(row.deleteRequestedAt).toISOString() : null,
   };
 }
 
@@ -105,6 +111,8 @@ const baseQuery = `
     c.product_image_name AS productImageName,
     c.bill_image_url AS billImageUrl,
     c.bill_image_name AS billImageName,
+    c.bill_image_public_id AS billImagePublicId,
+    c.bill_image_version AS billImageVersion,
     c.product_video_url AS productVideoUrl,
     c.product_video_name AS productVideoName,
     c.proof_url AS proofUrl,
@@ -116,6 +124,10 @@ const baseQuery = `
     c.badge_label AS badgeLabel,
     c.badge_tone AS badgeTone,
     c.action_label AS actionLabel,
+    c.service_type AS serviceType,
+    c.delete_requested AS deleteRequested,
+    c.delete_reason AS deleteReason,
+    c.delete_requested_at AS deleteRequestedAt,
     c.company_id AS companyId,
     c.category_id AS categoryId,
     co.name AS companyName,
@@ -171,6 +183,15 @@ export async function findAll() {
   return rows.map(mapComplaint);
 }
 
+export async function findPublicAll() {
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    ORDER BY c.created_at DESC
+  `);
+  return rows.map(mapComplaint);
+}
+
 export async function findById(id) {
   const [rows] = await pool.execute(`
     ${baseQuery}
@@ -178,6 +199,15 @@ export async function findById(id) {
     LIMIT 1
   `, [id]);
 
+  return rows[0] ? mapComplaint(rows[0]) : null;
+}
+
+export async function findPublicById(id) {
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE c.id = ? AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    LIMIT 1
+  `, [id]);
   return rows[0] ? mapComplaint(rows[0]) : null;
 }
 
@@ -202,6 +232,8 @@ export async function search({
   sort = '',
   page = 1,
   limit = 100,
+  publishedOnly = false,
+  deleteRequested = false,
 } = {}) {
   const normalizedQuery = q.trim().toLocaleLowerCase();
   const normalizedCategory = category.trim().toLocaleLowerCase();
@@ -210,6 +242,14 @@ export async function search({
   const normalizedStatus = status.trim().toUpperCase();
   const conditions = [];
   const parameters = [];
+
+  if (deleteRequested) {
+    conditions.push('c.delete_requested = 1');
+  }
+
+  if (publishedOnly) {
+    conditions.push("c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')");
+  }
 
   if (normalizedQuery) {
     conditions.push(`LOWER(${searchableComplaintSql}) LIKE ?`);
@@ -289,6 +329,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
+    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
     GROUP BY co.id, co.name, co.slug, ca.name, ca.slug
     ORDER BY complaintCount DESC, latestAt DESC
     LIMIT 12
@@ -305,6 +346,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
+    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
     GROUP BY COALESCE(NULLIF(c.product_model, ''), co.name), co.name, co.id, ca.name
     ORDER BY complaintCount DESC, latestAt DESC
     LIMIT 12
@@ -319,6 +361,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN categories ca ON ca.id = c.category_id
     LEFT JOIN categories parent ON parent.id = ca.parent_id
+    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
     GROUP BY COALESCE(parent.id, ca.id), COALESCE(parent.name, ca.name), COALESCE(parent.slug, ca.slug)
     ORDER BY complaintCount DESC, name ASC
   `);
@@ -365,7 +408,9 @@ export async function findRankings() {
 async function findLatestForProduct(companyId, productName) {
   const [rows] = await pool.execute(`
     ${baseQuery}
-    WHERE c.company_id = ? AND COALESCE(NULLIF(c.product_model, ''), co.name) = ?
+    WHERE c.company_id = ?
+      AND COALESCE(NULLIF(c.product_model, ''), co.name) = ?
+      AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
     ORDER BY c.created_at DESC
     LIMIT 1
   `, [companyId, productName]);
@@ -408,6 +453,8 @@ export async function create(complaint) {
           product_image_name,
           bill_image_url,
           bill_image_name,
+          bill_image_public_id,
+          bill_image_version,
           product_video_url,
           product_video_name,
           proof_url,
@@ -426,9 +473,10 @@ export async function create(complaint) {
           similar_complaint_count,
           badge_label,
           badge_tone,
-          action_label
+          action_label,
+          service_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       complaint.id,
@@ -445,6 +493,8 @@ export async function create(complaint) {
       complaint.productImageName || null,
       complaint.billImageUrl || null,
       complaint.billImageName || null,
+      complaint.billImagePublicId || null,
+      complaint.billImageVersion || null,
       complaint.productVideoUrl || null,
       complaint.productVideoName || null,
       complaint.proofUrl || null,
@@ -464,24 +514,51 @@ export async function create(complaint) {
       complaint.badge?.label || null,
       complaint.badge?.tone || null,
       complaint.actionLabel || 'View Details',
+      complaint.serviceType || null,
     ]
   );
 
   return findById(complaint.id);
 }
 
+export async function requestDeletion(id, reason = '') {
+  const [result] = await pool.execute(
+    `UPDATE complaints SET delete_requested = 1, delete_reason = ?, delete_requested_at = UTC_TIMESTAMP() WHERE id = ?`,
+    [reason || null, id]
+  );
+  if (result.affectedRows === 0) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+  return findById(id);
+}
+
+export async function cancelDeleteRequest(id) {
+  const [result] = await pool.execute(
+    `UPDATE complaints SET delete_requested = 0, delete_reason = NULL, delete_requested_at = NULL WHERE id = ?`,
+    [id]
+  );
+  if (result.affectedRows === 0) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+  return findById(id);
+}
+
 export async function updateStatus(id, status) {
-  const allowedStatuses = ['PENDING', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED'];
+  const allowedStatuses = ['PENDING', 'APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED'];
   if (!allowedStatuses.includes(status)) {
     throw new ApiError(400, `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`, 'INVALID_STATUS');
   }
 
+  const requiresApproval = ['COMPANY_RESPONDED', 'RESOLVED'].includes(status);
   const [result] = await pool.execute(
-    `UPDATE complaints SET status = ? WHERE id = ?`,
+    `UPDATE complaints SET status = ? WHERE id = ?${requiresApproval ? " AND status IN ('APPROVED', 'COMPANY_RESPONDED')" : ''}`,
     [status, id]
   );
 
   if (result.affectedRows === 0) {
+    if (requiresApproval && await findById(id)) {
+      throw new ApiError(409, 'Approve this complaint before moving it to a response or resolution status.', 'COMPLAINT_REQUIRES_APPROVAL');
+    }
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
 
@@ -503,6 +580,7 @@ export async function getStats() {
   const [[companiesCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM companies WHERE status = 'ACTIVE'`);
   const [[usersCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM users`);
   const [[pendingRequestsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM company_requests WHERE status = 'PENDING'`);
+  const [[pendingDeleteCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE delete_requested = 1`);
 
   return {
     totalComplaints: complaintsCount.total,
@@ -511,5 +589,6 @@ export async function getStats() {
     totalCompanies: companiesCount.total,
     totalUsers: usersCount.total,
     pendingCompanyRequests: pendingRequestsCount.total,
+    pendingDeleteRequests: pendingDeleteCount.total,
   };
 }

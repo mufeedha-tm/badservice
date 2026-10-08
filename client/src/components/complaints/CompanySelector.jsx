@@ -8,6 +8,7 @@ export default function CompanySelector({
   label,
   placeholder,
   onAddCompany,
+  showAddCompanyButton = false,
   addCompanyLabel = '+ Add Company',
   addCompanyOptionLabel = (companyName) => `+ Add “${companyName}”`,
   loadingLabel = 'Loading companies…',
@@ -33,8 +34,15 @@ export default function CompanySelector({
           onBlur={() => window.setTimeout(() => setOpen(false), 140)}
           onChange={(event) => onChange(event.target.value)}
         />
-        {value.trim() && !hasExact && onAddCompany && (
-          <button type="button" className="company-selector__add" onMouseDown={(event) => event.preventDefault()} onClick={() => onAddCompany(value.trim())}>{addCompanyLabel}</button>
+        {onAddCompany && (showAddCompanyButton || (value.trim() && !hasExact)) && (
+          <button
+            type="button"
+            className={`company-selector__add${showAddCompanyButton ? ' company-selector__add--directory' : ''}`}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => onAddCompany(value.trim() && !hasExact ? value.trim() : '')}
+          >
+            {addCompanyLabel}
+          </button>
         )}
       </div>
       {loading && <small className="company-selector__loading">{loadingLabel}</small>}

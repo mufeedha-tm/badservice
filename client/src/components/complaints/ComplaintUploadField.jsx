@@ -53,12 +53,9 @@ export default function ComplaintUploadField({
     if (kind === 'video') {
       setIsCheckingVideo(true);
       try {
-        const duration = await readVideoDuration(nextFile);
-        if (duration > VIDEO_MAX_DURATION_SECONDS) {
-          validationError = `Video must be ${VIDEO_MAX_DURATION_SECONDS} seconds or shorter.`;
-        }
+        await readVideoDuration(nextFile);
       } catch {
-        validationError = 'Video duration could not be checked. Please choose a playable MP4, MOV, or WEBM file.';
+        // Video duration read is optional; server auto-trims and compresses
       } finally {
         setIsCheckingVideo(false);
       }

@@ -1,53 +1,48 @@
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import ffmpegPath from 'ffmpeg-static';
 import { readVideoDurationSeconds } from '../src/utils/videoDuration.js';
 
-function makeMp4(seconds) {
-  const mvhd = Buffer.alloc(108);
-  mvhd.writeUInt32BE(mvhd.length, 0);
-  mvhd.write('mvhd', 4);
-  mvhd.writeUInt32BE(30_000, 20);
-  mvhd.writeUInt32BE(seconds * 30_000, 24);
+async function makeVideo(folder, format, seconds) {
+  const filePath = path.join(folder, `sample.${format}`);
+  const codec = format === 'webm' ? 'libvpx' : 'libx264';
+  const args = [
+    '-hide_banner',
+    '-loglevel', 'error',
+    '-f', 'lavfi',
+    '-i', `color=c=black:s=160x120:r=12:d=${seconds}`,
+    '-an',
+    '-c:v', codec,
+    '-t', String(seconds),
+    '-y',
+    filePath,
+  ];
 
-  const moov = Buffer.alloc(mvhd.length + 8);
-  moov.writeUInt32BE(moov.length, 0);
-  moov.write('moov', 4);
-  mvhd.copy(moov, 8);
+  await new Promise((resolve, reject) => {
+    const process = spawn(ffmpegPath, args, { windowsHide: true });
+    let stderr = '';
+    process.stderr.setEncoding('utf8');
+    process.stderr.on('data', (chunk) => {
+      stderr = `${stderr}${chunk}`.slice(-4000);
+    });
+    process.once('error', reject);
+    process.once('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(stderr || `FFmpeg exited with code ${code}.`));
+    });
+  });
 
-  const ftyp = Buffer.alloc(16);
-  ftyp.writeUInt32BE(ftyp.length, 0);
-  ftyp.write('ftyp', 4);
-  ftyp.write('isom', 8);
-  return Buffer.concat([ftyp, moov]);
+  return filePath;
 }
 
-function makeWebm(seconds) {
-  const duration = Buffer.alloc(8);
-  duration.writeDoubleBE(seconds * 1000);
-  const durationElement = Buffer.concat([
-    Buffer.from([0x44, 0x89, 0x88]),
-    duration,
-  ]);
-  const timecodeScaleElement = Buffer.from([0x2a, 0xd7, 0xb1, 0x83, 0x0f, 0x42, 0x40]);
-  const infoContent = Buffer.concat([timecodeScaleElement, durationElement]);
-  const info = Buffer.concat([
-    Buffer.from([0x15, 0x49, 0xa9, 0x66, 0x80 + infoContent.length]),
-    infoContent,
-  ]);
-  return Buffer.concat([
-    Buffer.from([0x18, 0x53, 0x80, 0x67, 0x80 + info.length]),
-    info,
-  ]);
-}
-
-async function withVideo(buffer, run) {
+async function withVideo(format, seconds, run) {
   const folder = await mkdtemp(path.join(os.tmpdir(), 'video-duration-'));
-  const filePath = path.join(folder, 'sample.mp4');
   try {
-    await writeFile(filePath, buffer);
+    const filePath = await makeVideo(folder, format, seconds);
     return await run(filePath);
   } finally {
     await rm(folder, { recursive: true, force: true });
@@ -55,25 +50,36 @@ async function withVideo(buffer, run) {
 }
 
 test('reads MP4 duration metadata', async () => {
-  await withVideo(makeMp4(8), async (filePath) => {
+  await withVideo('mp4', 8, async (filePath) => {
     assert.equal(await readVideoDurationSeconds(filePath), 8);
   });
 });
 
 test('reads WebM duration metadata', async () => {
-  await withVideo(makeWebm(8.3), async (filePath) => {
-    assert.equal(await readVideoDurationSeconds(filePath), 8.3);
+  await withVideo('webm', 8.3, async (filePath) => {
+    assert.ok(Math.abs(await readVideoDurationSeconds(filePath) - 8.3) < 0.05);
   });
 });
 
-test('reports clips longer than the upload limit from their actual duration', async () => {
-  await withVideo(makeMp4(16), async (filePath) => {
-    assert.ok((await readVideoDurationSeconds(filePath)) > 15);
+test('reads a clip at the 30-second duration limit', async () => {
+  await withVideo('mp4', 30, async (filePath) => {
+    assert.equal(await readVideoDurationSeconds(filePath), 30);
+  });
+});
+
+test('reports clips longer than the 30-second upload limit', async () => {
+  await withVideo('mp4', 31, async (filePath) => {
+    assert.ok((await readVideoDurationSeconds(filePath)) > 30);
   });
 });
 
 test('rejects files without duration metadata', async () => {
-  await withVideo(Buffer.from('not a video'), async (filePath) => {
+  const folder = await mkdtemp(path.join(os.tmpdir(), 'video-duration-'));
+  const filePath = path.join(folder, 'sample.mp4');
+  try {
+    await writeFile(filePath, Buffer.from('not a video'));
     await assert.rejects(readVideoDurationSeconds(filePath), /metadata/i);
-  });
+  } finally {
+    await rm(folder, { recursive: true, force: true });
+  }
 });

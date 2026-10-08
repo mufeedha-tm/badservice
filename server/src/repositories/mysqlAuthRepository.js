@@ -202,3 +202,28 @@ export async function removeSession(tokenHash) {
     [tokenHash]
   );
 }
+
+export async function insertPhoneSession(session) {
+  await pool.execute(
+    `INSERT INTO phone_sessions (token_hash, phone, expires_at) VALUES (?, ?, ?)`,
+    [session.tokenHash, session.phone, new Date(session.expiresAt)]
+  );
+}
+
+export async function findPhoneSessionByTokenHash(tokenHash) {
+  const [rows] = await pool.execute(
+    `SELECT phone, expires_at AS expiresAt FROM phone_sessions WHERE token_hash = ? LIMIT 1`,
+    [tokenHash]
+  );
+  const session = rows[0] || null;
+  if (!session) return null;
+  if (new Date(session.expiresAt).getTime() <= Date.now()) {
+    await removePhoneSession(tokenHash);
+    return null;
+  }
+  return session;
+}
+
+export async function removePhoneSession(tokenHash) {
+  await pool.execute(`DELETE FROM phone_sessions WHERE token_hash = ?`, [tokenHash]);
+}

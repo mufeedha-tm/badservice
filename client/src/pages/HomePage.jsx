@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import AmazonHeroCarousel from '../components/home/AmazonHeroCarousel.jsx';
 import EvidenceCarousel from '../components/media/EvidenceCarousel.jsx';
 import MediaCarousel from '../components/media/MediaCarousel.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
@@ -27,16 +28,9 @@ const marutiReferenceMedia = [
     id: 'maruti-public-video',
     type: 'video',
     url: '/maruthi%20video.mp4',
-    label: 'Maruti reference video · max 15 seconds',
+    label: 'Maruti reference video',
     referenceNotice: 'Public reference · not complaint evidence',
     maxDurationSeconds: 15,
-  },
-  {
-    id: 'maruti-sample-invoice',
-    type: 'image',
-    url: '/bill%20maruthi%20suzuki.png',
-    label: 'Maruti invoice reference',
-    referenceNotice: 'Invoice reference · not complaint evidence',
   },
 ];
 
@@ -99,30 +93,132 @@ export default function HomePage() {
   return (
     <MainLayout>
       <div className="home-modern">
-        <section className="home-consumer-hero">
-          <div className="home-consumer-hero__copy">
-            <span className="home-section__eyebrow">01 · Consumer watch</span>
-            <h1>Know the problem<br />before you buy.</h1>
-            <p>BadService.in turns real customer complaints into a simple consumer signal — so you can check brands, products and services before spending your money.</p>
-            <div className="home-hero-actions">
-              <Link className="home-primary" to="/complaints">Explore complaints</Link>
-              <Link className="home-hero-secondary" to="/file-complaint">File a complaint</Link>
+        {/* Amazon-Style Auto-Moving Hero Deals / Highlights Carousel */}
+        <AmazonHeroCarousel rankings={rankings} />
+
+        {/* Amazon-Style 4-Quadrant Cards Grid */}
+        <section className="amazon-card-grid" aria-label="Most Complained Highlights">
+          {/* Box 1: Most Complained Tech & Mobiles */}
+          <article className="amazon-box-card">
+            <h3 className="amazon-box-card__title">Most Complained Products</h3>
+            <div className="amazon-box-card__quad">
+              {(topProducts.slice(0, 4).length > 0 ? topProducts.slice(0, 4) : [
+                { name: 'Maruti Suzuki', count: 12, category: 'Vehicles & Automotive' },
+                { name: 'Smartphones', count: 8, category: 'Mobiles' },
+                { name: 'Laptops', count: 6, category: 'Computers' },
+                { name: 'Smart TV', count: 5, category: 'TV & Electronics' },
+              ]).map((prod) => (
+                <Link
+                  key={prod.name}
+                  to={`/complaints?q=${encodeURIComponent(prod.name)}`}
+                  className="amazon-quad-item"
+                >
+                  <div className="amazon-quad-item__thumb">
+                    <img src={getShowcaseImage(prod.category || 'Mobiles')} alt={prod.name} loading="lazy" />
+                  </div>
+                  <span className="amazon-quad-item__name">{prod.name}</span>
+                  <span className="amazon-quad-item__count">{prod.count} complaints</span>
+                </Link>
+              ))}
             </div>
-          </div>
-          <div className="home-consumer-hero__points">
-            {trustPoints.map((item) => (
-              <div className="home-trust-row" key={item.number}>
-                <span>{item.number}</span>
-                <div><strong>{item.title}</strong><p>{item.text}</p></div>
-              </div>
-            ))}
-          </div>
+            <Link to="/complaints?sort=most-complained" className="amazon-box-card__link">
+              See all product complaints →
+            </Link>
+          </article>
+
+          {/* Box 2: Most Complained Services */}
+          <article className="amazon-box-card">
+            <h3 className="amazon-box-card__title">Services with High Complaints</h3>
+            <div className="amazon-box-card__quad">
+              {[
+                { name: 'Hospitals', category: 'Hospital & Healthcare', icon: '🏥' },
+                { name: 'Hotels & Stays', category: 'Hotel & Travel', icon: '🏨' },
+                { name: 'Airlines / Flights', category: 'Flights & Trains', icon: '✈️' },
+                { name: 'Banking / Loans', category: 'Banking', icon: '🏦' },
+              ].map((svc) => (
+                <Link
+                  key={svc.name}
+                  to={`/complaints?category=${encodeURIComponent(svc.category)}`}
+                  className="amazon-quad-item"
+                >
+                  <div className="amazon-quad-item__thumb">
+                    <img src={getShowcaseImage(svc.category)} alt={svc.name} loading="lazy" />
+                  </div>
+                  <span className="amazon-quad-item__name">{svc.name}</span>
+                  <span className="amazon-quad-item__count">
+                    {categoryMap.get(svc.category) || 0} complaints
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <Link to="/complaints?category=Hospital%20%26%20Healthcare" className="amazon-box-card__link">
+              See all service complaints →
+            </Link>
+          </article>
+
+          {/* Box 3: Top Reported Brands */}
+          <article className="amazon-box-card">
+            <h3 className="amazon-box-card__title">Top Reported Brands</h3>
+            <div className="amazon-box-card__quad">
+              {(rankings.companies?.slice(0, 4).length > 0 ? rankings.companies.slice(0, 4) : [
+                { name: 'Maruti Suzuki', count: 12 },
+                { name: 'Samsung', count: 7 },
+                { name: 'Flipkart', count: 5 },
+                { name: 'Airtel', count: 4 },
+              ]).map((comp) => (
+                <Link
+                  key={comp.name}
+                  to={`/complaints?company=${encodeURIComponent(comp.name)}`}
+                  className="amazon-quad-item"
+                >
+                  <div className="amazon-quad-item__thumb">
+                    <img src={getShowcaseImage('TV & Electronics')} alt={comp.name} loading="lazy" />
+                  </div>
+                  <span className="amazon-quad-item__name">{comp.name}</span>
+                  <span className="amazon-quad-item__count">{comp.count} complaints</span>
+                </Link>
+              ))}
+            </div>
+            <Link to="/companies" className="amazon-box-card__link">
+              Compare all brands →
+            </Link>
+          </article>
+
+          {/* Box 4: Top Categories */}
+          <article className="amazon-box-card">
+            <h3 className="amazon-box-card__title">High-Alert Categories</h3>
+            <div className="amazon-box-card__quad">
+              {categories.slice(0, 4).map((cat) => (
+                <Link
+                  key={cat.id || cat.name}
+                  to={`/categories/${encodeURIComponent(cat.slug || cat.id || cat.name)}`}
+                  className="amazon-quad-item"
+                >
+                  <div className="amazon-quad-item__thumb">
+                    <img src={getShowcaseImage(cat.name)} alt={cat.name} loading="lazy" />
+                  </div>
+                  <span className="amazon-quad-item__name">{cat.name}</span>
+                  <span className="amazon-quad-item__count">
+                    {categoryMap.get(cat.name) || 0} complaints
+                  </span>
+                </Link>
+              ))}
+            </div>
+            <Link to="/complaints" className="amazon-box-card__link">
+              Browse all categories →
+            </Link>
+          </article>
         </section>
 
+        {/* SECTION: DETAILED PRODUCT RANKINGS WITH EVIDENCE CAROUSELS */}
         <section className="home-section home-section--ranking">
           <div className="home-section__heading">
-            <div><span className="home-section__eyebrow">02 · Most complained</span><h2>Products people are complaining about most</h2><p>Live rankings from complaint records. Open a card to inspect the underlying complaints.</p></div>
-            <Link to="/complaints?sort=most-complained">View all</Link>
+            <div>
+              <span className="home-section__eyebrow">🔥 Most Complained Rankings</span>
+              <h2>Products & Services with Verified Evidence</h2>
+              <p>Real photos and customer videos submitted by affected consumers. (Purchase bills are private and reserved for admin review).</p>
+            </div>
+            <Link to="/complaints?sort=most-complained">View all rankings →</Link>
           </div>
           {error && <div className="notice notice--error" role="alert">{error}</div>}
           {loading && <div className="simple-grid simple-grid--products">{[1, 2, 3, 4].map((n) => <Skeleton key={n} className="skeleton-card" />)}</div>}
@@ -136,12 +232,12 @@ export default function HomePage() {
                     <>
                       <MediaCarousel
                         items={marutiReferenceMedia}
-                        alt="Maruti photo, video, and invoice from the public client assets; reference only"
+                        alt="Maruti photo and video reference media"
                         compact
                         autoPlay
                       />
                       <p className="product-rank-card__media-credit">
-                        Photo, video, and invoice use the files supplied in the client public folder. They are reference media, not evidence submitted with a customer complaint. Video uploads in File Complaint are required and limited to 15 seconds.
+                        Photo and video shown are public reference media, not complaint evidence. Bills and sensitive proofs are kept private and accessible only to admins.
                       </p>
                     </>
                   ) : product.latestComplaint ? (

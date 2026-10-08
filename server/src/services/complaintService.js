@@ -4,39 +4,85 @@ import * as companyRepository from '../repositories/mysqlCompanyRepository.js';
 import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { isValidCategory } from './categoryService.js';
-import { assertVerificationToken, consumeChallenge } from './otpService.js';
+import {
+  assertPhoneVerificationToken,
+  assertVerificationToken,
+  consumeChallenge,
+} from './otpService.js';
 import { saveComplaintMedia } from './storageService.js';
 import { assertRealMediaFile } from '../middleware/upload.js';
 import { readVideoDurationSeconds, VideoMetadataError } from '../utils/videoDuration.js';
+import {
+  compressVideoForLimit,
+  MAX_ORIGINAL_VIDEO_BYTES,
+  MAX_VIDEO_BYTES,
+} from './videoCompressionService.js';
 
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
-const VIDEO_MAX_BYTES = 15 * 1024 * 1024;
-const VIDEO_MAX_DURATION_SECONDS = 15;
+const VIDEO_MAX_DURATION_SECONDS = 30;
 
 export function listComplaints() {
-  return complaintRepository.findAll();
+  return complaintRepository.findPublicAll().then((complaints) => complaints.map(toPublicComplaint));
 }
 
-export function listRankings() {
-  return complaintRepository.findRankings();
+export async function listRankings() {
+  const rankings = await complaintRepository.findRankings();
+  return {
+    ...rankings,
+    products: rankings.products.map((product) => ({
+      ...product,
+      latestComplaint: toPublicComplaint(product.latestComplaint),
+    })),
+  };
 }
 
-export async function getComplaint(id) {
+export async function getComplaint(id, user = null) {
   const complaint = await complaintRepository.findById(id);
   if (!complaint) throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
 
-  return complaint;
+  const isPubliclyVisible = ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
+  const isOwner = user && complaint.userId === user.id;
+  const isAdmin = user && user.role === 'ADMIN';
+
+  if (!isPubliclyVisible && !isOwner && !isAdmin) {
+    throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
+  }
+
+  return toPublicComplaint(complaint);
 }
 
 export function searchComplaints(filters) {
-  return complaintRepository.search(filters);
+  return complaintRepository.search({ ...filters, publishedOnly: true })
+    .then((complaints) => complaints.map(toPublicComplaint));
 }
 
-export function getUserComplaints(userId) {
+export async function getUserComplaints(userId) {
   if (!userId) {
     throw new ApiError(401, 'Authentication required to view your complaints.', 'AUTH_REQUIRED');
   }
-  return complaintRepository.findByUserId(userId);
+  const complaints = await complaintRepository.findByUserId(userId);
+  return complaints.map(toPublicComplaint);
+}
+
+export function toPublicComplaint(complaint) {
+  if (!complaint) return complaint;
+  const {
+    billImageUrl: _billImageUrl,
+    billImageName: _billImageName,
+    billImagePublicId: _billImagePublicId,
+    billImageVersion: _billImageVersion,
+    proofUrl: _proofUrl,
+    proofName: _proofName,
+    complainantPhone: _complainantPhone,
+    complainantEmail: _complainantEmail,
+    complainantAddress: _complainantAddress,
+    phoneVerified: _phoneVerified,
+    emailVerified: _emailVerified,
+    otpVerifiedAt: _otpVerifiedAt,
+    userId: _userId,
+    ...publicComplaint
+  } = complaint;
+  return publicComplaint;
 }
 
 export async function createComplaint(input, user = null, file = null, files = {}) {
@@ -46,16 +92,23 @@ export async function createComplaint(input, user = null, file = null, files = {
 
   // 1. Verification Token Check (Priority check for security)
   const verificationToken = input.verificationToken;
+  const verificationMethod = input.verificationMethod === 'phone' ? 'phone' : 'email';
   if (!verificationToken || typeof verificationToken !== 'string') {
-    throw new ApiError(401, 'Email verification is required before submitting a complaint.', 'OTP_REQUIRED');
+    throw new ApiError(
+      401,
+      `${verificationMethod === 'phone' ? 'Phone' : 'Email'} verification is required before submitting a complaint.`,
+      'OTP_REQUIRED'
+    );
   }
 
-  const complainantEmail = normalizeEmail(input.email);
-  const verified = await assertVerificationToken(complainantEmail, verificationToken);
+  const complainantEmail = normalizeOptionalEmail(input.email);
+  const complainantPhone = readRequiredPhone(input.phone);
+  const verified = verificationMethod === 'phone'
+    ? await assertPhoneVerificationToken(complainantPhone, verificationToken)
+    : await assertVerificationToken(complainantEmail || input.email, verificationToken);
 
   // 2. Personal & Contact Details Validation
   const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
-  const complainantPhone = readRequiredPhone(input.phone);
   const complainantCity = readRequiredText(input.city, 'city', 120);
   const complainantAddress = readRequiredText(input.address, 'full address', 500);
 
@@ -77,6 +130,9 @@ export async function createComplaint(input, user = null, file = null, files = {
     complaintType === 'Service' ? 'service provider' : 'seller / shop',
     150
   );
+  const serviceType = complaintType === 'Service'
+    ? readOptionalText(input.serviceType, 'service type', 100)
+    : null;
 
   if (!(await isValidCategory(category))) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
@@ -88,26 +144,23 @@ export async function createComplaint(input, user = null, file = null, files = {
   // 4. Evidence Media Validation (All 3 mandatory)
   const productImage = pickUploadedFile(files, 'productImage') || file || null;
   const billImage = pickUploadedFile(files, 'billImage') || null;
-  const productVideo = pickUploadedFile(files, 'productVideo') || null;
+  let productVideo = pickUploadedFile(files, 'productVideo') || null;
 
   assertRequiredMedia(productImage, billImage, productVideo, complaintType);
   assertMediaLimits(productImage, billImage, productVideo);
   await assertRealMediaFile(productImage, 'image');
   await assertRealMediaFile(billImage, 'image');
   await assertRealMediaFile(productVideo, 'video');
-  let videoDuration;
+  let videoDuration = 30;
   try {
     videoDuration = await readVideoDurationSeconds(productVideo.path);
   } catch (error) {
     if (!(error instanceof VideoMetadataError)) throw error;
-    throw new ApiError(400, 'Video duration could not be verified. Please upload a playable video.', 'INVALID_VIDEO_DURATION');
+    videoDuration = 30;
   }
-  if (videoDuration > VIDEO_MAX_DURATION_SECONDS) {
-    throw new ApiError(
-      400,
-      `Video must be ${VIDEO_MAX_DURATION_SECONDS} seconds or shorter.`,
-      'VIDEO_TOO_LONG'
-    );
+  productVideo = await compressVideoForLimit(productVideo, videoDuration);
+  if (productVideo.size > MAX_VIDEO_BYTES) {
+    throw new ApiError(422, 'Video could not be reduced to 15 MB or smaller.', 'VIDEO_COMPRESSION_LIMIT');
   }
 
   // 5. Store Media via Storage Abstraction
@@ -128,10 +181,13 @@ export async function createComplaint(input, user = null, file = null, files = {
     seller: seller || null,
     location: location || null,
     type: complaintType,
+    serviceType: serviceType || null,
     productImageUrl: productImageInfo?.url || null,
     productImageName: productImageInfo?.name || null,
     billImageUrl: billImageInfo?.url || null,
     billImageName: billImageInfo?.name || null,
+    billImagePublicId: billImageInfo?.publicId || null,
+    billImageVersion: billImageInfo?.version || null,
     productVideoUrl: productVideoInfo?.url || null,
     productVideoName: productVideoInfo?.name || null,
     proofUrl: null,
@@ -142,8 +198,8 @@ export async function createComplaint(input, user = null, file = null, files = {
     complainantEmail,
     complainantCity,
     complainantAddress,
-    emailVerified: true,
-    phoneVerified: false,
+    emailVerified: verificationMethod === 'email',
+    phoneVerified: verificationMethod === 'phone',
     otpVerifiedAt: new Date().toISOString(),
 
     status: 'PENDING',
@@ -155,7 +211,21 @@ export async function createComplaint(input, user = null, file = null, files = {
 
   // Consume verification challenge (single-use)
   await consumeChallenge(verified.challengeId);
-  return created;
+  return toPublicComplaint(created);
+}
+
+export async function requestComplaintDeletion(id, user, reason = '') {
+  if (!user) {
+    throw new ApiError(401, 'Authentication required to request deletion.', 'AUTH_REQUIRED');
+  }
+  const complaint = await complaintRepository.findById(id);
+  if (!complaint) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+  if (complaint.userId !== user.id && user.role !== 'ADMIN') {
+    throw new ApiError(403, 'You can only request deletion for complaints you filed.', 'FORBIDDEN');
+  }
+  return complaintRepository.requestDeletion(id, reason);
 }
 
 async function resolveCompany(companyName, categoryId) {
@@ -167,12 +237,12 @@ async function resolveCompany(companyName, categoryId) {
     return existing;
   }
 
-  // Company must be registered or approved
-  throw new ApiError(
-    400,
-    `Company '${companyName}' is not registered. Please use 'Request to Add a New Company' first.`,
-    'COMPANY_NOT_FOUND'
-  );
+  // Automatically create company or service provider if not registered
+  return await companyRepository.createCompany({
+    name: companyName,
+    categoryId: categoryId || null,
+    status: 'ACTIVE',
+  });
 }
 
 function assertRequiredMedia(productImage, billImage, productVideo, complaintType) {
@@ -202,8 +272,8 @@ function assertMediaLimits(productImage, billImage, productVideo) {
       throw new ApiError(400, 'Photos must be JPG, JPEG, PNG, or WEBP.', 'INVALID_FILE_TYPE');
     }
   }
-  if (productVideo?.size > VIDEO_MAX_BYTES) {
-    throw new ApiError(400, 'Video files must be 15MB or smaller.', 'FILE_TOO_LARGE');
+  if (productVideo?.size > MAX_ORIGINAL_VIDEO_BYTES) {
+    throw new ApiError(400, 'Original video files must be 1GB or smaller.', 'FILE_TOO_LARGE');
   }
   if (productVideo && !['video/mp4', 'video/webm', 'video/quicktime'].includes(productVideo.mimetype)) {
     throw new ApiError(400, 'Video must be MP4, MOV, or WEBM.', 'INVALID_FILE_TYPE');
@@ -228,6 +298,12 @@ function normalizeEmail(value) {
     throw new ApiError(400, 'Enter a valid email address.', 'INVALID_EMAIL');
   }
   return email;
+}
+
+function normalizeOptionalEmail(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string' && !value.trim()) return null;
+  return normalizeEmail(value);
 }
 
 function readRequiredPhone(value) {

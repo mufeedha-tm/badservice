@@ -2,11 +2,14 @@ export function errorHandler(error, _request, response, next) {
   if (response.headersSent) return next(error);
 
   if (error?.code === 'LIMIT_FILE_SIZE') {
+    const message = error.field === 'productVideo'
+      ? 'Video exceeds the 1 GB upload limit. Videos over 15 MB are automatically compressed to 15 MB or less.'
+      : 'The uploaded file exceeds its allowed size limit.';
     return response.status(400).json({
       success: false,
       error: {
         code: 'FILE_TOO_LARGE',
-        message: 'File is too large. Maximum allowed size: 15 MB.',
+        message,
       },
     });
   }

@@ -3,6 +3,7 @@ import {
   deleteComplaint,
   getAdminCategories,
   getAdminCompanies,
+  getAdminComplaintBill,
   getAdminComplaints,
   getAdminCompanyRequests,
   getAdminStats,
@@ -14,6 +15,7 @@ import {
   postAdminCompany,
   postApproveCompanyRequest,
   postRejectCompanyRequest,
+  postRejectDeleteRequest,
 } from '../controllers/adminController.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
 
@@ -22,6 +24,7 @@ const adminRouter = Router();
 // Protect ALL admin routes with requireAuth and requireRole('ADMIN')
 adminRouter.use('/admin', requireAuth, requireRole('ADMIN'));
 
+// Stats
 adminRouter.get('/admin/stats', getAdminStats);
 
 // Company requests
@@ -31,7 +34,9 @@ adminRouter.post('/admin/company-requests/:id/reject', postRejectCompanyRequest)
 
 // Complaints
 adminRouter.get('/admin/complaints', getAdminComplaints);
+adminRouter.get('/admin/complaints/:id/bill', getAdminComplaintBill);
 adminRouter.patch('/admin/complaints/:id/status', patchComplaintStatus);
+adminRouter.post('/admin/complaints/:id/reject-delete', postRejectDeleteRequest);
 adminRouter.delete('/admin/complaints/:id', deleteComplaint);
 
 // Companies

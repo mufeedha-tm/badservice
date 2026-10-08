@@ -2,7 +2,15 @@ import { useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { useAccount } from '../context/AccountContext.jsx';
-import { getAssetUrl, getErrorMessage, getMyComplaints, loginAccount, logoutAccount, registerAccount } from '../services/api.js';
+import {
+  getAssetUrl,
+  getErrorMessage,
+  getMyComplaints,
+  loginAccount,
+  logoutAccount,
+  registerAccount,
+  requestDeleteComplaint,
+} from '../services/api.js';
 
 export default function AccountPage() {
   const location = useLocation();
@@ -25,10 +33,15 @@ export default function AccountPage() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // My Complaints state
+  // My Complaints & Tracking / Delete Request state
   const [myComplaints, setMyComplaints] = useState([]);
   const [loadingComplaints, setLoadingComplaints] = useState(false);
   const [complaintsError, setComplaintsError] = useState('');
+  const [viewComplaintModal, setViewComplaintModal] = useState(null);
+  const [deleteModalComplaint, setDeleteModalComplaint] = useState(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
 
   useEffect(() => {
     if (account) {
@@ -157,10 +170,61 @@ export default function AccountPage() {
     }
   }
 
-  function getStatusBadge(complaintStatus) {
+  async function submitDeleteRequest(e) {
+    e.preventDefault();
+    if (!deleteModalComplaint) return;
+    setDeleteSubmitting(true);
+    try {
+      await requestDeleteComplaint(deleteModalComplaint.id, deleteReason.trim());
+      setMyComplaints((prev) =>
+        prev.map((c) =>
+          c.id === deleteModalComplaint.id
+            ? { ...c, deleteRequested: true, deleteReason: deleteReason.trim() }
+            : c
+        )
+      );
+      if (viewComplaintModal?.id === deleteModalComplaint.id) {
+        setViewComplaintModal((prev) => ({
+          ...prev,
+          deleteRequested: true,
+          deleteReason: deleteReason.trim(),
+        }));
+      }
+      setDeleteModalComplaint(null);
+      setDeleteReason('');
+      setDeleteSuccessMsg('Your deletion request has been submitted. An administrator will review and approve it.');
+      setTimeout(() => setDeleteSuccessMsg(''), 6000);
+    } catch (err) {
+      alert(getErrorMessage(err, 'Failed to submit deletion request.'));
+    } finally {
+      setDeleteSubmitting(false);
+    }
+  }
+
+  function getStatusBadge(complaintStatus, deleteRequested = false) {
+    if (deleteRequested) {
+      return (
+        <span
+          style={{
+            display: 'inline-block',
+            padding: '0.2rem 0.5rem',
+            borderRadius: '4px',
+            fontSize: '0.75rem',
+            fontWeight: 700,
+            background: '#ffebee',
+            color: '#c62828',
+            border: '1px solid #ffcdd2',
+          }}
+        >
+          Deletion Requested
+        </span>
+      );
+    }
+
     const s = (complaintStatus || 'PENDING').toUpperCase();
     const styles = {
       PENDING: { background: '#fff3cd', color: '#856404', border: '1px solid #ffeeba' },
+      APPROVED: { background: '#e8f5e9', color: '#2e7d32', border: '1px solid #c8e6c9' },
       UNDER_REVIEW: { background: '#cce5ff', color: '#004085', border: '1px solid #b8daff' },
       COMPANY_RESPONDED: { background: '#e2e3e5', color: '#383d41', border: '1px solid #d6d8db' },
       RESOLVED: { background: '#d4edda', color: '#155724', border: '1px solid #c3e6cb' },
@@ -179,7 +243,7 @@ export default function AccountPage() {
           ...currentStyle,
         }}
       >
-        {s.replace('_', ' ')}
+        {s === 'APPROVED' ? 'APPROVED & LIVE' : s.replace('_', ' ')}
       </span>
     );
   }
@@ -236,64 +300,375 @@ export default function AccountPage() {
 
             {/* My Complaints Section */}
             <div style={{ marginTop: '2rem', borderTop: '1px solid #e0e0e0', paddingTop: '1.5rem' }}>
-              <h2>My Filed Complaints</h2>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>My Filed Complaints & Updates</h2>
+                  <p style={{ margin: '0.25rem 0 0 0', fontSize: '0.88rem', color: '#666' }}>
+                    Track status updates, reviews, and manage your filed complaints.
+                  </p>
+                </div>
+                <Link to="/file-complaint" style={{ padding: '0.4rem 0.8rem', background: '#e65100', color: '#fff', borderRadius: '4px', textDecoration: 'none', fontSize: '0.85rem', fontWeight: 600 }}>
+                  + File New Complaint
+                </Link>
+              </div>
+
+              {deleteSuccessMsg && (
+                <div style={{ padding: '0.75rem 1rem', background: '#d4edda', color: '#155724', borderRadius: '4px', marginBottom: '1rem', border: '1px solid #c3e6cb', fontWeight: 500 }}>
+                  ✓ {deleteSuccessMsg}
+                </div>
+              )}
+
               {loadingComplaints && <p>Loading your complaints...</p>}
               {complaintsError && <p style={{ color: 'red' }}>{complaintsError}</p>}
               {!loadingComplaints && myComplaints.length === 0 && (
-                <div style={{ padding: '1.5rem', background: '#f9f9f9', borderRadius: '6px', textAlign: 'center' }}>
-                  <p>You have not filed any complaints yet.</p>
+                <div style={{ padding: '2rem', background: '#f9f9f9', borderRadius: '6px', textAlign: 'center' }}>
+                  <p style={{ margin: '0 0 0.5rem 0' }}>You have not filed any complaints yet.</p>
                   <Link to="/file-complaint" style={{ color: '#0066cc', fontWeight: 600 }}>+ File your first complaint</Link>
                 </div>
               )}
 
               {!loadingComplaints && myComplaints.length > 0 && (
                 <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid #ddd', background: '#f5f5f5' }}>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Company</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Category</th>
                         <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Status</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Proof</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Action</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Status & Review</th>
+                        <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {myComplaints.map((c) => (
-                        <tr key={c.id} style={{ borderBottom: '1px solid #eee' }}>
-                          <td style={{ padding: '0.6rem 0.8rem', fontWeight: 500 }}>
-                            <Link to={`/complaints/${encodeURIComponent(c.id)}`} style={{ color: '#0066cc', textDecoration: 'none' }}>
+                        <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : 'transparent' }}>
+                          <td style={{ padding: '0.6rem 0.8rem', maxWidth: '280px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setViewComplaintModal(c)}
+                              style={{
+                                background: 'none',
+                                border: 'none',
+                                padding: 0,
+                                color: '#0066cc',
+                                fontWeight: 600,
+                                textAlign: 'left',
+                                cursor: 'pointer',
+                                fontSize: '0.9rem',
+                              }}
+                            >
                               {c.title}
-                            </Link>
+                            </button>
+                            {c.model && <small style={{ display: 'block', color: '#666' }}>{c.model}</small>}
+                            {c.deleteRequested && (
+                              <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                ⚠️ Deletion Requested
+                              </span>
+                            )}
                           </td>
-                          <td style={{ padding: '0.6rem 0.8rem' }}>{c.company}</td>
                           <td style={{ padding: '0.6rem 0.8rem' }}>
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: c.type === 'Service' ? '#856404' : '#004085', background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', padding: '1px 5px', borderRadius: '3px', marginRight: '4px' }}>
+                              {c.type || 'Product'}
+                            </span>
+                            <strong>{c.company}</strong>
+                            {c.serviceType && <small style={{ display: 'block', color: '#666' }}>Type: {c.serviceType}</small>}
+                          </td>
+                          <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                             {c.category} {c.subcategory && <small style={{ color: '#666' }}>({c.subcategory})</small>}
                           </td>
                           <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#666' }}>
                             {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
                           </td>
-                          <td style={{ padding: '0.6rem 0.8rem' }}>{getStatusBadge(c.status)}</td>
-                          <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                            {c.proofUrl ? (
-                              <a href={getAssetUrl(c.proofUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc' }}>
-                                View Proof
-                              </a>
-                            ) : (
-                              <span style={{ color: '#999' }}>None</span>
-                            )}
+                          <td style={{ padding: '0.6rem 0.8rem' }}>
+                            {getStatusBadge(c.status, c.deleteRequested)}
+                            <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#666' }}>
+                              {c.status === 'PENDING' && '⏳ Awaiting Admin Approval'}
+                              {c.status === 'APPROVED' && '✅ Live on BadService.in'}
+                              {c.status === 'UNDER_REVIEW' && '🔍 Under Investigation'}
+                              {c.status === 'COMPANY_RESPONDED' && '💬 Company Responded'}
+                              {c.status === 'RESOLVED' && '🎉 Resolved'}
+                              {c.status === 'REJECTED' && '❌ Verification Rejected'}
+                            </div>
                           </td>
                           <td style={{ padding: '0.6rem 0.8rem' }}>
-                            <Link to={`/complaints/${encodeURIComponent(c.id)}`} style={{ fontSize: '0.85rem', color: '#0066cc' }}>
-                              View
-                            </Link>
+                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => setViewComplaintModal(c)}
+                                style={{
+                                  padding: '0.25rem 0.55rem',
+                                  background: '#232f3e',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 600,
+                                }}
+                              >
+                                View Updates
+                              </button>
+                              {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(c.status) && (
+                                <Link
+                                  to={`/complaints/${encodeURIComponent(c.id)}`}
+                                  style={{
+                                    padding: '0.25rem 0.55rem',
+                                    background: '#0066cc',
+                                    color: '#fff',
+                                    textDecoration: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  Public Page ↗
+                                </Link>
+                              )}
+                              {!c.deleteRequested ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setDeleteModalComplaint(c);
+                                    setDeleteReason('');
+                                  }}
+                                  style={{
+                                    padding: '0.25rem 0.5rem',
+                                    background: '#fff',
+                                    color: '#dc3545',
+                                    border: '1px solid #dc3545',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 500,
+                                  }}
+                                >
+                                  Request Delete
+                                </button>
+                              ) : (
+                                <span style={{ fontSize: '0.75rem', color: '#dc3545', fontWeight: 600 }}>
+                                  Delete Pending
+                                </span>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+
+              {/* USER COMPLAINT STATUS & UPDATES MODAL */}
+              {viewComplaintModal && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 9999,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem',
+                  }}
+                  onClick={() => setViewComplaintModal(null)}
+                >
+                  <div
+                    style={{
+                      background: '#fff',
+                      borderRadius: '8px',
+                      width: '100%',
+                      maxWidth: '750px',
+                      maxHeight: '90vh',
+                      overflowY: 'auto',
+                      padding: '1.5rem',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #eee', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+                      <div>
+                        <span style={{ fontSize: '0.75rem', color: '#666', fontWeight: 600 }}>
+                          Complaint ID: {viewComplaintModal.id}
+                        </span>
+                        <h2 style={{ margin: '0.25rem 0 0 0', fontSize: '1.2rem' }}>
+                          {viewComplaintModal.title}
+                        </h2>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setViewComplaintModal(null)}
+                        style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#888' }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    {/* Review Status Timeline / Progress */}
+                    <div style={{ background: '#f8f9fa', border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e' }}>
+                        📊 Review & Status Updates
+                      </h4>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: '#28a745', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>✓</span>
+                          <div>
+                            <strong>Complaint Submitted</strong>
+                            <small style={{ display: 'block', color: '#666' }}>
+                              {viewComplaintModal.createdAt ? new Date(viewComplaintModal.createdAt).toLocaleString() : 'Recent'}
+                            </small>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ width: '22px', height: '22px', borderRadius: '50%', background: viewComplaintModal.status !== 'PENDING' ? '#28a745' : '#ffc107', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 700 }}>
+                            {viewComplaintModal.status !== 'PENDING' ? '✓' : '•'}
+                          </span>
+                          <div>
+                            <strong>Administrative Verification & Moderation</strong>
+                            <div style={{ fontSize: '0.82rem', color: viewComplaintModal.status === 'PENDING' ? '#856404' : '#155724' }}>
+                              {viewComplaintModal.status === 'PENDING' && '⏳ Under Admin Review: Admin verifies invoice and details before making public.'}
+                              {viewComplaintModal.status === 'APPROVED' && '✅ Approved: Verified and published to BadService.in.'}
+                              {viewComplaintModal.status === 'UNDER_REVIEW' && '🔍 In Progress: Investigation underway.'}
+                              {viewComplaintModal.status === 'COMPANY_RESPONDED' && '💬 Company Responded.'}
+                              {viewComplaintModal.status === 'RESOLVED' && '🎉 Resolved.'}
+                              {viewComplaintModal.status === 'REJECTED' && '❌ Verification Rejected.'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {viewComplaintModal.deleteRequested && (
+                          <div style={{ padding: '0.5rem 0.75rem', background: '#ffebee', border: '1px solid #ffcdd2', borderRadius: '4px', color: '#c62828', fontSize: '0.85rem' }}>
+                            <strong>⚠️ Deletion Requested:</strong> A deletion request is awaiting administrator approval.
+                            {viewComplaintModal.deleteReason && <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>Reason: {viewComplaintModal.deleteReason}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Complaint Particulars */}
+                    <div style={{ border: '1px solid #eee', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0' }}>Complaint Details</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', fontSize: '0.85rem' }}>
+                        <div><strong>Type:</strong> {viewComplaintModal.type || 'Product'}</div>
+                        <div><strong>Category:</strong> {viewComplaintModal.category}</div>
+                        {viewComplaintModal.serviceType && <div><strong>Service Type:</strong> {viewComplaintModal.serviceType}</div>}
+                        <div><strong>Brand / Company:</strong> {viewComplaintModal.company}</div>
+                        <div><strong>Model / Details:</strong> {viewComplaintModal.model || 'N/A'}</div>
+                        {viewComplaintModal.location && <div><strong>Location:</strong> {viewComplaintModal.location}</div>}
+                      </div>
+                      <div style={{ marginTop: '0.75rem' }}>
+                        <strong>Description:</strong>
+                        <p style={{ margin: '0.25rem 0 0 0', whiteSpace: 'pre-wrap', fontSize: '0.88rem', color: '#444' }}>
+                          {viewComplaintModal.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Modal Actions */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #eee', paddingTop: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                      {!viewComplaintModal.deleteRequested ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeleteModalComplaint(viewComplaintModal);
+                            setDeleteReason('');
+                          }}
+                          style={{ padding: '0.4rem 0.8rem', background: '#fff', color: '#dc3545', border: '1px solid #dc3545', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          Request Complaint Deletion
+                        </button>
+                      ) : (
+                        <span style={{ fontSize: '0.82rem', color: '#dc3545', fontWeight: 600 }}>
+                          Deletion Request Submitted
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setViewComplaintModal(null)}
+                        style={{ padding: '0.4rem 0.8rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                      >
+                        Close
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* USER DELETE REQUEST MODAL */}
+              {deleteModalComplaint && (
+                <div
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'rgba(0,0,0,0.6)',
+                    zIndex: 10000,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '1rem',
+                  }}
+                  onClick={() => setDeleteModalComplaint(null)}
+                >
+                  <div
+                    style={{
+                      background: '#fff',
+                      borderRadius: '8px',
+                      width: '100%',
+                      maxWidth: '480px',
+                      padding: '1.5rem',
+                      boxShadow: '0 8px 30px rgba(0,0,0,0.25)',
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <h3 style={{ margin: '0 0 0.5rem 0', color: '#d9534f' }}>
+                      Request Complaint Deletion
+                    </h3>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '0.9rem', color: '#555' }}>
+                      Submit a deletion request for "<strong>{deleteModalComplaint.title}</strong>". An administrator will review and approve the request before it is permanently removed.
+                    </p>
+
+                    <form onSubmit={submitDeleteRequest}>
+                      <label style={{ display: 'block', marginBottom: '1rem' }}>
+                        <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
+                          Reason for deletion (optional):
+                        </span>
+                        <textarea
+                          rows={3}
+                          value={deleteReason}
+                          onChange={(e) => setDeleteReason(e.target.value)}
+                          placeholder="e.g., Issue resolved with seller, entered wrong details..."
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem', boxSizing: 'border-box' }}
+                        />
+                      </label>
+
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteModalComplaint(null)}
+                          style={{ padding: '0.45rem 0.9rem', background: '#f8f9fa', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={deleteSubmitting}
+                          style={{ padding: '0.45rem 1rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
+                        >
+                          {deleteSubmitting ? 'Submitting…' : 'Submit Deletion Request'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
                 </div>
               )}
             </div>

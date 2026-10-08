@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import AmazonHeroCarousel from '../components/home/AmazonHeroCarousel.jsx';
 import ComplaintGrid from '../components/complaints/ComplaintGrid.jsx';
-import ProductRankingCarousel from '../components/complaints/ProductRankingCarousel.jsx';
 import ComplaintToolbar from '../components/complaints/ComplaintToolbar.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -41,27 +41,7 @@ export default function ComplaintPage({ search, title = 'All Complaints' }) {
 
   return (
     <div className={isAllComplaints ? 'home-modern' : undefined}>
-      {isAllComplaints && <ProductRankingCarousel />}
-      {isAllComplaints && (
-        <section className="home-consumer-hero">
-          <div className="home-consumer-hero__copy">
-            <h1>Know the problem<br />before you buy.</h1>
-            <p>BadService.in turns real customer complaints into a simple consumer signal — so you can check brands, products and services before spending your money.</p>
-            <div className="home-hero-actions">
-              <a className="home-primary" href="#all-complaints-results">Explore complaints</a>
-              <Link className="home-hero-secondary" to="/file-complaint">File a complaint</Link>
-            </div>
-          </div>
-          <div className="home-consumer-hero__points">
-            {trustPoints.map((item) => (
-              <div className="home-trust-row" key={item.number}>
-                <span>{item.number}</span>
-                <div><strong>{item.title}</strong><p>{item.text}</p></div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {isAllComplaints && <AmazonHeroCarousel compact />}
 
       <section
         className="complaint-page"

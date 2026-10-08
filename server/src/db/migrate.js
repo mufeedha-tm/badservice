@@ -184,6 +184,8 @@ export async function runMigrations() {
   await addColumnIfNotExists('complaints', 'bill_image_url', 'VARCHAR(500) NULL');
 
   await addColumnIfNotExists('complaints', 'bill_image_name', 'VARCHAR(255) NULL');
+  await addColumnIfNotExists('complaints', 'bill_image_public_id', 'VARCHAR(255) NULL');
+  await addColumnIfNotExists('complaints', 'bill_image_version', 'INT UNSIGNED NULL');
 
   await addColumnIfNotExists('complaints', 'product_video_url', 'VARCHAR(500) NULL');
 
@@ -206,7 +208,16 @@ export async function runMigrations() {
   await addColumnIfNotExists('complaints', 'phone_verified', 'TINYINT(1) NOT NULL DEFAULT 0');
   await addColumnIfNotExists('complaints', 'email_verified', 'TINYINT(1) NOT NULL DEFAULT 0');
   await addColumnIfNotExists('complaints', 'otp_verified_at', 'DATETIME NULL');
-  await addColumnIfNotExists('complaints', 'status', "ENUM('PENDING', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED') NOT NULL DEFAULT 'PENDING'");
+  const [complaintStatusColumns] = await pool.query("SHOW COLUMNS FROM complaints LIKE 'status'");
+  if (!String(complaintStatusColumns[0]?.Type || '').includes("'APPROVED'")) {
+    await pool.query(
+      "ALTER TABLE complaints MODIFY status ENUM('PENDING', 'APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED') NOT NULL DEFAULT 'PENDING'"
+    );
+  }
+  await addColumnIfNotExists('complaints', 'service_type', 'VARCHAR(100) NULL');
+  await addColumnIfNotExists('complaints', 'delete_requested', 'TINYINT(1) NOT NULL DEFAULT 0');
+  await addColumnIfNotExists('complaints', 'delete_reason', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'delete_requested_at', 'DATETIME NULL');
   await addColumnIfNotExists('complaints', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
 
   console.log('Migrating otp_challenges table...');
@@ -301,6 +312,18 @@ export async function runMigrations() {
 
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS phone_sessions (
+      id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      token_hash CHAR(64) NOT NULL UNIQUE,
+      phone VARCHAR(20) NOT NULL,
+      expires_at DATETIME NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_phone_sessions_phone (phone),
+      INDEX idx_phone_sessions_expires (expires_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
   `);
 
   // 7. Add helpful indexes

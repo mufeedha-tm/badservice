@@ -1,7 +1,9 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs/promises';
+import { v2 as cloudinary } from 'cloudinary';
 import { env } from '../config/env.js';
+import { ApiError } from '../utils/ApiError.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +13,7 @@ const complaintUploadDirs = {
   billImage: path.resolve(__dirname, '../../uploads/complaints/bills'),
   productVideo: path.resolve(__dirname, '../../uploads/complaints/product-videos'),
 };
+const billUploadDir = complaintUploadDirs.billImage;
 
 for (const dir of Object.values(complaintUploadDirs)) {
   try {
@@ -43,6 +46,7 @@ export async function saveProof(file, category = 'legacy') {
           size: file.size,
           mimetype: file.mimetype,
           publicId: cloudResult.public_id,
+          version: cloudResult.version,
         };
       }
     } catch (cloudErr) {
@@ -72,6 +76,46 @@ export async function saveComplaintMedia(file, mediaType) {
   return saveProof(file, mediaType || 'legacy');
 }
 
+export function getAdminBillImageSource(complaint) {
+  if (!complaint?.billImageUrl) return null;
+
+  if (complaint.billImagePublicId) {
+    cloudinary.config({
+      cloud_name: env.cloudinaryCloudName || process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: env.cloudinaryApiKey || process.env.CLOUDINARY_API_KEY,
+      api_secret: env.cloudinaryApiSecret || process.env.CLOUDINARY_API_SECRET,
+      secure: true,
+    });
+    return {
+      type: 'remote',
+      url: cloudinary.url(complaint.billImagePublicId, {
+        resource_type: 'image',
+        type: 'authenticated',
+        sign_url: true,
+        secure: true,
+        version: complaint.billImageVersion,
+        format: path.extname(complaint.billImageName || '').slice(1),
+      }),
+    };
+  }
+
+  if (/^https?:\/\//i.test(complaint.billImageUrl)) {
+    return { type: 'remote', url: complaint.billImageUrl };
+  }
+
+  const prefix = '/uploads/complaints/bills/';
+  const filename = complaint.billImageUrl.startsWith(prefix)
+    ? complaint.billImageUrl.slice(prefix.length)
+    : '';
+  if (!filename || path.basename(filename) !== filename) {
+    throw new ApiError(404, 'Bill image not found.', 'BILL_IMAGE_NOT_FOUND');
+  }
+  return {
+    type: 'local',
+    path: path.resolve(billUploadDir, filename),
+  };
+}
+
 export function getPublicUrl(storedPath) {
   if (!storedPath) return null;
   if (/^https?:\/\//i.test(storedPath)) return storedPath;
@@ -98,7 +142,12 @@ async function uploadToCloudinary(file, category) {
   const folder = `badservice/${category}`;
 
   const { createHash } = await import('node:crypto');
-  const signatureString = `folder=${folder}&timestamp=${timestamp}${apiSecret}`;
+  const uploadParameters = { folder, timestamp };
+  if (category === 'billImage') uploadParameters.type = 'authenticated';
+  const signatureString = `${Object.keys(uploadParameters)
+    .sort()
+    .map((key) => `${key}=${uploadParameters[key]}`)
+    .join('&')}${apiSecret}`;
   const signature = createHash('sha1').update(signatureString).digest('hex');
 
   const fileBuffer = await fs.readFile(file.path);
@@ -108,6 +157,7 @@ async function uploadToCloudinary(file, category) {
   formData.append('timestamp', String(timestamp));
   formData.append('signature', signature);
   formData.append('folder', folder);
+  if (uploadParameters.type) formData.append('type', uploadParameters.type);
 
   const endpoint = `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`;
   const res = await fetch(endpoint, {

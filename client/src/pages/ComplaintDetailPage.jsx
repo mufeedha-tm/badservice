@@ -40,6 +40,11 @@ export default function ComplaintDetailPage() {
         {result.status === 'not-found' && <p role="status">Complaint not found.</p>}
         {result.complaint && (
           <article>
+            {result.complaint.status === 'PENDING' && (
+              <div style={{ padding: '0.75rem 1rem', background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', borderRadius: '4px', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                ⏳ <strong>Pending Admin Review:</strong> This complaint is currently under review with all uploaded evidence. Once approved by an administrator, it will become publicly searchable on the website.
+              </div>
+            )}
             <div className="complaint-detail__topline">
               {result.complaint.badge && <ComplaintBadge badge={result.complaint.badge} />}
               <span className={`status-chip status-chip--${(result.complaint.status || 'PENDING').toLowerCase()}`}>
@@ -54,7 +59,7 @@ export default function ComplaintDetailPage() {
             )}
             <dl className="complaint-detail__facts">
               <div>
-                <dt>Company</dt>
+                <dt>{result.complaint.type === 'Service' ? 'Service Provider' : 'Company'}</dt>
                 <dd>
                   <Link to={`/companies/${encodeURIComponent(result.complaint.companyId || result.complaint.company)}`}>
                     {result.complaint.company}
@@ -65,9 +70,15 @@ export default function ComplaintDetailPage() {
                 <dt>Category</dt>
                 <dd>{result.complaint.category}</dd>
               </div>
+              {result.complaint.serviceType && (
+                <div>
+                  <dt>Service Type</dt>
+                  <dd>{result.complaint.serviceType}</dd>
+                </div>
+              )}
               {result.complaint.model && (
                 <div>
-                  <dt>Product / Model</dt>
+                  <dt>{result.complaint.type === 'Service' ? 'Purpose / Service Details' : 'Product / Model'}</dt>
                   <dd>{result.complaint.model}</dd>
                 </div>
               )}

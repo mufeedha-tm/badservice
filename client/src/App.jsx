@@ -12,6 +12,7 @@ import HomePage from './pages/HomePage.jsx';
 import ComplaintsSearchPage from './pages/ComplaintsSearchPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import AdminDashboardPage from './pages/AdminDashboardPage.jsx';
+import TermsPage from './pages/TermsPage.jsx';
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
       <Route path="/admin" element={<AdminDashboardPage />} />
       <Route path="/categories/:slug" element={<CategoryPage />} />
       <Route path="/help" element={<HelpPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
     </>

@@ -9,7 +9,7 @@ export default function ComplaintMediaGallery({ complaint, autoPlay = false }) {
         productName={complaint?.productName || complaint?.model || complaint?.company || 'Product'}
         autoPlay={autoPlay}
       />
-      <p className="complaint-media-gallery__caption">Evidence rail: product photo · product video · purchase proof. Missing customer evidence is clearly labelled.</p>
+      <p className="complaint-media-gallery__caption">Product/service photos and videos are shown here. Purchase proof is visible only to admins.</p>
     </div>
   );
 }

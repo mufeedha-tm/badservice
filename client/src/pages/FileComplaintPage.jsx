@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import CompanySelector from '../components/complaints/CompanySelector.jsx';
 import ComplaintTypeSelector from '../components/complaints/ComplaintTypeSelector.jsx';
 import ComplaintUploadField from '../components/complaints/ComplaintUploadField.jsx';
+import LocationAutocomplete from '../components/complaints/LocationAutocomplete.jsx';
 import OtpVerification from '../components/complaints/OtpVerification.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { useAccount } from '../context/AccountContext.jsx';
@@ -18,12 +19,61 @@ import { getTranslation } from '../utils/FileComplaintTranslations.js';
 
 const emptyMedia = { productImage: null, billImage: null, productVideo: null };
 
+export const SERVICE_TYPE_OPTIONS = [
+  { value: 'Hospital', label: 'Hospital / Clinic / Medical', icon: '🏥', category: 'Hospital & Healthcare' },
+  { value: 'Hotel', label: 'Hotel / Resort / Stay', icon: '🏨', category: 'Hotel & Travel' },
+  { value: 'Flight', label: 'Flight / Airline', icon: '✈️', category: 'Flights & Trains' },
+  { value: 'Train', label: 'Train / Railway', icon: '🚆', category: 'Flights & Trains' },
+  { value: 'Restaurant', label: 'Restaurant / Dining', icon: '🍽️', category: 'Restaurants & Food' },
+  { value: 'Food Delivery', label: 'Food Delivery', icon: '🛵', category: 'Restaurants & Food' },
+  { value: 'Vehicle Service', label: 'Vehicle Service / Garage / Repair', icon: '🚗', category: 'Vehicles & Automotive' },
+  { value: 'Bank', label: 'Bank / Loan / Finance', icon: '🏦', category: 'Banking' },
+  { value: 'Telecom', label: 'Telecom / Mobile Network / ISP', icon: '📞', category: 'Telecom' },
+  { value: 'Appliance Repair', label: 'Appliance Repair / Service Center', icon: '📺', category: 'TV & Electronics' },
+  { value: 'Courier / Delivery', label: 'Courier / Parcel Delivery', icon: '📦', category: 'Hotel & Travel' },
+  { value: 'Education', label: 'Education / Coaching / College', icon: '🎓', category: 'Hospital & Healthcare' },
+  { value: 'Other Services', label: 'Other Professional Services', icon: '🛠️', category: 'TV & Electronics' },
+];
+
+const USER_IDENTITY_KEY = 'badservice_user_identity';
+const COMPLAINT_DRAFT_KEY = 'badservice_complaint_draft';
+const COMPLAINT_STEP_KEY = 'badservice_complaint_step';
+const USER_VERIFIED_OTP_KEY = 'badservice_user_verified_otp';
+
 export default function FileComplaintPage() {
+  const navigate = useNavigate();
   const { account } = useAccount();
   const [lang, setLang] = useState(() => localStorage.getItem('badservice_lang') === 'ml' ? 'ml' : 'en');
   const t = (key) => getTranslation(lang, key);
 
-  const [step, setStep] = useState(1);
+  function handleStep1BackAndUnfill() {
+    // Un-fill all form details in Step 1
+    setIdentity({
+      fullName: '',
+      phone: '',
+      email: '',
+      city: '',
+      address: '',
+      terms: false,
+    });
+    setOtpResult(null);
+    setErrors({});
+    try {
+      localStorage.removeItem(USER_IDENTITY_KEY);
+      localStorage.removeItem(USER_VERIFIED_OTP_KEY);
+      localStorage.removeItem(COMPLAINT_STEP_KEY);
+      localStorage.removeItem(COMPLAINT_DRAFT_KEY);
+    } catch {}
+    navigate(-1);
+  }
+
+  const [step, setStep] = useState(() => {
+    try {
+      const savedStep = localStorage.getItem(COMPLAINT_STEP_KEY);
+      if (savedStep === '2') return 2;
+    } catch {}
+    return 1;
+  });
   const [categories, setCategories] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
@@ -33,27 +83,70 @@ export default function FileComplaintPage() {
   const [submitError, setSubmitError] = useState('');
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(null);
-  const [otpResult, setOtpResult] = useState(null);
-
-  const [identity, setIdentity] = useState({
-    fullName: '',
-    phone: '',
-    email: '',
-    city: '',
-    address: '',
-    terms: false,
+  const [otpResult, setOtpResult] = useState(() => {
+    try {
+      const savedOtp = localStorage.getItem(USER_VERIFIED_OTP_KEY);
+      if (savedOtp) return JSON.parse(savedOtp);
+    } catch {}
+    return null;
   });
 
-  const [form, setForm] = useState({
-    type: 'Product',
-    category: '',
-    serviceType: '',
-    company: '',
-    model: '',
-    seller: '',
-    location: '',
-    title: '',
-    description: '',
+  // Persistent User Identity (saved permanently so user never has to re-type on any visit)
+  const [identity, setIdentity] = useState(() => {
+    try {
+      const saved = localStorage.getItem(USER_IDENTITY_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          fullName: parsed.fullName || '',
+          phone: parsed.phone || '',
+          email: parsed.email || '',
+          city: parsed.city || '',
+          address: parsed.address || '',
+          terms: Boolean(parsed.terms),
+        };
+      }
+    } catch {}
+    return {
+      fullName: '',
+      phone: '',
+      email: '',
+      city: '',
+      address: '',
+      terms: false,
+    };
+  });
+
+  // Persistent Complaint Form Draft (preserved when user navigates to other pages and returns)
+  const [form, setForm] = useState(() => {
+    try {
+      const saved = localStorage.getItem(COMPLAINT_DRAFT_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return {
+          type: parsed.type || 'Product',
+          category: parsed.category || '',
+          serviceType: parsed.serviceType || '',
+          company: parsed.company || '',
+          model: parsed.model || '',
+          seller: parsed.seller || '',
+          location: parsed.location || '',
+          title: parsed.title || '',
+          description: parsed.description || '',
+        };
+      }
+    } catch {}
+    return {
+      type: 'Product',
+      category: '',
+      serviceType: '',
+      company: '',
+      model: '',
+      seller: '',
+      location: '',
+      title: '',
+      description: '',
+    };
   });
 
   const [mediaFiles, setMediaFiles] = useState(emptyMedia);
@@ -72,6 +165,20 @@ export default function FileComplaintPage() {
     localStorage.setItem('badservice_lang', lang);
     window.dispatchEvent(new Event('badservice-language-change'));
   }, [lang]);
+
+  // Persist user identity permanently so it is always filled when entering this page
+  useEffect(() => {
+    try {
+      localStorage.setItem(USER_IDENTITY_KEY, JSON.stringify(identity));
+    } catch {}
+  }, [identity]);
+
+  // Persist complaint draft details so if user navigates to other pages, details remain
+  useEffect(() => {
+    try {
+      localStorage.setItem(COMPLAINT_DRAFT_KEY, JSON.stringify(form));
+    } catch {}
+  }, [form]);
 
   // If user is already logged in, automatically populate identity details
   useEffect(() => {
@@ -118,11 +225,50 @@ export default function FileComplaintPage() {
     setErrors((prev) => ({ ...prev, [name]: '' }));
   }
 
+  function handleServiceTypeChange(event) {
+    const nextServiceType = event.target.value;
+    const match = SERVICE_TYPE_OPTIONS.find((opt) => opt.value === nextServiceType);
+    setForm((prev) => {
+      let nextCategory = prev.category;
+      if (match?.category) {
+        const found = categories.find(
+          (c) => c.name.toLowerCase() === match.category.toLowerCase()
+        );
+        nextCategory = found ? found.name : match.category;
+      }
+      return { ...prev, serviceType: nextServiceType, category: nextCategory };
+    });
+    setErrors((prev) => ({ ...prev, serviceType: '', category: '' }));
+  }
+
+  function handleServiceCategoryChange(event) {
+    const nextCategory = event.target.value;
+    setForm((prev) => {
+      let nextServiceType = prev.serviceType;
+      const matches = SERVICE_TYPE_OPTIONS.filter(
+        (opt) => opt.category.toLowerCase() === nextCategory.toLowerCase()
+      );
+      if (matches.length > 0) {
+        const isCurrentMatch = matches.some((opt) => opt.value === prev.serviceType);
+        if (!isCurrentMatch) {
+          nextServiceType = matches[0].value;
+        }
+      }
+      return { ...prev, category: nextCategory, serviceType: nextServiceType };
+    });
+    setErrors((prev) => ({ ...prev, category: '', serviceType: '' }));
+  }
+
   function validateStep1() {
     const nextErrors = {};
     if (!identity.fullName.trim() || identity.fullName.trim().length < 2) nextErrors.fullName = t('errName');
-    if (!identity.email.trim()) nextErrors.email = t('errEmail');
-    if (!otpResult?.verified) nextErrors.otp = t('errOtp');
+    if (identity.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(identity.email.trim())) {
+      nextErrors.email = t('errEmail');
+    }
+    const isPhoneVerified = Boolean(
+      otpResult?.verified && (!otpResult?.phone || otpResult.phone === identity.phone.trim())
+    );
+    if (!isPhoneVerified) nextErrors.otp = t('errOtp');
     if (!identity.phone.trim()) nextErrors.phone = t('errPhoneReq');
     else if (!/^(?:\+91|0)?[6-9]\d{9}$/.test(identity.phone.trim().replace(/[\s\-()]/g, ''))) nextErrors.phone = t('errPhoneInv');
     if (!identity.city.trim()) nextErrors.city = t('errCity');
@@ -163,6 +309,9 @@ export default function FileComplaintPage() {
     event.preventDefault();
     if (validateStep1()) {
       setStep(2);
+      try {
+        localStorage.setItem(COMPLAINT_STEP_KEY, '2');
+      } catch {}
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }
@@ -217,6 +366,7 @@ export default function FileComplaintPage() {
       formData.append('city', identity.city.trim());
       formData.append('address', identity.address.trim());
       formData.append('verificationToken', otpResult.verificationToken);
+      formData.append('verificationMethod', 'phone');
       formData.append('type', form.type);
       formData.append('category', form.category.trim());
       formData.append('company', form.company.trim());
@@ -231,6 +381,11 @@ export default function FileComplaintPage() {
       formData.append('productVideo', mediaFiles.productVideo);
 
       const complaint = await createComplaint(formData);
+      try {
+        localStorage.removeItem(COMPLAINT_DRAFT_KEY);
+        localStorage.removeItem(COMPLAINT_STEP_KEY);
+      } catch {}
+      setStep(1);
       setSubmitted(complaint);
       window.scrollTo({ top: 0, behavior: 'instant' });
     } catch (error) {
@@ -250,9 +405,13 @@ export default function FileComplaintPage() {
             <p>{t('complaintReceived')}</p>
             <p className="success-card__id">{t('complaintId')}: <strong>{submitted.id}</strong></p>
             <div className="success-card__actions">
-              <Link className="primary-cta" to={`/complaints/${encodeURIComponent(submitted.id)}`}>
-                {t('viewComplaint')}
-              </Link>
+              {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(submitted.status) ? (
+                <Link className="primary-cta" to={`/complaints/${encodeURIComponent(submitted.id)}`}>
+                  {t('viewComplaint')}
+                </Link>
+              ) : (
+                <span className="ghost-cta">{t('awaitingApproval')}</span>
+              )}
               <Link className="ghost-cta" to="/">
                 {t('backHome')}
               </Link>
@@ -289,16 +448,16 @@ export default function FileComplaintPage() {
         <div className={`progress-banner${step === 2 || otpResult?.verified ? ' is-verified' : ''}`}>
           {step === 1 ? (
             otpResult?.verified ? (
-              <span>{t('step1Verified')} · {identity.email}</span>
+              <span>{t('step1Verified')} · {identity.phone}</span>
             ) : (
               <span>{t('step1Progress')}</span>
             )
           ) : (
-            <span>{t('step2Verified')}</span>
+            <span>{t('step2Verified')} {identity.phone ? `✓ (${identity.phone})` : '✓'}</span>
           )}
         </div>
 
-        {/* STEP 1: YOUR DETAILS & EMAIL VERIFICATION */}
+        {/* STEP 1: YOUR DETAILS & PHONE VERIFICATION */}
         {step === 1 && (
           <div className="complaint-form-card complaint-form-card--step-one">
             {/* Step 1 Fields */}
@@ -316,36 +475,46 @@ export default function FileComplaintPage() {
                 {errors.fullName && <small className="field-error">{errors.fullName}</small>}
               </label>
 
-              {/* Email Address + Send OTP + Enter OTP + Verify */}
+              {/* Phone Number + Send OTP + Enter OTP + Verify */}
               <OtpVerification
-                email={identity.email}
                 phone={identity.phone}
-                onEmailChange={(val) => {
-                  setIdentity((prev) => ({ ...prev, email: val }));
-                  setOtpResult(null);
-                  setErrors((prev) => ({ ...prev, email: '', otp: '' }));
+                onPhoneChange={(val) => {
+                  setIdentity((prev) => ({ ...prev, phone: val }));
+                  if (otpResult?.phone && otpResult.phone !== val.trim()) {
+                    setOtpResult(null);
+                    try {
+                      localStorage.removeItem(USER_VERIFIED_OTP_KEY);
+                    } catch {}
+                  }
+                  setErrors((prev) => ({ ...prev, phone: '', otp: '' }));
                 }}
-                verified={Boolean(otpResult?.verified)}
+                verified={Boolean(
+                  otpResult?.verified && (!otpResult?.phone || otpResult.phone === identity.phone?.trim())
+                )}
                 onVerified={(res) => {
-                  setOtpResult(res);
+                  const verifiedData = { ...res, verified: true, phone: identity.phone.trim() };
+                  setOtpResult(verifiedData);
+                  try {
+                    localStorage.setItem(USER_VERIFIED_OTP_KEY, JSON.stringify(verifiedData));
+                  } catch {}
                   setErrors((prev) => ({ ...prev, otp: '' }));
                 }}
                 t={t}
-                error={errors.email || errors.otp}
+                error={errors.phone || errors.otp}
               />
 
               <label className="field">
-                <span>{t('mobile')} *</span>
+                <span>{t('email')}</span>
                 <input
-                  name="phone"
-                  type="tel"
-                  value={identity.phone}
+                  name="email"
+                  type="email"
+                  value={identity.email}
                   onChange={handleIdentityChange}
-                  autoComplete="tel"
-                  placeholder={t('phonePlaceholder')}
-                  className={errors.phone ? 'is-invalid' : ''}
+                  autoComplete="email"
+                  placeholder={t('emailPlaceholder')}
+                  className={errors.email ? 'is-invalid' : ''}
                 />
-                {errors.phone && <small className="field-error">{errors.phone}</small>}
+                {errors.email && <small className="field-error">{errors.email}</small>}
               </label>
 
               <label className="field">
@@ -383,13 +552,19 @@ export default function FileComplaintPage() {
                 />
                 <span>
                   {t('terms1')}
-                  <Link to="/help" target="_blank">{t('terms2')}</Link>
-                  {t('terms3')}
+                  <Link to="/terms" target="_blank">{t('terms2')}</Link>
                 </span>
               </label>
               {errors.terms && <small className="field-error">{errors.terms}</small>}
 
-              <div className="complaint-form-actions">
+              <div className="complaint-form-actions complaint-form-actions--split">
+                <button
+                  type="button"
+                  className="submit-button submit-button--ghost"
+                  onClick={handleStep1BackAndUnfill}
+                >
+                  {t('backBtn')}
+                </button>
                 <button type="submit" className="submit-button submit-button--orange">
                   {t('continueBtn')}
                 </button>
@@ -400,7 +575,7 @@ export default function FileComplaintPage() {
 
         {/* STEP 2: COMPLAINT DETAILS & MANDATORY EVIDENCE */}
         {step === 2 && (
-          <div className="complaint-form-card">
+          <div className="complaint-form-card complaint-form-card--step-two">
             <form onSubmit={handleSubmit} noValidate>
               <ComplaintTypeSelector
                 value={form.type}
@@ -410,59 +585,46 @@ export default function FileComplaintPage() {
                 serviceLabel={t('service')}
               />
 
-              <div className="complaint-form-grid">
-                <label className="field">
-                  <span>{t('category')} *</span>
-                  <select
-                    name="category"
-                    value={form.category}
-                    onChange={handleFieldChange}
-                    className={errors.category ? 'is-invalid' : ''}
-                  >
-                    <option value="">{t('selectCategory')}</option>
-                    {categories.map((cat) => (
-                      <option key={cat.id || cat.name} value={cat.name}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                  {errors.category && <small className="field-error">{errors.category}</small>}
-                </label>
-
-                {form.type === 'Product' ? (
-                  <CompanySelector
-                    companies={companies}
-                    value={form.company}
-                    onChange={(company) => {
-                      setForm((prev) => ({ ...prev, company }));
-                      setErrors((prev) => ({ ...prev, company: '' }));
-                    }}
-                    error={errors.company}
-                    label={`${t('company')} *`}
-                    placeholder={companiesLoading ? t('loadingCompanies') : t('companySearchPlaceholder')}
-                    onAddCompany={openCompanyRequest}
-                    addCompanyLabel={t('addCompany')}
-                    addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
-                    loadingLabel={t('loadingCompanies')}
-                    loading={companiesLoading}
-                  />
-                ) : (
-                  <label className="field">
-                    <span>{t('serviceType')} *</span>
-                    <input
-                      name="serviceType"
-                      value={form.serviceType}
-                      onChange={handleFieldChange}
-                      placeholder={t('serviceTypePlaceholder')}
-                      className={errors.serviceType ? 'is-invalid' : ''}
-                    />
-                    {errors.serviceType && <small className="field-error">{errors.serviceType}</small>}
-                  </label>
-                )}
-              </div>
-
               {form.type === 'Product' ? (
                 <>
+                  <div className="complaint-form-grid">
+                    <label className="field">
+                      <span>{t('category')} *</span>
+                      <select
+                        name="category"
+                        value={form.category}
+                        onChange={handleFieldChange}
+                        className={errors.category ? 'is-invalid' : ''}
+                      >
+                        <option value="">{t('selectCategory')}</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id || cat.name} value={cat.name}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.category && <small className="field-error">{errors.category}</small>}
+                    </label>
+
+                    <CompanySelector
+                      companies={companies}
+                      value={form.company}
+                      onChange={(company) => {
+                        setForm((prev) => ({ ...prev, company }));
+                        setErrors((prev) => ({ ...prev, company: '' }));
+                      }}
+                      error={errors.company}
+                      label={`${t('company')} *`}
+                      placeholder={companiesLoading ? t('loadingCompanies') : t('companySearchPlaceholder')}
+                      onAddCompany={openCompanyRequest}
+                      showAddCompanyButton
+                      addCompanyLabel={t('addCompany')}
+                      addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
+                      loadingLabel={t('loadingCompanies')}
+                      loading={companiesLoading}
+                    />
+                  </div>
+
                   <div className="complaint-form-grid">
                     <label className="field">
                       <span>{t('productModel')} *</span>
@@ -488,9 +650,96 @@ export default function FileComplaintPage() {
                       {errors.seller && <small className="field-error">{errors.seller}</small>}
                     </label>
                   </div>
+
+                  <div className="complaint-form-grid">
+                    <LocationAutocomplete
+                      label={`${t('incidentLocation')} *`}
+                      value={form.location}
+                      onChange={(location) => {
+                        setForm((prev) => ({ ...prev, location }));
+                        setErrors((prev) => ({ ...prev, location: '' }));
+                      }}
+                      placeholder={t('locationPlaceholder')}
+                      error={errors.location}
+                    />
+
+                    <label className="field">
+                      <span>{t('complaintTitle')} *</span>
+                      <input
+                        name="title"
+                        value={form.title}
+                        onChange={handleFieldChange}
+                        placeholder={t('titlePlaceholder')}
+                        className={errors.title ? 'is-invalid' : ''}
+                      />
+                      {errors.title && <small className="field-error">{errors.title}</small>}
+                    </label>
+                  </div>
+
+                  <label className="field field--full">
+                    <span>{t('fullDetails')} *</span>
+                    <textarea
+                      name="description"
+                      rows={4}
+                      value={form.description}
+                      onChange={handleFieldChange}
+                      placeholder={t('detailsPlaceholder')}
+                      className={errors.description ? 'is-invalid' : ''}
+                    />
+                    {errors.description && <small className="field-error">{errors.description}</small>}
+                  </label>
                 </>
               ) : (
                 <>
+                  <div className="complaint-form-grid">
+                    <label className="field">
+                      <span>{t('serviceType')} *</span>
+                      <select
+                        name="serviceType"
+                        value={form.serviceType}
+                        onChange={handleServiceTypeChange}
+                        className={errors.serviceType ? 'is-invalid' : ''}
+                      >
+                        <option value="">{t('selectServiceType')}</option>
+                        {form.category && SERVICE_TYPE_OPTIONS.some((opt) => opt.category.toLowerCase() === form.category.toLowerCase()) && (
+                          <optgroup label={`Recommended for ${form.category}`}>
+                            {SERVICE_TYPE_OPTIONS.filter((opt) => opt.category.toLowerCase() === form.category.toLowerCase()).map((opt) => (
+                              <option key={opt.value} value={opt.value}>
+                                {opt.icon} {opt.label}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label={form.category ? 'Other Service Types' : 'All Service Types'}>
+                          {SERVICE_TYPE_OPTIONS.filter((opt) => !form.category || opt.category.toLowerCase() !== form.category.toLowerCase()).map((opt) => (
+                            <option key={opt.value} value={opt.value}>
+                              {opt.icon} {opt.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      </select>
+                      {errors.serviceType && <small className="field-error">{errors.serviceType}</small>}
+                    </label>
+
+                    <label className="field">
+                      <span>{t('category')} *</span>
+                      <select
+                        name="category"
+                        value={form.category}
+                        onChange={handleServiceCategoryChange}
+                        className={errors.category ? 'is-invalid' : ''}
+                      >
+                        <option value="">{t('selectCategory')}</option>
+                        {categories.map((cat) => (
+                          <option key={cat.id || cat.name} value={cat.name}>
+                            {cat.name}
+                          </option>
+                        ))}
+                      </select>
+                      {errors.category && <small className="field-error">{errors.category}</small>}
+                    </label>
+                  </div>
+
                   <div className="complaint-form-grid">
                     <CompanySelector
                       companies={companies}
@@ -500,11 +749,12 @@ export default function FileComplaintPage() {
                         setErrors((prev) => ({ ...prev, company: '' }));
                       }}
                       error={errors.company}
-                      label={`${t('serviceProvider')} *`}
+                      label={`${t('serviceProviderName')} *`}
                       placeholder={companiesLoading ? t('loadingCompanies') : t('serviceProviderPlaceholder')}
                       onAddCompany={openCompanyRequest}
-                      addCompanyLabel={t('addCompany')}
-                      addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
+                      showAddCompanyButton
+                      addCompanyLabel="+ Add Service Provider"
+                      addCompanyOptionLabel={(name) => `+ Add Service Provider “${name}”`}
                       loadingLabel={t('loadingCompanies')}
                       loading={companiesLoading}
                     />
@@ -521,47 +771,46 @@ export default function FileComplaintPage() {
                       {errors.model && <small className="field-error">{errors.model}</small>}
                     </label>
                   </div>
+
+                  <div className="complaint-form-grid">
+                    <LocationAutocomplete
+                      label={`${t('incidentLocation')} *`}
+                      value={form.location}
+                      onChange={(location) => {
+                        setForm((prev) => ({ ...prev, location }));
+                        setErrors((prev) => ({ ...prev, location: '' }));
+                      }}
+                      placeholder={t('locationPlaceholder')}
+                      error={errors.location}
+                    />
+
+                    <label className="field">
+                      <span>{t('complaintTitle')} *</span>
+                      <input
+                        name="title"
+                        value={form.title}
+                        onChange={handleFieldChange}
+                        placeholder={t('titlePlaceholder')}
+                        className={errors.title ? 'is-invalid' : ''}
+                      />
+                      {errors.title && <small className="field-error">{errors.title}</small>}
+                    </label>
+                  </div>
+
+                  <label className="field field--full">
+                    <span>{t('fullDetails')} *</span>
+                    <textarea
+                      name="description"
+                      rows={4}
+                      value={form.description}
+                      onChange={handleFieldChange}
+                      placeholder={t('detailsPlaceholder')}
+                      className={errors.description ? 'is-invalid' : ''}
+                    />
+                    {errors.description && <small className="field-error">{errors.description}</small>}
+                  </label>
                 </>
               )}
-
-              <div className="complaint-form-grid">
-                <label className="field">
-                  <span>{t('incidentLocation')} *</span>
-                  <input
-                    name="location"
-                    value={form.location}
-                    onChange={handleFieldChange}
-                    placeholder={t('locationPlaceholder')}
-                    className={errors.location ? 'is-invalid' : ''}
-                  />
-                  {errors.location && <small className="field-error">{errors.location}</small>}
-                </label>
-
-                <label className="field">
-                  <span>{t('complaintTitle')} *</span>
-                  <input
-                    name="title"
-                    value={form.title}
-                    onChange={handleFieldChange}
-                    placeholder={t('titlePlaceholder')}
-                    className={errors.title ? 'is-invalid' : ''}
-                  />
-                  {errors.title && <small className="field-error">{errors.title}</small>}
-                </label>
-              </div>
-
-              <label className="field field--full">
-                <span>{t('fullDetails')} *</span>
-                <textarea
-                  name="description"
-                  rows={4}
-                  value={form.description}
-                  onChange={handleFieldChange}
-                  placeholder={t('detailsPlaceholder')}
-                  className={errors.description ? 'is-invalid' : ''}
-                />
-                {errors.description && <small className="field-error">{errors.description}</small>}
-              </label>
 
               {/* MANDATORY EVIDENCE SECTION */}
               <div className="evidence-section">
@@ -636,6 +885,9 @@ export default function FileComplaintPage() {
                   className="submit-button submit-button--ghost"
                   onClick={() => {
                     setStep(1);
+                    try {
+                      localStorage.setItem(COMPLAINT_STEP_KEY, '1');
+                    } catch {}
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                 >

@@ -1,10 +1,11 @@
 import fs from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
 import multer from 'multer';
 import { ApiError } from '../utils/ApiError.js';
+import { MAX_ORIGINAL_VIDEO_BYTES } from '../services/videoCompressionService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -80,7 +81,7 @@ export const uploadComplaintMedia = multer({
   }),
   fileFilter: makeComplaintFileFilter(),
   limits: {
-    fileSize: 15 * 1024 * 1024, // 15MB max
+    fileSize: MAX_ORIGINAL_VIDEO_BYTES,
   },
 });
 
@@ -109,7 +110,15 @@ export function getComplaintUploadFolder(fieldName) {
 
 export async function assertRealMediaFile(file, kind) {
   if (!file?.path) throw new ApiError(400, 'Uploaded media is invalid.', 'INVALID_FILE');
-  const header = await readFile(file.path, { encoding: null }).then((buffer) => buffer.subarray(0, 32));
+  const handle = await open(file.path, 'r');
+  const headerBuffer = Buffer.alloc(32);
+  let header;
+  try {
+    const { bytesRead } = await handle.read(headerBuffer, 0, headerBuffer.length, 0);
+    header = headerBuffer.subarray(0, bytesRead);
+  } finally {
+    await handle.close();
+  }
   const starts = (...bytes) => bytes.every((value, index) => header[index] === value);
   const isJpeg = starts(0xff, 0xd8, 0xff);
   const isPng = starts(0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a);
