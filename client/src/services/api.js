@@ -68,20 +68,36 @@ export async function getMyComplaints() {
   return response.data.data;
 }
 
+let cachedCategories = null;
 let pendingCategoriesPromise = null;
 export async function getCategories() {
+  if (cachedCategories) return cachedCategories;
   if (pendingCategoriesPromise) return pendingCategoriesPromise;
   pendingCategoriesPromise = api.get('/categories')
-    .then((response) => response.data.data)
+    .then((response) => {
+      cachedCategories = response.data.data;
+      return cachedCategories;
+    })
     .finally(() => {
-      setTimeout(() => { pendingCategoriesPromise = null; }, 5000);
+      pendingCategoriesPromise = null;
     });
   return pendingCategoriesPromise;
 }
 
+let cachedCompanies = null;
+let pendingCompaniesPromise = null;
 export async function getCompanies() {
-  const response = await api.get('/companies');
-  return response.data.data;
+  if (cachedCompanies) return cachedCompanies;
+  if (pendingCompaniesPromise) return pendingCompaniesPromise;
+  pendingCompaniesPromise = api.get('/companies')
+    .then((response) => {
+      cachedCompanies = response.data.data;
+      return cachedCompanies;
+    })
+    .finally(() => {
+      pendingCompaniesPromise = null;
+    });
+  return pendingCompaniesPromise;
 }
 
 export async function getCompany(id) {
@@ -121,13 +137,18 @@ export async function verifyOtp({ email, phone, otp }) {
   return response.data.data;
 }
 
+let cachedRankings = null;
 let pendingRankingsPromise = null;
 export async function getComplaintRankings() {
+  if (cachedRankings) return cachedRankings;
   if (pendingRankingsPromise) return pendingRankingsPromise;
   pendingRankingsPromise = api.get('/complaints/rankings')
-    .then((response) => response.data.data)
+    .then((response) => {
+      cachedRankings = response.data.data;
+      return cachedRankings;
+    })
     .finally(() => {
-      setTimeout(() => { pendingRankingsPromise = null; }, 5000);
+      pendingRankingsPromise = null;
     });
   return pendingRankingsPromise;
 }

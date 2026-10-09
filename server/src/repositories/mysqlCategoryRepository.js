@@ -1,6 +1,15 @@
 import pool from '../config/database.js';
 
+let categoriesCache = null;
+let categoriesCacheTime = 0;
+const CATEGORIES_CACHE_TTL = 300000; // 5 minutes
+
 export async function findAll() {
+  const now = Date.now();
+  if (categoriesCache && now - categoriesCacheTime < CATEGORIES_CACHE_TTL) {
+    return categoriesCache;
+  }
+
   const [rows] = await pool.execute(`
     SELECT
       id,
@@ -13,6 +22,8 @@ export async function findAll() {
     ORDER BY name ASC
   `);
 
+  categoriesCache = rows;
+  categoriesCacheTime = Date.now();
   return rows;
 }
 

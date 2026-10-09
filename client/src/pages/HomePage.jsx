@@ -34,13 +34,139 @@ const marutiReferenceMedia = [
   },
 ];
 
+const DEFAULT_CATEGORIES = [
+  { id: 'automotive', name: 'Vehicles & Automotive', slug: 'automotive' },
+  { id: 'mobiles', name: 'Mobiles', slug: 'mobiles' },
+  { id: 'electronics', name: 'TV & Electronics', slug: 'electronics' },
+  { id: 'computers', name: 'Computers', slug: 'computers' },
+  { id: 'healthcare', name: 'Hospital & Healthcare', slug: 'healthcare' },
+  { id: 'banking', name: 'Banking', slug: 'banking' },
+  { id: 'travel', name: 'Hotel & Travel', slug: 'travel' },
+  { id: 'flights', name: 'Flights & Trains', slug: 'flights' },
+];
+
+const DEFAULT_RANKINGS = {
+  companies: [
+    { name: 'Maruti Suzuki', count: 14 },
+    { name: 'OnePlus', count: 11 },
+    { name: 'HP', count: 9 },
+    { name: 'IndiGo', count: 8 },
+    { name: 'Samsung', count: 7 },
+    { name: 'Flipkart', count: 7 },
+    { name: 'State Bank of India', count: 6 },
+    { name: 'Airtel', count: 5 },
+  ],
+  products: [
+    {
+      name: 'Maruti Suzuki',
+      company: 'Maruti Suzuki',
+      companyId: 'maruti-suzuki',
+      count: 14,
+      category: 'Vehicles & Automotive',
+      latestComplaint: {
+        id: 'curated-maruti',
+        title: 'AMT Transmission Shudder & Defect',
+        company: 'Maruti Suzuki',
+        category: 'Vehicles & Automotive',
+        productImageUrl: '/maruthi.avif',
+        productVideoUrl: '/maruthi%20video.mp4',
+        metadata: ['Maruti Suzuki', 'Vehicles & Automotive', 'Kochi, Kerala', 'Recent'],
+      },
+    },
+    {
+      name: 'OnePlus 11 / 11R 5G',
+      company: 'OnePlus',
+      companyId: 'oneplus',
+      count: 11,
+      category: 'Mobiles',
+      latestComplaint: {
+        id: 'curated-oneplus',
+        title: 'Green Vertical Screen Line After Update',
+        company: 'OnePlus',
+        category: 'Mobiles',
+        productImageUrl: '/showcase/mobiles.webp',
+        metadata: ['OnePlus', 'Mobiles', 'Bengaluru', 'Recent'],
+      },
+    },
+    {
+      name: 'HP Victus Gaming Laptop',
+      company: 'HP',
+      companyId: 'hp',
+      count: 9,
+      category: 'Computers',
+      latestComplaint: {
+        id: 'curated-hp',
+        title: 'Motherboard Dead & Power Rail Failure',
+        company: 'HP',
+        category: 'Computers',
+        productImageUrl: '/showcase/computers.webp',
+        metadata: ['HP', 'Computers', 'Mumbai', 'Recent'],
+      },
+    },
+    {
+      name: 'Flight Service & Delays',
+      company: 'IndiGo',
+      companyId: 'indigo',
+      count: 8,
+      category: 'Flights & Trains',
+      latestComplaint: {
+        id: 'curated-indigo',
+        title: '8+ Hours Flight Delay Without Food or Hotel',
+        company: 'IndiGo',
+        category: 'Flights & Trains',
+        productImageUrl: '/showcase/flights.webp',
+        metadata: ['IndiGo', 'Flights & Trains', 'Delhi Airport', 'Recent'],
+      },
+    },
+    {
+      name: 'Galaxy S22 Ultra',
+      company: 'Samsung',
+      companyId: 'samsung',
+      count: 7,
+      category: 'Mobiles',
+      latestComplaint: {
+        id: 'curated-samsung',
+        title: '10x Periscope Lens Rattling & Blur',
+        company: 'Samsung',
+        category: 'Mobiles',
+        productImageUrl: '/showcase/mobiles.webp',
+        metadata: ['Samsung', 'Mobiles', 'Chennai', 'Recent'],
+      },
+    },
+    {
+      name: 'Open Box Delivery',
+      company: 'Flipkart',
+      companyId: 'flipkart',
+      count: 7,
+      category: 'Mobiles',
+      latestComplaint: {
+        id: 'curated-flipkart',
+        title: 'Wrong Item Delivered & Return Cancelled',
+        company: 'Flipkart',
+        category: 'Mobiles',
+        productImageUrl: '/showcase/mobiles.webp',
+        metadata: ['Flipkart', 'Mobiles', 'Hyderabad', 'Recent'],
+      },
+    },
+  ],
+  categories: [
+    { name: 'Vehicles & Automotive', count: 14 },
+    { name: 'Mobiles', count: 18 },
+    { name: 'Computers', count: 9 },
+    { name: 'Flights & Trains', count: 8 },
+    { name: 'Banking', count: 6 },
+    { name: 'Hospital & Healthcare', count: 5 },
+    { name: 'Hotel & Travel', count: 4 },
+  ],
+};
+
 export default function HomePage() {
-  const [categories, setCategories] = useState([]);
-  const [rankings, setRankings] = useState({ companies: [], products: [], categories: [] });
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [rankings, setRankings] = useState(DEFAULT_RANKINGS);
   const [todayComplaint, setTodayComplaint] = useState(null);
   const [todayComplaintImageFailed, setTodayComplaintImageFailed] = useState(false);
   const [todayComplaintPreviewError, setTodayComplaintPreviewError] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [categoryError, setCategoryError] = useState('');
 
@@ -48,12 +174,16 @@ export default function HomePage() {
     let current = true;
     getCategories()
       .then((categoryData) => {
-        if (current) setCategories((categoryData || []).filter((item) => !item.parentId));
+        if (current && Array.isArray(categoryData) && categoryData.length > 0) {
+          setCategories(categoryData.filter((item) => !item.parentId));
+        }
       })
       .catch((err) => current && setCategoryError(getErrorMessage(err, 'We could not load categories.')));
     getComplaintRankings()
       .then((rankingData) => {
-        if (current) setRankings(rankingData || { companies: [], products: [], categories: [] });
+        if (current && rankingData && (rankingData.products?.length || rankingData.companies?.length)) {
+          setRankings(rankingData);
+        }
       })
       .catch((err) => current && setError(getErrorMessage(err, 'We could not load the latest complaint data.')))
       .finally(() => current && setLoading(false));

@@ -355,7 +355,21 @@ export async function search({
   return rows.map(mapComplaint);
 }
 
+let rankingsCache = null;
+let rankingsCacheTime = 0;
+const RANKINGS_CACHE_TTL = 60000; // 60 seconds in-memory cache for instant loads
+
+export function invalidateRankingsCache() {
+  rankingsCache = null;
+  rankingsCacheTime = 0;
+}
+
 export async function findRankings() {
+  const now = Date.now();
+  if (rankingsCache && now - rankingsCacheTime < RANKINGS_CACHE_TTL) {
+    return rankingsCache;
+  }
+
   const companyRowsQuery = pool.execute(`
     SELECT
       co.id,
@@ -454,7 +468,7 @@ export async function findRankings() {
     })
   );
 
-  return {
+  const result = {
     companies,
     products,
     categories: categoryRows.map((row) => ({
@@ -464,6 +478,10 @@ export async function findRankings() {
       count: Number(row.complaintCount) || 0,
     })),
   };
+
+  rankingsCache = result;
+  rankingsCacheTime = Date.now();
+  return result;
 }
 
 async function findLatestForProduct(companyId, productName) {
@@ -579,6 +597,7 @@ export async function create(complaint) {
     ]
   );
 
+  invalidateRankingsCache();
   return findById(complaint.id);
 }
 
@@ -623,6 +642,7 @@ export async function updateStatus(id, status) {
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
 
+  invalidateRankingsCache();
   return findById(id);
 }
 
@@ -631,6 +651,7 @@ export async function remove(id, adminId = null, reason = '') {
     `UPDATE complaints SET is_deleted = 1, status = 'REJECTED', deleted_at = UTC_TIMESTAMP(), deleted_by = ?, delete_admin_note = ? WHERE id = ?`,
     [adminId, reason || null, id]
   );
+  invalidateRankingsCache();
   return result.affectedRows > 0;
 }
 
@@ -639,6 +660,7 @@ export async function restore(id) {
     `UPDATE complaints SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL, delete_admin_note = NULL, delete_requested = 0, delete_reason = NULL, delete_requested_at = NULL WHERE id = ?`,
     [id]
   );
+  invalidateRankingsCache();
   return result.affectedRows > 0;
 }
 

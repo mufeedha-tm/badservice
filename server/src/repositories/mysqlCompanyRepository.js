@@ -1,6 +1,20 @@
 import pool from '../config/database.js';
 
+let companiesCache = null;
+let companiesCacheTime = 0;
+const COMPANIES_CACHE_TTL = 120000; // 2 minutes
+
+export function invalidateCompaniesCache() {
+  companiesCache = null;
+  companiesCacheTime = 0;
+}
+
 export async function findAll() {
+  const now = Date.now();
+  if (companiesCache && now - companiesCacheTime < COMPANIES_CACHE_TTL) {
+    return companiesCache;
+  }
+
   const [rows] = await pool.execute(`
     SELECT
       c.id,
@@ -15,6 +29,8 @@ export async function findAll() {
     ORDER BY c.name ASC
   `);
 
+  companiesCache = rows;
+  companiesCacheTime = Date.now();
   return rows;
 }
 
