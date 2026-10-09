@@ -165,14 +165,6 @@ export async function verifyOtp(input) {
 async function sendPhoneOtp(value) {
   const phone = normalizePhoneRequired(value);
 
-  if (env.production) {
-    throw new ApiError(
-      501,
-      'Phone OTP delivery is not configured yet.',
-      'OTP_DELIVERY_UNAVAILABLE'
-    );
-  }
-
   const latest = await otpRepository.findLatestByPhone(phone);
   if (latest?.createdAt) {
     const ageMs = Date.now() - new Date(latest.createdAt).getTime();

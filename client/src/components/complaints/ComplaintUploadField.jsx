@@ -104,8 +104,8 @@ export default function ComplaintUploadField({
       {uploadStatus === 'uploading' && (
         <div style={{ marginTop: '8px', padding: '0 4px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', fontWeight: 600, color: '#e65100', marginBottom: '4px' }}>
-            <span>⏳ Autosaving to server…</span>
-            <span>{uploadProgress || 0}%</span>
+            <span>⏳ Uploading evidence…</span>
+            <span>{uploadProgress < 100 ? `${uploadProgress || 0}%` : 'Processing…'}</span>
           </div>
           <div style={{ width: '100%', height: '6px', background: '#e0e0e0', borderRadius: '3px', overflow: 'hidden' }}>
             <div
@@ -113,7 +113,7 @@ export default function ComplaintUploadField({
                 width: `${uploadProgress || 0}%`,
                 height: '100%',
                 background: 'linear-gradient(90deg, #ff9800, #e65100)',
-                transition: 'width 0.2s ease',
+                transition: 'width 0.25s ease',
               }}
             />
           </div>
@@ -122,7 +122,7 @@ export default function ComplaintUploadField({
 
       {isAutosaved && uploadStatus === 'done' && (
         <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#2e7d32', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
-          <span>✓</span> <span>Autosaved on server (Instant submission ready)</span>
+          <span>✓</span> <span>Evidence verified & attached</span>
         </div>
       )}
 

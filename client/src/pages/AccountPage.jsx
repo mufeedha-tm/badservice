@@ -548,6 +548,15 @@ export default function AccountPage() {
                             {viewComplaintModal.deleteReason && <div style={{ fontSize: '0.8rem', marginTop: '2px' }}>Reason: {viewComplaintModal.deleteReason}</div>}
                           </div>
                         )}
+
+                        {(viewComplaintModal.status === 'REJECTED' || viewComplaintModal.deleteAdminNote) && (
+                          <div style={{ padding: '0.75rem 1rem', background: '#fdf2f2', border: '1.5px solid #f87171', borderRadius: '6px', color: '#991b1b', fontSize: '0.85rem' }}>
+                            <strong>❌ Rejection / Deletion Reason from Admin:</strong>
+                            <div style={{ marginTop: '4px', fontWeight: 600, color: '#7f1d1d' }}>
+                              {viewComplaintModal.deleteAdminNote || viewComplaintModal.statusNote || 'Your complaint was rejected by administrator.'}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 

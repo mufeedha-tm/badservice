@@ -15,10 +15,12 @@ export default function Header({ menuOpen, menuId, onMenuToggle, menuButtonRef, 
         buttonRef={menuButtonRef}
       />
       <SearchBar onSearch={onSearch} />
-      <Link to="/track" className="track-complaint-button" title="Track your complaint status and updates">
-        <span>📍 Track Status</span>
-      </Link>
-      <FileComplaintButton />
+      <div className="header-actions-group">
+        <Link to="/track" className="track-complaint-button" title="Track your complaint status and updates">
+          <span>📍 Track Status</span>
+        </Link>
+        <FileComplaintButton />
+      </div>
     </header>
   );
 }

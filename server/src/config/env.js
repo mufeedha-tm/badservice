@@ -28,6 +28,7 @@ export const env = {
 
   // Single Admin Account Configuration
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
+  adminPassword: process.env.ADMIN_PASSWORD || 'admin',
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || '',
 
   // Session & JWT

@@ -54,7 +54,7 @@ export default function OtpVerification({
       setSent(true);
       startCountdown(60);
       if (result.testCode) {
-        window.alert(`${t('otpTestCode')} ${result.testCode}`);
+        window.alert(`🔔 Mobile Verification Code for ${phone.trim()}:\n\n👉  ${result.testCode}  👈\n\n(Enter this 6-digit code in the field to verify your phone number)`);
       }
       setStatusMessage(
         result.testCode

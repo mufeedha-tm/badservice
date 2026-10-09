@@ -229,9 +229,25 @@ export async function findByUserId(userId) {
   const [rows] = await pool.execute(`
     ${baseQuery}
     WHERE c.user_id = ?
-      AND c.is_deleted = 0
     ORDER BY c.created_at DESC
   `, [userId]);
+
+  return rows.map(mapComplaint);
+}
+
+export async function findByPhone(phone) {
+  if (!phone) return [];
+  const digits = String(phone).replace(/\D/g, '');
+  if (!digits || digits.length < 10) return [];
+  const last10 = digits.slice(-10);
+
+  const [rows] = await pool.execute(`
+    ${baseQuery}
+    WHERE (
+      REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.complainant_phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') LIKE CONCAT('%', ?)
+    )
+    ORDER BY c.created_at DESC
+  `, [last10]);
 
   return rows.map(mapComplaint);
 }
@@ -612,7 +628,7 @@ export async function updateStatus(id, status) {
 
 export async function remove(id, adminId = null, reason = '') {
   const [result] = await pool.execute(
-    `UPDATE complaints SET is_deleted = 1, deleted_at = UTC_TIMESTAMP(), deleted_by = ?, delete_admin_note = ? WHERE id = ?`,
+    `UPDATE complaints SET is_deleted = 1, status = 'REJECTED', deleted_at = UTC_TIMESTAMP(), deleted_by = ?, delete_admin_note = ? WHERE id = ?`,
     [adminId, reason || null, id]
   );
   return result.affectedRows > 0;

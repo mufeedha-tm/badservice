@@ -61,19 +61,31 @@ export const SERVICE_TYPE_OPTIONS = [
   { value: 'Other Services', label: 'Other Professional Services', icon: '🛠️', category: 'Other Professional Services' },
 ];
 
-const USER_IDENTITY_KEY = 'badservice_user_identity';
-const COMPLAINT_DRAFT_KEY = 'badservice_complaint_draft';
-const COMPLAINT_STEP_KEY = 'badservice_complaint_step';
-const USER_VERIFIED_OTP_KEY = 'badservice_user_verified_otp';
+const USER_IDENTITY_KEY = 'badservice_user_identity_session';
+const COMPLAINT_DRAFT_KEY = 'badservice_complaint_draft_session';
+const COMPLAINT_STEP_KEY = 'badservice_complaint_step_session';
+const USER_VERIFIED_OTP_KEY = 'badservice_user_verified_otp_session';
+const UPLOADED_MEDIA_KEY = 'badservice_uploaded_media_session';
 
 export default function FileComplaintPage() {
   const navigate = useNavigate();
   const { account } = useAccount();
   const [lang, setLang] = useState(() => localStorage.getItem('badservice_lang') === 'ml' ? 'ml' : 'en');
   const t = (key) => getTranslation(lang, key);
+  const [copiedId, setCopiedId] = useState(false);
+
+  // Clear legacy localStorage data so reopening the browser starts with completely empty fields & OTP
+  useEffect(() => {
+    try {
+      localStorage.removeItem('badservice_user_identity');
+      localStorage.removeItem('badservice_user_verified_otp');
+      localStorage.removeItem('badservice_complaint_step');
+      localStorage.removeItem('badservice_complaint_draft');
+      localStorage.removeItem('badservice_complaint_uploaded_media');
+    } catch {}
+  }, []);
 
   function handleStep1BackAndUnfill() {
-    // Un-fill all form details in Step 1
     setIdentity({
       fullName: '',
       phone: '',
@@ -85,17 +97,18 @@ export default function FileComplaintPage() {
     setOtpResult(null);
     setErrors({});
     try {
-      localStorage.removeItem(USER_IDENTITY_KEY);
-      localStorage.removeItem(USER_VERIFIED_OTP_KEY);
-      localStorage.removeItem(COMPLAINT_STEP_KEY);
-      localStorage.removeItem(COMPLAINT_DRAFT_KEY);
+      sessionStorage.removeItem(USER_IDENTITY_KEY);
+      sessionStorage.removeItem(USER_VERIFIED_OTP_KEY);
+      sessionStorage.removeItem(COMPLAINT_STEP_KEY);
+      sessionStorage.removeItem(COMPLAINT_DRAFT_KEY);
+      sessionStorage.removeItem(UPLOADED_MEDIA_KEY);
     } catch {}
     navigate(-1);
   }
 
   const [step, setStep] = useState(() => {
     try {
-      const savedStep = localStorage.getItem(COMPLAINT_STEP_KEY);
+      const savedStep = sessionStorage.getItem(COMPLAINT_STEP_KEY);
       if (savedStep === '2') return 2;
     } catch {}
     return 1;
@@ -111,16 +124,16 @@ export default function FileComplaintPage() {
   const [submitted, setSubmitted] = useState(null);
   const [otpResult, setOtpResult] = useState(() => {
     try {
-      const savedOtp = localStorage.getItem(USER_VERIFIED_OTP_KEY);
+      const savedOtp = sessionStorage.getItem(USER_VERIFIED_OTP_KEY);
       if (savedOtp) return JSON.parse(savedOtp);
     } catch {}
     return null;
   });
 
-  // Persistent User Identity (saved permanently so user never has to re-type on any visit)
+  // Transient Session Identity (stays while website is open, cleared on browser close/reopen)
   const [identity, setIdentity] = useState(() => {
     try {
-      const saved = localStorage.getItem(USER_IDENTITY_KEY);
+      const saved = sessionStorage.getItem(USER_IDENTITY_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
@@ -143,10 +156,10 @@ export default function FileComplaintPage() {
     };
   });
 
-  // Persistent Complaint Form Draft (preserved when user navigates to other pages and returns)
+  // Transient Session Complaint Draft (stays while website is open, cleared on browser close/reopen)
   const [form, setForm] = useState(() => {
     try {
-      const saved = localStorage.getItem(COMPLAINT_DRAFT_KEY);
+      const saved = sessionStorage.getItem(COMPLAINT_DRAFT_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         return {
@@ -190,7 +203,7 @@ export default function FileComplaintPage() {
   });
   const [uploadedMedia, setUploadedMedia] = useState(() => {
     try {
-      const saved = localStorage.getItem('badservice_complaint_uploaded_media');
+      const saved = sessionStorage.getItem(UPLOADED_MEDIA_KEY);
       return saved ? JSON.parse(saved) : {};
     } catch {
       return {};
@@ -209,7 +222,7 @@ export default function FileComplaintPage() {
       setUploadedMedia((prev) => {
         const next = { ...prev };
         delete next[kind];
-        try { localStorage.setItem('badservice_complaint_uploaded_media', JSON.stringify(next)); } catch {}
+        try { sessionStorage.setItem(UPLOADED_MEDIA_KEY, JSON.stringify(next)); } catch {}
         return next;
       });
       setUploadStatus((prev) => ({ ...prev, [kind]: 'idle' }));
@@ -217,36 +230,28 @@ export default function FileComplaintPage() {
       return;
     }
 
-    // Immediate background autosave with live percentage
+    // Realistic upload progress: scale to 85% during data transfer, 100% on confirmation
     setUploadStatus((prev) => ({ ...prev, [kind]: 'uploading' }));
-    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+    setUploadProgress((prev) => ({ ...prev, [kind]: 10 }));
 
     uploadDraftMedia(file, kind, (percent) => {
-      setUploadProgress((prev) => ({ ...prev, [kind]: percent }));
+      const scaled = Math.min(85, Math.max(10, Math.round(percent * 0.85)));
+      setUploadProgress((prev) => ({ ...prev, [kind]: scaled }));
     })
       .then((data) => {
         setUploadedMedia((prev) => {
           const next = { ...prev, [kind]: data };
-          try { localStorage.setItem('badservice_complaint_uploaded_media', JSON.stringify(next)); } catch {}
+          try { sessionStorage.setItem(UPLOADED_MEDIA_KEY, JSON.stringify(next)); } catch {}
           return next;
         });
         setUploadStatus((prev) => ({ ...prev, [kind]: 'done' }));
         setUploadProgress((prev) => ({ ...prev, [kind]: 100 }));
       })
       .catch((err) => {
-        console.warn('Media autosave error:', err);
+        console.warn('Media upload issue:', err);
         setUploadStatus((prev) => ({ ...prev, [kind]: 'error' }));
       });
   }
-
-  // Company request modal / inline state
-  const [addCompanyOpen, setAddCompanyOpen] = useState(false);
-  const [reqCompanyName, setReqCompanyName] = useState('');
-  const [reqCategoryId, setReqCategoryId] = useState('');
-  const [reqDescription, setReqDescription] = useState('');
-  const [reqSubmitting, setReqSubmitting] = useState(false);
-  const [reqSuccess, setReqSuccess] = useState('');
-  const [reqError, setReqError] = useState('');
 
   // Persist language
   useEffect(() => {
@@ -254,17 +259,17 @@ export default function FileComplaintPage() {
     window.dispatchEvent(new Event('badservice-language-change'));
   }, [lang]);
 
-  // Persist user identity permanently so it is always filled when entering this page
+  // Persist user identity in sessionStorage for this open browsing session
   useEffect(() => {
     try {
-      localStorage.setItem(USER_IDENTITY_KEY, JSON.stringify(identity));
+      sessionStorage.setItem(USER_IDENTITY_KEY, JSON.stringify(identity));
     } catch {}
   }, [identity]);
 
-  // Persist complaint draft details so if user navigates to other pages, details remain
+  // Persist complaint draft details in sessionStorage for this open browsing session
   useEffect(() => {
     try {
-      localStorage.setItem(COMPLAINT_DRAFT_KEY, JSON.stringify(form));
+      sessionStorage.setItem(COMPLAINT_DRAFT_KEY, JSON.stringify(form));
     } catch {}
   }, [form]);
 
@@ -313,35 +318,17 @@ export default function FileComplaintPage() {
     setErrors((prev) => ({ ...prev, [name]: '' }));
   }
 
+  // Requirement 4: Service type and main category are separate, not auto-filled
   function handleServiceTypeChange(event) {
     const nextServiceType = event.target.value;
-    const match = SERVICE_TYPE_OPTIONS.find((opt) => opt.value === nextServiceType);
-    setForm((prev) => {
-      let nextCategory = prev.category;
-      if (match?.category) {
-        nextCategory = match.category;
-      }
-      return { ...prev, serviceType: nextServiceType, category: nextCategory };
-    });
-    setErrors((prev) => ({ ...prev, serviceType: '', category: '' }));
+    setForm((prev) => ({ ...prev, serviceType: nextServiceType }));
+    setErrors((prev) => ({ ...prev, serviceType: '' }));
   }
 
   function handleServiceCategoryChange(event) {
     const nextCategory = event.target.value;
-    setForm((prev) => {
-      let nextServiceType = prev.serviceType;
-      const matches = SERVICE_TYPE_OPTIONS.filter(
-        (opt) => opt.category.toLowerCase() === nextCategory.toLowerCase()
-      );
-      if (matches.length > 0) {
-        const isCurrentMatch = matches.some((opt) => opt.value === prev.serviceType);
-        if (!isCurrentMatch) {
-          nextServiceType = matches[0].value;
-        }
-      }
-      return { ...prev, category: nextCategory, serviceType: nextServiceType };
-    });
-    setErrors((prev) => ({ ...prev, category: '', serviceType: '' }));
+    setForm((prev) => ({ ...prev, category: nextCategory }));
+    setErrors((prev) => ({ ...prev, category: '' }));
   }
 
   function validateStep1() {
@@ -395,46 +382,10 @@ export default function FileComplaintPage() {
     if (validateStep1()) {
       setStep(2);
       try {
-        localStorage.setItem(COMPLAINT_STEP_KEY, '2');
+        sessionStorage.setItem(COMPLAINT_STEP_KEY, '2');
       } catch {}
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  }
-
-  async function handleCompanyRequestSubmit(e) {
-    e.preventDefault();
-    if (!reqCompanyName.trim()) {
-      setReqError(t('errCompanyNameRequired'));
-      return;
-    }
-    setReqSubmitting(true);
-    setReqError('');
-    try {
-      await submitCompanyRequest({
-        companyName: reqCompanyName.trim(),
-        categoryId: reqCategoryId || 'others',
-        description: reqDescription.trim(),
-      });
-      setReqSuccess(`${t('companyRequestSubmittedPrefix')}${reqCompanyName.trim()}${t('companyRequestSubmittedSuffix')}`);
-      setForm((prev) => ({ ...prev, company: reqCompanyName.trim() }));
-      setTimeout(() => {
-        setAddCompanyOpen(false);
-        setReqSuccess('');
-      }, 2000);
-    } catch (err) {
-      setReqError(getErrorMessage(err, 'Failed to submit company request.'));
-    } finally {
-      setReqSubmitting(false);
-    }
-  }
-
-  function openCompanyRequest(companyName = '') {
-    setReqCompanyName(companyName);
-    setReqCategoryId(categories.find((category) => category.name === form.category)?.id || '');
-    setReqDescription('');
-    setReqError('');
-    setReqSuccess('');
-    setAddCompanyOpen(true);
   }
 
   async function handleSubmit(event) {
@@ -444,7 +395,7 @@ export default function FileComplaintPage() {
     // Check if any file is still actively uploading
     const isUploading = Object.values(uploadStatus).some((s) => s === 'uploading');
     if (isUploading) {
-      setSubmitError('Please wait a moment while evidence files finish autosaving to the server…');
+      setSubmitError('Please wait a moment while evidence files finish uploading…');
       return;
     }
 
@@ -453,7 +404,7 @@ export default function FileComplaintPage() {
 
     try {
       let complaint;
-      // If all 3 media files are already autosaved on server, submit instantaneously via fast JSON!
+      // If all 3 media files are already uploaded, submit instantaneously via fast JSON
       if (uploadedMedia.productImage?.url && uploadedMedia.billImage?.url && uploadedMedia.productVideo?.url) {
         const payload = {
           fullName: identity.fullName.trim(),
@@ -525,9 +476,9 @@ export default function FileComplaintPage() {
       }
 
       try {
-        localStorage.removeItem(COMPLAINT_DRAFT_KEY);
-        localStorage.removeItem(COMPLAINT_STEP_KEY);
-        localStorage.removeItem('badservice_complaint_uploaded_media');
+        sessionStorage.removeItem(COMPLAINT_DRAFT_KEY);
+        sessionStorage.removeItem(COMPLAINT_STEP_KEY);
+        sessionStorage.removeItem(UPLOADED_MEDIA_KEY);
       } catch {}
 
       setStep(1);
@@ -548,7 +499,66 @@ export default function FileComplaintPage() {
             <p className="success-card__eyebrow">BadService.in</p>
             <h1>✓ {t('complaintSubmitted')}</h1>
             <p>{t('complaintReceived')}</p>
-            <p className="success-card__id">{t('complaintId')}: <strong>{submitted.id}</strong></p>
+
+            {/* Requirement 12: Notice that Complaint ID is mandatory for tracking and private to user */}
+            <div
+              style={{
+                backgroundColor: '#fffbeb',
+                border: '1.5px solid #fef08a',
+                borderRadius: '12px',
+                padding: '16px 18px',
+                margin: '18px 0',
+                textAlign: 'left',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <span style={{ fontSize: '1.1rem' }}>📌</span>
+                <strong style={{ color: '#854d0e', fontSize: '0.95rem' }}>
+                  Please Note Down Your Complaint Reference ID
+                </strong>
+              </div>
+              <p style={{ margin: '0 0 10px', fontSize: '0.86rem', color: '#713f12', lineHeight: 1.45 }}>
+                Your <strong>Complaint Reference ID</strong> or your registered <strong>Mobile Number</strong> is required to track the status and review updates of your complaint. This ID is private and is not displayed publicly to other visitors.
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span style={{ fontSize: '0.85rem', color: '#451a03', fontWeight: 600 }}>Your ID:</span>
+                <code
+                  style={{
+                    backgroundColor: '#fff',
+                    border: '1px solid #fde047',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    color: '#9a3412',
+                    letterSpacing: '0.5px',
+                  }}
+                >
+                  {submitted.id}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(submitted.id);
+                    setCopiedId(true);
+                    setTimeout(() => setCopiedId(false), 2500);
+                  }}
+                  style={{
+                    padding: '6px 14px',
+                    backgroundColor: '#232f3e',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {copiedId ? '✓ Copied to Clipboard!' : '📋 Copy Complaint ID'}
+                </button>
+              </div>
+            </div>
+
             <div className="success-card__actions">
               {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(submitted.status) ? (
                 <Link className="primary-cta" to={`/complaints/${encodeURIComponent(submitted.id)}`}>
@@ -628,7 +638,7 @@ export default function FileComplaintPage() {
                   if (otpResult?.phone && otpResult.phone !== val.trim()) {
                     setOtpResult(null);
                     try {
-                      localStorage.removeItem(USER_VERIFIED_OTP_KEY);
+                      sessionStorage.removeItem(USER_VERIFIED_OTP_KEY);
                     } catch {}
                   }
                   setErrors((prev) => ({ ...prev, phone: '', otp: '' }));
@@ -640,7 +650,7 @@ export default function FileComplaintPage() {
                   const verifiedData = { ...res, verified: true, phone: identity.phone.trim() };
                   setOtpResult(verifiedData);
                   try {
-                    localStorage.setItem(USER_VERIFIED_OTP_KEY, JSON.stringify(verifiedData));
+                    sessionStorage.setItem(USER_VERIFIED_OTP_KEY, JSON.stringify(verifiedData));
                   } catch {}
                   setErrors((prev) => ({ ...prev, otp: '' }));
                 }}
@@ -761,10 +771,6 @@ export default function FileComplaintPage() {
                       error={errors.company}
                       label={`${t('company')} *`}
                       placeholder={companiesLoading ? t('loadingCompanies') : t('companySearchPlaceholder')}
-                      onAddCompany={openCompanyRequest}
-                      showAddCompanyButton
-                      addCompanyLabel={t('addCompany')}
-                      addCompanyOptionLabel={(companyName) => `${t('addCompany')} “${companyName}”`}
                       loadingLabel={t('loadingCompanies')}
                       loading={companiesLoading}
                     />
@@ -885,10 +891,6 @@ export default function FileComplaintPage() {
                       error={errors.company}
                       label={`${t('serviceProviderName')} *`}
                       placeholder={companiesLoading ? t('loadingCompanies') : t('serviceProviderPlaceholder')}
-                      onAddCompany={openCompanyRequest}
-                      showAddCompanyButton
-                      addCompanyLabel="+ Add Service Provider"
-                      addCompanyOptionLabel={(name) => `+ Add Service Provider “${name}”`}
                       loadingLabel={t('loadingCompanies')}
                       loading={companiesLoading}
                     />
@@ -1020,7 +1022,7 @@ export default function FileComplaintPage() {
                   onClick={() => {
                     setStep(1);
                     try {
-                      localStorage.setItem(COMPLAINT_STEP_KEY, '1');
+                      sessionStorage.setItem(COMPLAINT_STEP_KEY, '1');
                     } catch {}
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -1036,84 +1038,6 @@ export default function FileComplaintPage() {
                 </button>
               </div>
             </form>
-          </div>
-        )}
-
-        {/* Modal: Request to Add a New Company */}
-        {addCompanyOpen && (
-          <div className="modal-backdrop" onClick={() => setAddCompanyOpen(false)}>
-            <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2>{t('requestCompanyHeading')}</h2>
-                <button
-                  type="button"
-                  className="modal-close"
-                  onClick={() => setAddCompanyOpen(false)}
-                  aria-label={t('closeDialog')}
-                >
-                  ×
-                </button>
-              </div>
-              <p className="modal-description">{t('requestCompanyDesc')}</p>
-
-              <form onSubmit={handleCompanyRequestSubmit} className="modal-form">
-                <label className="field">
-                  <span>{t('companyNamePlaceholder')} *</span>
-                  <input
-                    type="text"
-                    value={reqCompanyName}
-                    onChange={(e) => setReqCompanyName(e.target.value)}
-                    placeholder={t('companySearchPlaceholder')}
-                    required
-                  />
-                </label>
-
-                <label className="field">
-                  <span>{t('selectCatForBrand')}</span>
-                  <select
-                    value={reqCategoryId}
-                    onChange={(e) => setReqCategoryId(e.target.value)}
-                  >
-                    <option value="">{t('selectCategory')}</option>
-                    {categories.map((c) => (
-                      <option key={c.id || c.name} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="field">
-                  <span>{t('companyNotesPlaceholder')}</span>
-                  <textarea
-                    rows={2}
-                    value={reqDescription}
-                    onChange={(e) => setReqDescription(e.target.value)}
-                    placeholder={t('companyNotesInputPlaceholder')}
-                  />
-                </label>
-
-                {reqError && <small className="field-error">{reqError}</small>}
-                {reqSuccess && <small className="field-hint" style={{ color: '#16a34a' }}>{reqSuccess}</small>}
-
-                <div className="modal-actions">
-                  <button
-                    type="button"
-                    className="ghost-cta"
-                    onClick={() => setAddCompanyOpen(false)}
-                  >
-                    {t('closeRequestForm')}
-                  </button>
-                  <button
-                    type="submit"
-                    className="primary-cta"
-                    disabled={reqSubmitting}
-                  >
-                    {reqSubmitting ? t('submittingRequest') : t('submitBrandReq')}
-                  </button>
-                </div>
-              </form>
-            </div>
           </div>
         )}
       </div>

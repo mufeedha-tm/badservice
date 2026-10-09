@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssetUrl, getComplaintRankings, getComplaints } from '../../services/api.js';
 import { getShowcaseImage } from '../../utils/showcaseImages.js';
+import ComplaintCommentsModal from '../complaints/ComplaintCommentsModal.jsx';
 
 // Verified reference records so the carousel is always vibrant and informative
 const CURATED_COMPLAINTS = [
@@ -154,6 +155,7 @@ const CURATED_COMPLAINTS = [
 export default function AmazonHeroCarousel({ compact = false, rankings: propRankings = null }) {
   const [items, setItems] = useState(CURATED_COMPLAINTS);
   const [activeVideoModal, setActiveVideoModal] = useState(null);
+  const [activeCommentsItem, setActiveCommentsItem] = useState(null);
 
   // Populate cards using ranked complaints, avoiding redundant heavy API fetches
   useEffect(() => {
@@ -315,13 +317,36 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
           <span className="amazon-multi-card__warning-badge">
             {item.warningBadge}
           </span>
-          <Link
-            to={item.link}
-            className="amazon-multi-card__action-btn"
-            aria-label={`Inspect ${item.productName} complaints`}
-          >
-            Inspect Evidence →
-          </Link>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setActiveCommentsItem(item);
+              }}
+              style={{
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: '4px',
+                padding: '4px 8px',
+                fontSize: '0.74rem',
+                fontWeight: 700,
+                color: '#1e293b',
+                cursor: 'pointer',
+              }}
+              title="Open discussion and comments"
+            >
+              💬 Comments
+            </button>
+            <Link
+              to={item.link}
+              className="amazon-multi-card__action-btn"
+              aria-label={`Inspect ${item.productName} complaints`}
+            >
+              Inspect →
+            </Link>
+          </div>
         </div>
       </article>
     );
@@ -421,6 +446,16 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             </div>
           </div>
         </div>
+      )}
+      {/* Modal for Hero Card Comments */}
+      {activeCommentsItem && (
+        <ComplaintCommentsModal
+          complaintId={activeCommentsItem.id}
+          complaintTitle={activeCommentsItem.productName || activeCommentsItem.defectTitle}
+          companyName={activeCommentsItem.company}
+          isOpen={Boolean(activeCommentsItem)}
+          onClose={() => setActiveCommentsItem(null)}
+        />
       )}
     </section>
   );

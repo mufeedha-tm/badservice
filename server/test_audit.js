@@ -225,9 +225,9 @@ async function main() {
     const companyRequestId = reqSubmit.data.data.id;
 
     // Login as Admin
-    const adminLogin = await request('/api/auth/login', {
+    const adminLogin = await request('/api/auth/admin-login', {
       method: 'POST',
-      body: { email: 'mufeedha059@gmail.com', password: '12345678' },
+      body: { username: 'admin', password: 'admin' },
     });
     assert(adminLogin.status === 200 && adminLogin.data.data.role === 'ADMIN', 'Admin login successful with role ADMIN');
     const cookieAdmin = adminLogin.setCookie?.split(';')[0];

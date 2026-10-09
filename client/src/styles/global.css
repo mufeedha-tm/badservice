@@ -4529,6 +4529,14 @@ body { background: var(--bs-bg); color: var(--bs-ink); }
   margin: 0;
 }
 
+.primary-header > .header-actions-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-self: end;
+  flex-shrink: 0;
+}
+
 .primary-header > .file-complaint-button {
   justify-self: end;
 }
@@ -5082,54 +5090,57 @@ body { background: var(--bs-bg); color: var(--bs-ink); }
 
 @media (max-width: 720px) {
   .primary-header {
-    display: grid;
-    grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     gap: 8px;
+    padding: 8px 12px;
   }
 
   .logo {
-    grid-column: 1;
-    grid-row: 1;
     font-size: 1.25rem;
   }
 
   .all-menu-button {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 38px;
-    padding: 0 9px;
+    min-height: 36px;
+    padding: 0 8px;
   }
 
   .all-menu-button__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0, 0, 0, 0);
+    display: none;
   }
 
-  .search-bar {
-    grid-column: 1 / 4;
-    grid-row: 2;
+  .primary-header > .header-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+  }
+
+  .track-complaint-button {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .file-complaint-button {
+    font-size: 0.72rem;
+    padding: 6px 10px;
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .primary-header > .search-bar {
+    order: 10;
     width: 100%;
-    flex: initial;
-    min-width: 0;
+    flex-basis: 100%;
     max-width: none;
-    margin: 0;
-    justify-self: stretch;
+    margin: 4px 0 0;
   }
 
   .search-bar select {
     display: none;
-  }
-
-  .file-complaint-button {
-    grid-column: 4;
-    grid-row: 2;
-    margin: 0;
-    min-height: 42px;
-    padding: 0 9px;
-    font-size: .72rem;
   }
 }
 

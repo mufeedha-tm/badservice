@@ -300,7 +300,33 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="home-bottom-cta"><div><span>Have a genuine problem?</span><h2>File it clearly. Help the next consumer.</h2><p>Use the guided complaint form and attach useful evidence where available.</p></div><Link className="home-primary" to="/file-complaint">＋ File a Complaint</Link></section>
+        <section className="home-bottom-cta">
+          <div>
+            <span>Have a genuine problem?</span>
+            <h2>File it clearly. Help the next consumer.</h2>
+            <p>Use the guided complaint form and attach useful evidence where available.</p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <Link className="home-primary" to="/file-complaint">＋ File a Complaint</Link>
+            <Link
+              to="/track"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: '0.65rem 1.25rem',
+                borderRadius: '999px',
+                background: 'rgba(255,255,255,0.15)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.4)',
+                textDecoration: 'none',
+                fontWeight: 700,
+                fontSize: '0.9rem',
+              }}
+            >
+              📍 Track Status & Updations
+            </Link>
+          </div>
+        </section>
       </div>
     </MainLayout>
   );

@@ -44,37 +44,48 @@ export async function trackComplaintStatus(request, response) {
   const query = (request.params.query || '').trim();
   if (!query) throw new ApiError(400, 'Complaint reference ID or phone number is required.', 'MISSING_QUERY');
 
-  // Search by ID or phone
-  let complaint = await complaintRepository.findById(query);
-  if (!complaint) {
-    // Try finding by phone
-    const byPhone = await complaintRepository.search({ q: query, includeDeleted: true });
-    if (byPhone.length > 0) {
-      complaint = byPhone[0];
+  // Search by exact ID first
+  let results = [];
+  const complaint = await complaintRepository.findById(query);
+  if (complaint) {
+    results = [complaint];
+  } else {
+    // If not found by ID, search by phone number
+    const phoneDigits = query.replace(/\D/g, '');
+    if (phoneDigits.length >= 10) {
+      results = await complaintRepository.findByPhone(phoneDigits);
     }
   }
 
-  if (!complaint) {
+  // If still not found and query is non-empty, try search
+  if (results.length === 0) {
+    results = await complaintRepository.search({ q: query, includeDeleted: true });
+  }
+
+  if (results.length === 0) {
     throw new ApiError(404, 'No complaint found matching this Reference ID or phone number.', 'NOT_FOUND');
   }
 
   response.json({
     success: true,
-    data: {
-      id: complaint.id,
-      title: complaint.title,
-      type: complaint.type,
-      company: complaint.company,
-      category: complaint.category,
-      status: complaint.status,
-      statusNote: complaint.statusNote || null,
-      deleteRequested: complaint.deleteRequested,
-      deleteReason: complaint.deleteReason,
-      isDeleted: complaint.isDeleted,
-      createdAt: complaint.createdAt,
-      updatedAt: complaint.updatedAt,
-      productImageUrl: complaint.productImageUrl,
-    },
+    data: results.map((c) => ({
+      id: c.id,
+      title: c.title,
+      type: c.type,
+      company: c.company,
+      productName: c.productModel || c.company,
+      serviceType: c.serviceType || '',
+      category: c.category,
+      status: c.status,
+      statusNote: c.statusNote || null,
+      deleteRequested: c.deleteRequested,
+      deleteReason: c.deleteReason,
+      isDeleted: c.isDeleted,
+      deleteAdminNote: c.deleteAdminNote || null,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+      productImageUrl: c.productImageUrl,
+    })),
   });
 }
 

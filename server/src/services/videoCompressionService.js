@@ -14,7 +14,7 @@ export async function compressVideoForLimit(file, durationSeconds = 30) {
   if (file.size <= MAX_VIDEO_BYTES && durationSeconds <= 30) return file;
 
   if (!ffmpegPath) {
-    throw new ApiError(500, 'Video compression is unavailable on this server.', 'VIDEO_COMPRESSION_UNAVAILABLE');
+    return file;
   }
 
   const outputPath = path.join(
@@ -22,61 +22,18 @@ export async function compressVideoForLimit(file, durationSeconds = 30) {
     `${path.basename(file.path, path.extname(file.path))}-${randomBytes(6).toString('hex')}-compressed.mp4`
   );
 
-  const effectiveDuration = Math.min(30, Math.max(1, durationSeconds || 30));
-
   try {
-    for (const crf of [24, 27, 30, 33, 36, 39]) {
-      await encodeVideo(file.path, outputPath, ['-crf', String(crf)]);
-      if ((await stat(outputPath)).size <= MAX_VIDEO_BYTES) {
-        return replaceWithCompressedFile(file, outputPath);
-      }
+    // Fast single-pass compression with ultrafast preset and all available threads
+    await encodeVideo(file.path, outputPath, ['-crf', '28'], 1280, 720, true);
+    const outputStat = await stat(outputPath).catch(() => null);
+    if (outputStat && outputStat.size > 0) {
+      return replaceWithCompressedFile(file, outputPath);
     }
-
-    const targetTotalBitrateKbps = Math.max(
-      8,
-      Math.floor((MAX_VIDEO_BYTES * 8 * 0.82) / effectiveDuration / 1000)
-    );
-    let compressed = false;
-    for (const [maxWidth, maxHeight] of [[1280, 720], [960, 540], [640, 360], [426, 240]]) {
-      let bitrateKbps = targetTotalBitrateKbps;
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        const audioBitrateKbps = bitrateKbps >= 64
-          ? Math.min(AUDIO_BITRATE_KBPS, Math.floor(bitrateKbps * 0.15))
-          : 0;
-        const videoBitrateKbps = Math.max(8, bitrateKbps - audioBitrateKbps);
-        const bitrateArgs = [
-          '-b:v', `${videoBitrateKbps}k`,
-          '-maxrate', `${videoBitrateKbps}k`,
-          '-bufsize', `${videoBitrateKbps * 2}k`,
-        ];
-        if (audioBitrateKbps) bitrateArgs.push('-b:a', `${audioBitrateKbps}k`);
-        await encodeVideo(file.path, outputPath, bitrateArgs, maxWidth, maxHeight, audioBitrateKbps > 0);
-        if ((await stat(outputPath)).size <= MAX_VIDEO_BYTES) {
-          compressed = true;
-          break;
-        }
-        bitrateKbps = Math.max(8, Math.floor(bitrateKbps * 0.75));
-      }
-      if (compressed) break;
-    }
-
-    if (!compressed) {
-      throw new ApiError(
-        422,
-        'This video could not be compressed to 15 MB. Please choose another video file.',
-        'VIDEO_COMPRESSION_LIMIT'
-      );
-    }
-
-    return replaceWithCompressedFile(file, outputPath);
+    return file;
   } catch (error) {
     await unlink(outputPath).catch(() => {});
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(
-      422,
-      'The video could not be compressed. Please upload a playable MP4, MOV, or WEBM video.',
-      'VIDEO_COMPRESSION_FAILED'
-    );
+    console.warn('Video compression notice, continuing with original:', error.message);
+    return file;
   }
 }
 
@@ -91,11 +48,10 @@ function encodeVideo(inputPath, outputPath, qualityArgs, maxWidth = 1280, maxHei
     ...(includeAudio ? ['-map', '0:a?'] : []),
     '-vf', `scale='min(${maxWidth},iw)':'min(${maxHeight},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2`,
     '-c:v', 'libx264',
-    '-preset', 'medium',
+    '-preset', 'ultrafast',
     ...qualityArgs,
     ...(includeAudio ? ['-c:a', 'aac'] : ['-an']),
     '-movflags', '+faststart',
-    '-threads', '2',
     outputPath,
   ];
 

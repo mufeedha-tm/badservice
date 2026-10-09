@@ -322,8 +322,26 @@ export default function TrackComplaintPage() {
                     </div>
                   </div>
 
+                  {/* Rejection / Deletion Reason from Admin (Requirement 1) */}
+                  {(c.status === 'REJECTED' || c.isDeleted || c.deleteAdminNote) && (
+                    <div style={{ background: '#fdf2f2', border: '1.5px solid #f87171', color: '#991b1b', padding: '1rem 1.25rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>❌</span>
+                        <strong style={{ fontSize: '0.95rem', color: '#b91c1c' }}>
+                          Complaint Rejected / Removed by Administrator
+                        </strong>
+                      </div>
+                      <p style={{ margin: '0 0 6px 0', fontSize: '0.9rem', color: '#7f1d1d' }}>
+                        <strong>Reason for Rejection:</strong> {c.deleteAdminNote || c.statusNote || 'Submitted evidence or complaint details did not meet platform verification standards.'}
+                      </p>
+                      <small style={{ color: '#991b1b', fontSize: '0.8rem', display: 'block' }}>
+                        Notice: To file again, please submit valid purchase invoice and clear proof of service/product issue.
+                      </small>
+                    </div>
+                  )}
+
                   {/* Status Note from Admin / Platform */}
-                  {c.statusNote && (
+                  {c.statusNote && !c.deleteAdminNote && (
                     <div style={{ background: '#e8f4fd', border: '1px solid #b8daff', color: '#004085', padding: '0.85rem 1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                       <strong style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
                         📌 Latest Updation from Admin:

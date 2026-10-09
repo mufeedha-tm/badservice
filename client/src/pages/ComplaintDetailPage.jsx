@@ -186,6 +186,14 @@ export default function ComplaintDetailPage() {
   const isApproved = complaint && ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
   const isCompanyResponded = complaint && ['COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
   const isResolved = complaint && complaint.status === 'RESOLVED';
+  const isOwner = Boolean(
+    complaint && account && (
+      (complaint.userId && account.id === complaint.userId) ||
+      (account.phone && complaint.complainantPhone && account.phone.replace(/\D/g, '') === complaint.complainantPhone.replace(/\D/g, '')) ||
+      (account.email && complaint.complainantEmail && account.email.toLowerCase() === complaint.complainantEmail.toLowerCase())
+    )
+  );
+  const canSeeReferenceId = Boolean(isAdmin || isOwner);
 
   return (
     <MainLayout>
@@ -253,9 +261,15 @@ export default function ComplaintDetailPage() {
                 <h3 style={{ margin: 0, fontSize: '1rem', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span>📍</span> Complaint Status & Tracking
                 </h3>
-                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                  Reference ID: <strong style={{ color: '#0f172a' }}>{complaint.id}</strong>
-                </span>
+                {canSeeReferenceId ? (
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Reference ID: <strong style={{ color: '#0f172a' }}>{complaint.id}</strong>
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                    Verified Community Complaint
+                  </span>
+                )}
               </div>
 
               {/* 4-Stage Progress Tracker */}
@@ -299,44 +313,46 @@ export default function ComplaintDetailPage() {
                 </div>
               )}
 
-              {complaint.deleteRequested ? (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: '#fff3cd', border: '1px solid #ffeeba', padding: '0.75rem 1rem', borderRadius: '6px', marginTop: '0.75rem' }}>
-                  <div>
-                    <strong style={{ color: '#856404', fontSize: '0.85rem' }}>⚠️ Deletion Request Submitted to Admin:</strong>
-                    <div style={{ fontSize: '0.78rem', color: '#664d03', marginTop: '2px' }}>
-                      Reason: {complaint.deleteReason || 'Requested by complainant'}. (Admin review in progress).
+              {canSeeReferenceId && (
+                complaint.deleteRequested ? (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: '#fff3cd', border: '1px solid #ffeeba', padding: '0.75rem 1rem', borderRadius: '6px', marginTop: '0.75rem' }}>
+                    <div>
+                      <strong style={{ color: '#856404', fontSize: '0.85rem' }}>⚠️ Deletion Request Submitted to Admin:</strong>
+                      <div style={{ fontSize: '0.78rem', color: '#664d03', marginTop: '2px' }}>
+                        Reason: {complaint.deleteReason || 'Requested by complainant'}. (Admin review in progress).
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelDeleteRequest}
+                      style={{ padding: '4px 10px', fontSize: '0.78rem', background: '#fff', border: '1px solid #d39e00', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                    >
+                      Cancel Deletion Request
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCancelDeleteRequest}
-                    style={{ padding: '4px 10px', fontSize: '0.78rem', background: '#fff', border: '1px solid #d39e00', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
-                  >
-                    Cancel Deletion Request
-                  </button>
-                </div>
-              ) : (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                    Need to remove this complaint? You can request deletion for admin verification.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteModalOpen(true)}
-                    style={{
-                      padding: '5px 12px',
-                      fontSize: '0.8rem',
-                      fontWeight: 600,
-                      background: '#fff',
-                      border: '1px solid #ef4444',
-                      color: '#dc2626',
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    🗑️ Request Complaint Deletion
-                  </button>
-                </div>
+                ) : (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid #e2e8f0', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                      Need to remove this complaint? You can request deletion for admin verification.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteModalOpen(true)}
+                      style={{
+                        padding: '5px 12px',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        background: '#fff',
+                        border: '1px solid #ef4444',
+                        color: '#dc2626',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🗑️ Request Complaint Deletion
+                    </button>
+                  </div>
+                )
               )}
             </div>
 

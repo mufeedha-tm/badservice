@@ -6,6 +6,7 @@ import {
   approveCompanyRequest,
   createAdminCompany,
   deleteAdminComplaint,
+  restoreAdminComplaint,
   getAdminCategories,
   getAdminCompanies,
   getAdminComplaints,
@@ -49,6 +50,7 @@ export default function AdminDashboardPage() {
   const [complaintFilter, setComplaintFilter] = useState('');
   const [complaintSearch, setComplaintSearch] = useState('');
   const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
+  const [viewDeleted, setViewDeleted] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
 
   // Add Company Admin Form
@@ -95,13 +97,14 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function loadComplaints(onlyDelete = deleteRequestOnly) {
+  async function loadComplaints(onlyDelete = deleteRequestOnly, showOnlyDeleted = viewDeleted) {
     setLoading(true);
     try {
       const data = await getAdminComplaints({
         status: complaintFilter,
         q: complaintSearch,
         deleteRequested: onlyDelete ? 'true' : '',
+        onlyDeleted: showOnlyDeleted ? 'true' : '',
       });
       setComplaints(data);
     } catch (err) {
@@ -188,10 +191,13 @@ export default function AdminDashboardPage() {
   }
 
   async function handleDeleteComplaint(id) {
-    if (!window.confirm('Delete this complaint permanently?')) return;
+    const reason = window.prompt(
+      'Soft delete this complaint?\n\nIt will be hidden from the public website but safely kept in database archives for auditing and restoration.\n\nEnter deletion note / reason (optional):'
+    );
+    if (reason === null) return;
     try {
-      await deleteAdminComplaint(id);
-      showMessage('Complaint deleted successfully.');
+      await deleteAdminComplaint(id, reason.trim() || 'Admin deleted');
+      showMessage('Complaint safely archived (soft-deleted) in database.');
       setComplaints((prev) => prev.filter((c) => c.id !== id));
       if (selectedComplaint?.id === id) {
         setSelectedComplaint(null);
@@ -203,10 +209,10 @@ export default function AdminDashboardPage() {
   }
 
   async function handleApproveDeleteRequest(id) {
-    if (!window.confirm('Approve this deletion request? The complaint will be permanently removed from the website and database.')) return;
+    if (!window.confirm('Approve this deletion request? The complaint will be removed from the public website and safely archived in the database.')) return;
     try {
-      await deleteAdminComplaint(id);
-      showMessage('Delete request approved. Complaint permanently removed.');
+      await deleteAdminComplaint(id, 'User deletion request approved by Admin');
+      showMessage('Delete request approved. Complaint safely archived in database.');
       setComplaints((prev) => prev.filter((c) => c.id !== id));
       if (selectedComplaint?.id === id) {
         setSelectedComplaint(null);
@@ -214,6 +220,20 @@ export default function AdminDashboardPage() {
       loadStats();
     } catch (err) {
       showMessage(err.response?.data?.error?.message || 'Delete approval failed', 'error');
+    }
+  }
+
+  async function handleRestoreComplaint(id) {
+    try {
+      await restoreAdminComplaint(id);
+      showMessage('Complaint restored successfully! It is now active on the platform.');
+      setComplaints((prev) => prev.filter((c) => c.id !== id));
+      if (selectedComplaint?.id === id) {
+        setSelectedComplaint(null);
+      }
+      loadStats();
+    } catch (err) {
+      showMessage(err.response?.data?.error?.message || 'Restore failed', 'error');
     }
   }
 
@@ -486,6 +506,12 @@ export default function AdminDashboardPage() {
                 <h2 style={{ margin: '0.5rem 0' }}>{stats?.totalUsers || 0}</h2>
                 <small style={{ color: '#666' }}>Community members</small>
               </div>
+
+              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Soft-Deleted Archive</p>
+                <h2 style={{ margin: '0.5rem 0', color: '#6c757d' }}>{stats?.deletedComplaints || 0}</h2>
+                <small style={{ color: '#666' }}>Safely stored in DB</small>
+              </div>
             </div>
 
             <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem' }}>
@@ -615,9 +641,29 @@ export default function AdminDashboardPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    const next = !deleteRequestOnly;
-                    setDeleteRequestOnly(next);
-                    loadComplaints(next);
+                    setDeleteRequestOnly(false);
+                    setViewDeleted(false);
+                    loadComplaints(false, false);
+                  }}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    background: !deleteRequestOnly && !viewDeleted ? '#232f3e' : '#f8f9fa',
+                    color: !deleteRequestOnly && !viewDeleted ? '#fff' : '#495057',
+                    border: '1px solid ' + (!deleteRequestOnly && !viewDeleted ? '#232f3e' : '#ced4da'),
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  Active Complaints
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setViewDeleted(false);
+                    setDeleteRequestOnly(true);
+                    loadComplaints(true, false);
                   }}
                   style={{
                     padding: '0.35rem 0.75rem',
@@ -631,6 +677,26 @@ export default function AdminDashboardPage() {
                   }}
                 >
                   ⚠️ Delete Requests {stats?.pendingDeleteRequests > 0 ? `(${stats.pendingDeleteRequests})` : ''}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteRequestOnly(false);
+                    setViewDeleted(true);
+                    loadComplaints(false, true);
+                  }}
+                  style={{
+                    padding: '0.35rem 0.75rem',
+                    background: viewDeleted ? '#6c757d' : '#f8f9fa',
+                    color: viewDeleted ? '#fff' : '#495057',
+                    border: '1px solid ' + (viewDeleted ? '#6c757d' : '#ced4da'),
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '0.82rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  🗄️ Soft-Deleted Archive {stats?.deletedComplaints > 0 ? `(${stats.deletedComplaints})` : ''}
                 </button>
               </div>
 
@@ -667,7 +733,7 @@ export default function AdminDashboardPage() {
             {loading && <p>Loading complaints...</p>}
             {!loading && complaints.length === 0 && (
               <p style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '6px' }}>
-                {deleteRequestOnly ? 'No pending delete requests.' : 'No complaints found matching criteria.'}
+                {deleteRequestOnly ? 'No pending delete requests.' : viewDeleted ? 'No soft-deleted complaints in archive.' : 'No complaints found matching criteria.'}
               </p>
             )}
 
@@ -687,7 +753,7 @@ export default function AdminDashboardPage() {
                   </thead>
                   <tbody>
                     {complaints.map((c) => (
-                      <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : 'transparent' }}>
+                      <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : c.isDeleted ? '#fff5f5' : 'transparent' }}>
                         <td style={{ padding: '0.6rem 0.8rem', maxWidth: '260px' }}>
                           <button
                             type="button"
@@ -710,6 +776,14 @@ export default function AdminDashboardPage() {
                             <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
                               ⚠️ DELETE REQUESTED
                             </span>
+                          )}
+                          {c.isDeleted && (
+                            <div style={{ marginTop: '4px' }}>
+                              <span style={{ display: 'inline-block', padding: '2px 6px', background: '#f8d7da', color: '#721c24', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                🗄️ ARCHIVED IN DB
+                              </span>
+                              {c.deleteAdminNote && <small style={{ display: 'block', color: '#888', fontStyle: 'italic' }}>Note: {c.deleteAdminNote}</small>}
+                            </div>
                           )}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem' }}>
@@ -741,61 +815,87 @@ export default function AdminDashboardPage() {
                           )}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem' }}>
-                          <select
-                            value={c.status || 'PENDING'}
-                            onChange={(e) => handleComplaintStatusChange(c.id, e.target.value)}
-                            style={{
-                              padding: '0.2rem 0.4rem',
-                              fontSize: '0.8rem',
-                              borderRadius: '4px',
-                              fontWeight: 600,
-                              background: c.status === 'APPROVED' ? '#e8f5e9' : c.status === 'PENDING' ? '#fff8e1' : '#f5f5f5',
-                            }}
-                          >
-                            <option value="PENDING">PENDING</option>
-                            <option value="APPROVED">APPROVED</option>
-                            <option value="UNDER_REVIEW">UNDER_REVIEW</option>
-                            <option value="COMPANY_RESPONDED">COMPANY_RESPONDED</option>
-                            <option value="RESOLVED">RESOLVED</option>
-                            <option value="REJECTED">REJECTED</option>
-                          </select>
+                          {c.isDeleted ? (
+                            <span style={{ fontSize: '0.78rem', fontWeight: 700, background: '#f8d7da', color: '#721c24', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
+                              🗑️ SOFT-DELETED
+                            </span>
+                          ) : (
+                            <select
+                              value={c.status || 'PENDING'}
+                              onChange={(e) => handleComplaintStatusChange(c.id, e.target.value)}
+                              style={{
+                                padding: '0.2rem 0.4rem',
+                                fontSize: '0.8rem',
+                                borderRadius: '4px',
+                                fontWeight: 600,
+                                background: c.status === 'APPROVED' ? '#e8f5e9' : c.status === 'PENDING' ? '#fff8e1' : '#f5f5f5',
+                              }}
+                            >
+                              <option value="PENDING">PENDING</option>
+                              <option value="APPROVED">APPROVED</option>
+                              <option value="UNDER_REVIEW">UNDER_REVIEW</option>
+                              <option value="COMPANY_RESPONDED">COMPANY_RESPONDED</option>
+                              <option value="RESOLVED">RESOLVED</option>
+                              <option value="REJECTED">REJECTED</option>
+                            </select>
+                          )}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem' }}>
-                          <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedComplaint(c)}
-                              style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                            >
-                              🔍 Review
-                            </button>
-                            {c.status === 'PENDING' && (
+                          {c.isDeleted ? (
+                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
                               <button
                                 type="button"
-                                onClick={() => handleComplaintStatusChange(c.id, 'APPROVED')}
-                                style={{ padding: '0.25rem 0.5rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                onClick={() => setSelectedComplaint(c)}
+                                style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                               >
-                                ✓ Approve
+                                🔍 Review
                               </button>
-                            )}
-                            {c.deleteRequested && (
                               <button
                                 type="button"
-                                onClick={() => handleApproveDeleteRequest(c.id)}
-                                style={{ padding: '0.25rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                title="Approve deletion request and permanently delete this complaint"
+                                onClick={() => handleRestoreComplaint(c.id)}
+                                style={{ padding: '0.25rem 0.55rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                title="Restore this complaint back to active status on the website"
                               >
-                                Approve Delete
+                                ♻️ Restore
                               </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteComplaint(c.id)}
-                              style={{ padding: '0.25rem 0.4rem', background: '#eee', color: '#dc3545', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-                            >
-                              Delete
-                            </button>
-                          </div>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedComplaint(c)}
+                                style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                              >
+                                🔍 Review
+                              </button>
+                              {c.status === 'PENDING' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleComplaintStatusChange(c.id, 'APPROVED')}
+                                  style={{ padding: '0.25rem 0.5rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                >
+                                  ✓ Approve
+                                </button>
+                              )}
+                              {c.deleteRequested && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleApproveDeleteRequest(c.id)}
+                                  style={{ padding: '0.25rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                  title="Approve deletion request and archive this complaint"
+                                >
+                                  Approve Delete
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteComplaint(c.id)}
+                                style={{ padding: '0.25rem 0.4rem', background: '#eee', color: '#dc3545', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -884,6 +984,30 @@ export default function AdminDashboardPage() {
                           ✗ Reject Delete Request (Keep Complaint)
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {/* Soft-Deleted In DB Alert */}
+                  {selectedComplaint.isDeleted && (
+                    <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', color: '#721c24', padding: '1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
+                      <h4 style={{ margin: '0 0 0.35rem 0', color: '#721c24' }}>
+                        🗄️ Soft-Deleted & Safely Archived in Database
+                      </h4>
+                      <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>
+                        <strong>Admin Deletion Note:</strong> {selectedComplaint.deleteAdminNote || 'Archived by administrator'}
+                      </p>
+                      {selectedComplaint.deletedAt && (
+                        <p style={{ margin: '0 0 0.75rem 0', fontSize: '0.8rem', color: '#666' }}>
+                          Deleted at: {new Date(selectedComplaint.deletedAt).toLocaleString()}
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRestoreComplaint(selectedComplaint.id)}
+                        style={{ padding: '0.45rem 1rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}
+                      >
+                        ♻️ Restore Complaint to Website
+                      </button>
                     </div>
                   )}
 
@@ -1112,13 +1236,23 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteComplaint(selectedComplaint.id)}
-                        style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
-                      >
-                        Delete Complaint
-                      </button>
+                      {selectedComplaint.isDeleted ? (
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreComplaint(selectedComplaint.id)}
+                          style={{ padding: '0.4rem 0.8rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                        >
+                          ♻️ Restore to Website
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteComplaint(selectedComplaint.id)}
+                          style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
+                        >
+                          Soft Delete
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => setSelectedComplaint(null)}
