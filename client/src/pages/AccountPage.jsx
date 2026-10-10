@@ -42,6 +42,7 @@ export default function AccountPage() {
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState('');
+  const [complaintTab, setComplaintTab] = useState('ALL');
 
   useEffect(() => {
     if (account) {
@@ -327,137 +328,187 @@ export default function AccountPage() {
                 </div>
               )}
 
-              {!loadingComplaints && myComplaints.length > 0 && (
-                <div style={{ overflowX: 'auto', marginTop: '1rem' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
-                    <thead>
-                      <tr style={{ borderBottom: '2px solid #ddd', background: '#f5f5f5' }}>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Company</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Category</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Status & Review</th>
-                        <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {myComplaints.map((c) => (
-                        <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : 'transparent' }}>
-                          <td style={{ padding: '0.6rem 0.8rem', maxWidth: '280px' }}>
-                            <button
-                              type="button"
-                              onClick={() => setViewComplaintModal(c)}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                padding: 0,
-                                color: '#0066cc',
-                                fontWeight: 600,
-                                textAlign: 'left',
-                                cursor: 'pointer',
-                                fontSize: '0.9rem',
-                              }}
-                            >
-                              {c.title}
-                            </button>
-                            {c.model && <small style={{ display: 'block', color: '#666' }}>{c.model}</small>}
-                            {c.deleteRequested && (
-                              <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-                                ⚠️ Deletion Requested
-                              </span>
-                            )}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.8rem' }}>
-                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: c.type === 'Service' ? '#856404' : '#004085', background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', padding: '1px 5px', borderRadius: '3px', marginRight: '4px' }}>
-                              {c.type || 'Product'}
-                            </span>
-                            <strong>{c.company}</strong>
-                            {c.serviceType && <small style={{ display: 'block', color: '#666' }}>Type: {c.serviceType}</small>}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                            {c.category} {c.subcategory && <small style={{ color: '#666' }}>({c.subcategory})</small>}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#666' }}>
-                            {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
-                          </td>
-                          <td style={{ padding: '0.6rem 0.8rem' }}>
-                            {getStatusBadge(c.status, c.deleteRequested)}
-                            <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#666' }}>
-                              {c.status === 'PENDING' && '⏳ Awaiting Admin Approval'}
-                              {c.status === 'APPROVED' && '✅ Live on BadService.in'}
-                              {c.status === 'UNDER_REVIEW' && '🔍 Under Investigation'}
-                              {c.status === 'COMPANY_RESPONDED' && '💬 Company Responded'}
-                              {c.status === 'RESOLVED' && '🎉 Resolved'}
-                              {c.status === 'REJECTED' && '❌ Verification Rejected'}
-                            </div>
-                          </td>
-                          <td style={{ padding: '0.6rem 0.8rem' }}>
-                            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                onClick={() => setViewComplaintModal(c)}
-                                style={{
-                                  padding: '0.25rem 0.55rem',
-                                  background: '#232f3e',
-                                  color: '#fff',
-                                  border: 'none',
-                                  borderRadius: '4px',
-                                  cursor: 'pointer',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                View Updates
-                              </button>
-                              {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(c.status) && (
-                                <Link
-                                  to={`/complaints/${encodeURIComponent(c.id)}`}
-                                  style={{
-                                    padding: '0.25rem 0.55rem',
-                                    background: '#0066cc',
-                                    color: '#fff',
-                                    textDecoration: 'none',
-                                    borderRadius: '4px',
-                                    fontSize: '0.78rem',
-                                    fontWeight: 600,
-                                  }}
-                                >
-                                  Public Page ↗
-                                </Link>
-                              )}
-                              {!c.deleteRequested ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setDeleteModalComplaint(c);
-                                    setDeleteReason('');
-                                  }}
-                                  style={{
-                                    padding: '0.25rem 0.5rem',
-                                    background: '#fff',
-                                    color: '#dc3545',
-                                    border: '1px solid #dc3545',
-                                    borderRadius: '4px',
-                                    cursor: 'pointer',
-                                    fontSize: '0.75rem',
-                                    fontWeight: 500,
-                                  }}
-                                >
-                                  Request Delete
-                                </button>
-                              ) : (
-                                <span style={{ fontSize: '0.75rem', color: '#dc3545', fontWeight: 600 }}>
-                                  Delete Pending
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              {!loadingComplaints && myComplaints.length > 0 && (() => {
+                const liveComplaints = myComplaints.filter((c) => ['APPROVED', 'COMPANY_RESPONDED'].includes(c.status));
+                const pendingComplaints = myComplaints.filter((c) => ['PENDING', 'UNDER_REVIEW'].includes(c.status));
+                const previousComplaints = myComplaints.filter((c) => ['RESOLVED', 'REJECTED'].includes(c.status));
+
+                const filtered = myComplaints.filter((c) => {
+                  if (complaintTab === 'LIVE') return ['APPROVED', 'COMPANY_RESPONDED'].includes(c.status);
+                  if (complaintTab === 'PENDING') return ['PENDING', 'UNDER_REVIEW'].includes(c.status);
+                  if (complaintTab === 'RESOLVED') return ['RESOLVED', 'REJECTED'].includes(c.status);
+                  return true;
+                });
+
+                const tabBtn = (tabKey, label, count) => (
+                  <button
+                    type="button"
+                    onClick={() => setComplaintTab(tabKey)}
+                    style={{
+                      padding: '0.4rem 0.8rem',
+                      borderRadius: '6px',
+                      border: '1px solid ' + (complaintTab === tabKey ? '#232f3e' : '#ced4da'),
+                      background: complaintTab === tabKey ? '#232f3e' : '#fff',
+                      color: complaintTab === tabKey ? '#fff' : '#495057',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {label} ({count})
+                  </button>
+                );
+
+                return (
+                  <div>
+                    {/* Complaint History Category Tabs */}
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                      {tabBtn('ALL', 'All Complaints', myComplaints.length)}
+                      {tabBtn('LIVE', '🟢 Live on BadService', liveComplaints.length)}
+                      {tabBtn('PENDING', '⏳ Under Review', pendingComplaints.length)}
+                      {tabBtn('RESOLVED', '📁 Previous / Resolved', previousComplaints.length)}
+                    </div>
+
+                    <div style={{ overflowX: 'auto', marginTop: '0.5rem' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid #ddd', background: '#f5f5f5' }}>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Company</th>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Category</th>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Status & Review</th>
+                            <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filtered.length === 0 ? (
+                            <tr>
+                              <td colSpan="6" style={{ padding: '2rem', textAlign: 'center', color: '#666' }}>
+                                No complaints found in this category.
+                              </td>
+                            </tr>
+                          ) : (
+                            filtered.map((c) => (
+                              <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : 'transparent' }}>
+                                <td style={{ padding: '0.6rem 0.8rem', maxWidth: '280px' }}>
+                                  <button
+                                    type="button"
+                                    onClick={() => setViewComplaintModal(c)}
+                                    style={{
+                                      background: 'none',
+                                      border: 'none',
+                                      padding: 0,
+                                      color: '#0066cc',
+                                      fontWeight: 600,
+                                      textAlign: 'left',
+                                      cursor: 'pointer',
+                                      fontSize: '0.9rem',
+                                    }}
+                                  >
+                                    {c.title}
+                                  </button>
+                                  {c.model && <small style={{ display: 'block', color: '#666' }}>{c.model}</small>}
+                                  {c.deleteRequested && (
+                                    <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
+                                      ⚠️ Deletion Requested
+                                    </span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.8rem' }}>
+                                  <span style={{ fontSize: '0.72rem', fontWeight: 600, color: c.type === 'Service' ? '#856404' : '#004085', background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', padding: '1px 5px', borderRadius: '3px', marginRight: '4px' }}>
+                                    {c.type || 'Product'}
+                                  </span>
+                                  <strong>{c.company}</strong>
+                                  {c.serviceType && <small style={{ display: 'block', color: '#666' }}>Type: {c.serviceType}</small>}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
+                                  {c.category} {c.subcategory && <small style={{ color: '#666' }}>({c.subcategory})</small>}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#666' }}>
+                                  {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
+                                </td>
+                                <td style={{ padding: '0.6rem 0.8rem' }}>
+                                  {getStatusBadge(c.status, c.deleteRequested)}
+                                  <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#666' }}>
+                                    {c.status === 'PENDING' && '⏳ Awaiting Admin Approval'}
+                                    {c.status === 'APPROVED' && '✅ Live on BadService.in'}
+                                    {c.status === 'UNDER_REVIEW' && '🔍 Under Investigation'}
+                                    {c.status === 'COMPANY_RESPONDED' && '💬 Company Responded'}
+                                    {c.status === 'RESOLVED' && '🎉 Resolved'}
+                                    {c.status === 'REJECTED' && '❌ Verification Rejected'}
+                                  </div>
+                                </td>
+                                <td style={{ padding: '0.6rem 0.8rem' }}>
+                                  <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                                    <button
+                                      type="button"
+                                      onClick={() => setViewComplaintModal(c)}
+                                      style={{
+                                        padding: '0.25rem 0.55rem',
+                                        background: '#232f3e',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '0.78rem',
+                                        fontWeight: 600,
+                                      }}
+                                    >
+                                      View Updates
+                                    </button>
+                                    {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(c.status) && (
+                                      <Link
+                                        to={`/complaints/${encodeURIComponent(c.id)}`}
+                                        style={{
+                                          padding: '0.25rem 0.55rem',
+                                          background: '#0066cc',
+                                          color: '#fff',
+                                          textDecoration: 'none',
+                                          borderRadius: '4px',
+                                          fontSize: '0.78rem',
+                                          fontWeight: 600,
+                                        }}
+                                      >
+                                        Public Page ↗
+                                      </Link>
+                                    )}
+                                    {!c.deleteRequested ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setDeleteModalComplaint(c);
+                                          setDeleteReason('');
+                                        }}
+                                        style={{
+                                          padding: '0.25rem 0.5rem',
+                                          background: '#fff',
+                                          color: '#dc3545',
+                                          border: '1px solid #dc3545',
+                                          borderRadius: '4px',
+                                          cursor: 'pointer',
+                                          fontSize: '0.75rem',
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        Request Delete
+                                      </button>
+                                    ) : (
+                                      <span style={{ fontSize: '0.75rem', color: '#dc3545', fontWeight: 600 }}>
+                                        Delete Pending
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* USER COMPLAINT STATUS & UPDATES MODAL */}
               {viewComplaintModal && (

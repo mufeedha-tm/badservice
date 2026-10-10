@@ -64,6 +64,16 @@ export async function patchComplaintStatus(request, response) {
   response.json({ success: true, data: toAdminComplaint(updated) });
 }
 
+export async function patchAdminEditComplaint(request, response) {
+  const updates = request.body || {};
+  const updated = await complaintRepository.updateComplaintAdmin(
+    request.params.id,
+    updates,
+    request.user?.id || 'admin'
+  );
+  response.json({ success: true, data: toAdminComplaint(updated) });
+}
+
 export async function postRejectDeleteRequest(request, response) {
   const { reason } = request.body || {};
   if (!reason || !reason.trim()) {

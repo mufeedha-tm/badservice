@@ -15,28 +15,57 @@ export function isImageUrl(url = '') {
   return /\.(jpe?g|png|webp|gif)(\?.*)?$/i.test(url);
 }
 
-export function getComplaintMedia(complaint) {
+export function getComplaintMedia(complaint, includeBill = false) {
   if (!complaint) return [];
 
   const items = [];
-  if (complaint.productImageUrl) {
+
+  // 1. Multiple product/service photos or single photo
+  if (Array.isArray(complaint.productImages) && complaint.productImages.length > 0) {
+    complaint.productImages.forEach((img, idx) => {
+      const url = typeof img === 'string' ? img : img?.url;
+      if (url) {
+        items.push({
+          id: `${complaint.id}-product-image-${idx}`,
+          kind: 'product',
+          type: 'image',
+          url: getAssetUrl(url),
+          label: complaint.type === 'Service' ? `Service photo ${idx + 1}` : `Product photo ${idx + 1}`,
+        });
+      }
+    });
+  } else if (complaint.productImageUrl) {
     items.push({
       id: `${complaint.id}-product-image`,
       kind: 'product',
       type: 'image',
       url: getAssetUrl(complaint.productImageUrl),
-      label: 'Product photo',
+      label: complaint.type === 'Service' ? 'Service photo' : 'Product photo',
     });
   }
+
+  // 2. Product/Service Video
   if (complaint.productVideoUrl) {
     items.push({
       id: `${complaint.id}-product-video`,
       kind: 'video',
       type: 'video',
       url: getAssetUrl(complaint.productVideoUrl),
-      label: 'Product video',
+      label: complaint.type === 'Service' ? 'Service video' : 'Product video',
     });
   }
+
+  // 3. Bill / Purchase Proof (included where authorized or admin)
+  if (includeBill && complaint.billImageUrl) {
+    items.push({
+      id: `${complaint.id}-bill-image`,
+      kind: 'bill',
+      type: 'image',
+      url: getAssetUrl(complaint.billImageUrl),
+      label: 'Purchase bill proof',
+    });
+  }
+
   return items;
 }
 

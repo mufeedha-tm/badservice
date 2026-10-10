@@ -1,6 +1,6 @@
 import EvidenceCarousel from '../media/EvidenceCarousel.jsx';
 
-export default function ComplaintMediaGallery({ complaint, autoPlay = false }) {
+export default function ComplaintMediaGallery({ complaint, autoPlay = true }) {
   return (
     <div className="complaint-media-gallery complaint-media-gallery--evidence">
       <EvidenceCarousel

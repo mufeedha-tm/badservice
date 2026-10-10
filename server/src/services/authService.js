@@ -98,7 +98,11 @@ export async function loginAdminAccount(input) {
   }
 
   const configuredUsername = (env.adminUsername || 'admin').toLowerCase();
-  const usernameMatches = username.toLowerCase() === configuredUsername || username.toLowerCase() === 'admin';
+  const usernameLower = username.toLowerCase();
+  const usernameMatches =
+    usernameLower === configuredUsername ||
+    usernameLower === 'admin' ||
+    usernameLower === 'badservice97@gmail.com';
 
   let passwordMatches = false;
   if (env.adminPassword && password === env.adminPassword) {
@@ -118,8 +122,8 @@ export async function loginAdminAccount(input) {
     // Auto-provision system admin account if missing
     const newAdmin = {
       id: 'admin-system-id',
-      name: 'Administrator',
-      email: 'admin@badservice.in',
+      name: 'BadService Admin',
+      email: 'badservice97@gmail.com',
       phone: null,
       passwordSalt: '0000000000000000',
       passwordHash: 'admin',

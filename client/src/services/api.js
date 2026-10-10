@@ -257,6 +257,11 @@ export async function updateAdminComplaintStatus(id, status, reason = '') {
   return response.data.data;
 }
 
+export async function editAdminComplaint(id, updates) {
+  const response = await api.patch(`/admin/complaints/${encodeURIComponent(id)}`, updates);
+  return response.data.data;
+}
+
 export async function uploadDraftMedia(file, mediaType, onProgress = null) {
   const formData = new FormData();
   formData.append('media', file);

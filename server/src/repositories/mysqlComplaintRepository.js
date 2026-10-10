@@ -27,11 +27,14 @@ function mapComplaint(row) {
     complainantEmail: row.complainantEmail ?? '',
     complainantCity: row.complainantCity ?? '',
     complainantAddress: row.complainantAddress ?? '',
+    complainantPincode: row.complainantPincode ?? '',
     phoneVerified: Boolean(row.phoneVerified),
     emailVerified: Boolean(row.emailVerified ?? row.phoneVerified),
     otpVerifiedAt: row.otpVerifiedAt ? new Date(row.otpVerifiedAt).toISOString() : null,
     productImageUrl: row.productImageUrl ?? null,
     productImageName: row.productImageName ?? null,
+    productImages: row.productImages ? parseJsonSafe(row.productImages) : (row.productImageUrl ? [{ url: row.productImageUrl, name: row.productImageName }] : []),
+    editHistory: row.editHistory ? parseJsonSafe(row.editHistory) : [],
     billImageUrl: row.billImageUrl ?? null,
     billImageName: row.billImageName ?? null,
     billImagePublicId: row.billImagePublicId ?? null,
@@ -69,6 +72,17 @@ function mapComplaint(row) {
     deleteAdminNote: row.deleteAdminNote ?? null,
     statusNote: row.statusNote ?? '',
   };
+}
+
+function parseJsonSafe(value) {
+  if (!value) return [];
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
 }
 
 function formatCreatedAtLabel(createdAt) {
@@ -109,11 +123,14 @@ const baseQuery = `
     c.complainant_email AS complainantEmail,
     c.complainant_city AS complainantCity,
     c.complainant_address AS complainantAddress,
+    c.complainant_pincode AS complainantPincode,
     c.phone_verified AS phoneVerified,
     c.email_verified AS emailVerified,
     c.otp_verified_at AS otpVerifiedAt,
     c.product_image_url AS productImageUrl,
     c.product_image_name AS productImageName,
+    c.product_images AS productImages,
+    c.edit_history AS editHistory,
     c.bill_image_url AS billImageUrl,
     c.bill_image_name AS billImageName,
     c.bill_image_public_id AS billImagePublicId,
@@ -542,6 +559,8 @@ export async function create(complaint) {
           complainant_email,
           complainant_city,
           complainant_address,
+          complainant_pincode,
+          product_images,
           phone_verified,
           email_verified,
           otp_verified_at,
@@ -553,7 +572,7 @@ export async function create(complaint) {
           action_label,
           service_type
         )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     [
       complaint.id,
@@ -582,6 +601,8 @@ export async function create(complaint) {
       complaint.complainantEmail || null,
       complaint.complainantCity || null,
       complaint.complainantAddress || null,
+      complaint.complainantPincode || null,
+      complaint.productImages ? JSON.stringify(complaint.productImages) : null,
       complaint.phoneVerified ? 1 : 0,
       complaint.emailVerified ? 1 : 0,
       complaint.otpVerifiedAt ? new Date(complaint.otpVerifiedAt) : null,
@@ -597,6 +618,99 @@ export async function create(complaint) {
 
   invalidateRankingsCache();
   return findById(complaint.id);
+}
+
+export async function updateComplaintAdmin(id, updates = {}, adminId = null) {
+  const existing = await findById(id);
+  if (!existing) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
+  }
+
+  // Preserve history
+  const historyEntry = {
+    editedAt: new Date().toISOString(),
+    editedBy: adminId || 'admin',
+    changes: {},
+  };
+
+  const fieldsToUpdate = {};
+  const allowedFields = [
+    'title', 'description', 'model', 'seller', 'location',
+    'complainantName', 'complainantCity', 'complainantAddress', 'complainantPincode',
+    'statusNote',
+  ];
+
+  for (const field of allowedFields) {
+    if (updates[field] !== undefined && updates[field] !== existing[field]) {
+      historyEntry.changes[field] = {
+        from: existing[field],
+        to: updates[field],
+      };
+      fieldsToUpdate[field] = updates[field];
+    }
+  }
+
+  const existingHistory = Array.isArray(existing.editHistory) ? existing.editHistory : [];
+  if (Object.keys(historyEntry.changes).length > 0) {
+    existingHistory.unshift(historyEntry);
+  }
+
+  const sqlSets = [];
+  const params = [];
+
+  if (fieldsToUpdate.title !== undefined) {
+    sqlSets.push('title = ?');
+    params.push(fieldsToUpdate.title);
+  }
+  if (fieldsToUpdate.description !== undefined) {
+    sqlSets.push('description = ?');
+    params.push(fieldsToUpdate.description);
+  }
+  if (fieldsToUpdate.model !== undefined) {
+    sqlSets.push('product_model = ?');
+    params.push(fieldsToUpdate.model);
+  }
+  if (fieldsToUpdate.seller !== undefined) {
+    sqlSets.push('seller_name = ?');
+    params.push(fieldsToUpdate.seller);
+  }
+  if (fieldsToUpdate.location !== undefined) {
+    sqlSets.push('location = ?');
+    params.push(fieldsToUpdate.location);
+  }
+  if (fieldsToUpdate.complainantName !== undefined) {
+    sqlSets.push('complainant_name = ?');
+    params.push(fieldsToUpdate.complainantName);
+  }
+  if (fieldsToUpdate.complainantCity !== undefined) {
+    sqlSets.push('complainant_city = ?');
+    params.push(fieldsToUpdate.complainantCity);
+  }
+  if (fieldsToUpdate.complainantAddress !== undefined) {
+    sqlSets.push('complainant_address = ?');
+    params.push(fieldsToUpdate.complainantAddress);
+  }
+  if (fieldsToUpdate.complainantPincode !== undefined) {
+    sqlSets.push('complainant_pincode = ?');
+    params.push(fieldsToUpdate.complainantPincode);
+  }
+  if (fieldsToUpdate.statusNote !== undefined) {
+    sqlSets.push('status_note = ?');
+    params.push(fieldsToUpdate.statusNote);
+  }
+
+  sqlSets.push('edit_history = ?');
+  params.push(JSON.stringify(existingHistory));
+
+  sqlSets.push('updated_at = UTC_TIMESTAMP()');
+
+  if (sqlSets.length > 0) {
+    params.push(id);
+    await pool.execute(`UPDATE complaints SET ${sqlSets.join(', ')} WHERE id = ?`, params);
+  }
+
+  invalidateRankingsCache();
+  return findById(id);
 }
 
 export async function requestDeletion(id, reason = '') {

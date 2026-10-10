@@ -23,6 +23,7 @@ import {
   updateAdminUserRole,
   updateAdminUserStatus,
   loginAdminAccount,
+  editAdminComplaint,
 } from '../services/api.js';
 
 export default function AdminDashboardPage() {
@@ -52,6 +53,20 @@ export default function AdminDashboardPage() {
   const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
   const [viewDeleted, setViewDeleted] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [editingComplaint, setEditingComplaint] = useState(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    description: '',
+    model: '',
+    seller: '',
+    location: '',
+    complainantName: '',
+    complainantCity: '',
+    complainantAddress: '',
+    complainantPincode: '',
+    statusNote: '',
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Add Company Admin Form
   const [newCompany, setNewCompany] = useState({ name: '', categoryId: '', status: 'ACTIVE' });
@@ -282,6 +297,42 @@ export default function AdminDashboardPage() {
       loadStats();
     } catch (err) {
       showMessage(err.response?.data?.error?.message || 'Rejection failed', 'error');
+    }
+  }
+
+  function handleStartEdit(complaint) {
+    setEditingComplaint(complaint);
+    setEditForm({
+      title: complaint.title || '',
+      description: complaint.description || '',
+      model: complaint.model || '',
+      seller: complaint.seller || '',
+      location: complaint.location || '',
+      complainantName: complaint.complainantName || '',
+      complainantCity: complaint.complainantCity || '',
+      complainantAddress: complaint.complainantAddress || '',
+      complainantPincode: complaint.complainantPincode || '',
+      statusNote: complaint.statusNote || '',
+    });
+  }
+
+  async function handleSaveEdit(e) {
+    e.preventDefault();
+    if (!editingComplaint) return;
+    setSavingEdit(true);
+    try {
+      const updated = await editAdminComplaint(editingComplaint.id, editForm);
+      showMessage('Complaint details updated successfully, changes recorded in history.');
+      setComplaints((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+      if (selectedComplaint?.id === updated.id) {
+        setSelectedComplaint(updated);
+      }
+      setEditingComplaint(null);
+      loadStats();
+    } catch (err) {
+      showMessage(err.response?.data?.error?.message || 'Failed to update complaint', 'error');
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -884,6 +935,14 @@ export default function AdminDashboardPage() {
                               </button>
                               <button
                                 type="button"
+                                onClick={() => handleStartEdit(c)}
+                                style={{ padding: '0.25rem 0.5rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                title="Edit complaint details"
+                              >
+                                ✏️ Edit
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleRestoreComplaint(c.id)}
                                 style={{ padding: '0.25rem 0.55rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                                 title="Restore this complaint back to active status on the website"
@@ -899,6 +958,14 @@ export default function AdminDashboardPage() {
                                 style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
                               >
                                 🔍 Review
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(c)}
+                                style={{ padding: '0.25rem 0.5rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
+                                title="Edit complaint details"
+                              >
+                                ✏️ Edit
                               </button>
                               {c.status === 'PENDING' && (
                                 <button
@@ -1097,6 +1164,23 @@ export default function AdminDashboardPage() {
                           View Public Page ↗
                         </Link>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => handleStartEdit(selectedComplaint)}
+                        style={{
+                          padding: '0.45rem 0.9rem',
+                          background: '#0d6efd',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          fontSize: '0.85rem',
+                        }}
+                        title="Edit complaint details and preserve revision history"
+                      >
+                        ✏️ Edit Details
+                      </button>
                     </div>
                   </div>
 
@@ -1116,6 +1200,7 @@ export default function AdminDashboardPage() {
                         <div><strong>Email:</strong> {selectedComplaint.complainantEmail || 'None'}</div>
                         <div><strong>City:</strong> {selectedComplaint.complainantCity || 'Not specified'}</div>
                         <div><strong>Address:</strong> {selectedComplaint.complainantAddress || 'Not specified'}</div>
+                        <div><strong>PIN Code:</strong> {selectedComplaint.complainantPincode || 'Not specified'}</div>
                         <div><strong>Submitted:</strong> {selectedComplaint.createdAt ? new Date(selectedComplaint.createdAt).toLocaleString() : 'N/A'}</div>
                       </div>
                     </div>
@@ -1154,6 +1239,33 @@ export default function AdminDashboardPage() {
                       {selectedComplaint.description || 'No description provided.'}
                     </p>
                   </div>
+
+                  {/* Edit History Section (Preserving History) */}
+                  {Array.isArray(selectedComplaint.editHistory) && selectedComplaint.editHistory.length > 0 && (
+                    <div style={{ border: '1px solid #cce5ff', background: '#f0f7ff', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
+                      <h4 style={{ margin: '0 0 0.5rem 0', color: '#004085', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        🕒 Edit & Correction History ({selectedComplaint.editHistory.length} revisions)
+                      </h4>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                        {selectedComplaint.editHistory.map((hist, idx) => (
+                          <div key={idx} style={{ background: '#fff', padding: '0.65rem 0.85rem', borderRadius: '4px', border: '1px solid #d6e9f8', fontSize: '0.82rem' }}>
+                            <div style={{ color: '#555', marginBottom: '4px', fontWeight: 600 }}>
+                              Edited at {hist.editedAt ? new Date(hist.editedAt).toLocaleString() : 'N/A'} by {hist.editedBy || 'admin'}
+                            </div>
+                            <ul style={{ margin: '0', paddingLeft: '1.2rem', lineHeight: '1.6' }}>
+                              {Object.entries(hist.changes || {}).map(([fKey, ch]) => (
+                                <li key={fKey}>
+                                  <strong style={{ textTransform: 'capitalize' }}>{fKey}:</strong>{' '}
+                                  <span style={{ color: '#dc3545', textDecoration: 'line-through' }}>{ch.from || '(empty)'}</span> &rarr;{' '}
+                                  <span style={{ color: '#28a745', fontWeight: 600 }}>{ch.to || '(empty)'}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Evidences Section: Bill, Photo, Video */}
                   <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem', background: '#fff' }}>
@@ -1294,6 +1406,211 @@ export default function AdminDashboardPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* EDIT COMPLAINT MODAL (ADMIN EDIT & SPELLING/DETAILS CORRECTION) */}
+            {editingComplaint && (
+              <div
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(0,0,0,0.7)',
+                  zIndex: 10000,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: '1rem',
+                }}
+                onClick={() => setEditingComplaint(null)}
+              >
+                <div
+                  style={{
+                    background: '#fff',
+                    borderRadius: '8px',
+                    width: '100%',
+                    maxWidth: '800px',
+                    maxHeight: '92vh',
+                    overflowY: 'auto',
+                    padding: '1.5rem',
+                    boxShadow: '0 12px 30px rgba(0,0,0,0.35)',
+                  }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0066cc', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+                    <div>
+                      <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#111' }}>
+                        ✏️ Edit Complaint #{editingComplaint.id}
+                      </h2>
+                      <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: '#666' }}>
+                        Correct typos, seller, address, or details. All modifications are logged in complaint revision history.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingComplaint(null)}
+                      style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#888' }}
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                        Complaint Title
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.title}
+                        onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Product Model / Details
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.model}
+                          onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
+                          placeholder="e.g. iPhone 15 Pro, AC Repair"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Seller / Store Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.seller}
+                          onChange={(e) => setEditForm({ ...editForm, seller: e.target.value })}
+                          placeholder="e.g. Retailer or Branch"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Incident Location / Branch
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.location}
+                          onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
+                          placeholder="e.g. Mumbai, Indiranagar Branch"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '6px', border: '1px solid #e9ecef' }}>
+                      <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#232f3e' }}>
+                        👤 Complainant Contact & Address Details
+                      </h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            Complainant Name
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.complainantName}
+                            onChange={(e) => setEditForm({ ...editForm, complainantName: e.target.value })}
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            City / Town
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.complainantCity}
+                            onChange={(e) => setEditForm({ ...editForm, complainantCity: e.target.value })}
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            PIN Code (6 digits)
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.complainantPincode}
+                            onChange={(e) => setEditForm({ ...editForm, complainantPincode: e.target.value })}
+                            placeholder="6-digit PIN code"
+                            maxLength={6}
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Complete Postal Address
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.complainantAddress}
+                          onChange={(e) => setEditForm({ ...editForm, complainantAddress: e.target.value })}
+                          placeholder="House/flat number, street, area"
+                          style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                        Complaint Description
+                      </label>
+                      <textarea
+                        rows={5}
+                        value={editForm.description}
+                        onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem', lineHeight: '1.4' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                        Admin / Status Note (Optional explanation for complainant or internal audit)
+                      </label>
+                      <input
+                        type="text"
+                        value={editForm.statusNote}
+                        onChange={(e) => setEditForm({ ...editForm, statusNote: e.target.value })}
+                        placeholder="e.g. Corrected spelling in brand model per invoice review"
+                        style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                      />
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingComplaint(null)}
+                        disabled={savingEdit}
+                        style={{ padding: '0.5rem 1rem', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingEdit}
+                        style={{ padding: '0.5rem 1.25rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
+                      >
+                        {savingEdit ? 'Saving Changes…' : '💾 Save Changes & Log Revision'}
+                      </button>
+                    </div>
+                  </form>
                 </div>
               </div>
             )}

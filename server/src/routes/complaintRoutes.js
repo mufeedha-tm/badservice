@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getComplaintById,
   getComplaints,
+  getMyComplaints,
   getComplaintRankings,
   postComplaint,
   postRequestDeleteComplaint,
@@ -15,6 +16,7 @@ import { uploadComplaintMedia } from '../middleware/upload.js';
 const complaintRouter = Router();
 
 complaintRouter.get('/complaints', getComplaints);
+complaintRouter.get('/complaints/my', requireAuth, getMyComplaints);
 complaintRouter.get('/complaints/rankings', getComplaintRankings);
 complaintRouter.get('/complaints/track/:query', trackComplaintStatus);
 complaintRouter.post(
@@ -29,6 +31,8 @@ complaintRouter.post(
   attachUser,
   uploadComplaintMedia.fields([
     { name: 'productImage', maxCount: 1 },
+    { name: 'productImage2', maxCount: 1 },
+    { name: 'productImage3', maxCount: 1 },
     { name: 'billImage', maxCount: 1 },
     { name: 'productVideo', maxCount: 1 },
     { name: 'proof', maxCount: 1 },

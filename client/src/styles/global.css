@@ -10,6 +10,26 @@ body {
   line-height: 1.5;
 }
 
+/* Requirement 2: Automatically display headings, subheadings, complaint titles in UPPERCASE */
+h1,
+h2,
+h3,
+h4,
+.complaint-card__title,
+.amazon-multi-card__product,
+.amazon-multi-card__company,
+.amazon-multi-banner__title,
+.product-rank-card h3,
+.complaint-detail h1,
+.complaint-item-title,
+.complaint-title-text,
+.badge,
+.complaint-badge,
+.hero-carousel-title {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 button,
 input,
 select {
@@ -5586,28 +5606,98 @@ html, body {
 .amazon-two-row-grid {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
   width: 100%;
 }
-.amazon-grid-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+.hero-carousel-row-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
-  box-sizing: border-box;
 }
-@media (max-width: 1024px) {
-  .amazon-grid-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.hero-carousel-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  padding-bottom: 8px;
 }
-@media (max-width: 600px) {
-  .amazon-grid-row {
-    grid-template-columns: 1fr;
-  }
+.hero-carousel-row-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
+.hero-carousel-row-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 850;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.03em;
+}
+.hero-carousel-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+.hero-speed-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.hero-speed-btn:hover {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+.hero-marquee-viewport {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  padding: 6px 0 12px;
+  mask-image: linear-gradient(to right, transparent 0%, black 2%, black 98%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 2%, black 98%, transparent 100%);
+}
+.hero-marquee-track {
+  display: flex;
+  gap: 16px;
+  width: max-content;
+  will-change: transform;
+}
+.hero-marquee-track--left {
+  animation: heroMarqueeLeft var(--hero-speed, 35s) linear infinite;
+}
+.hero-marquee-track--right {
+  animation: heroMarqueeRight var(--hero-speed, 40s) linear infinite;
+}
+.hero-marquee-viewport:hover .hero-marquee-track {
+  animation-play-state: paused;
+}
+@keyframes heroMarqueeLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes heroMarqueeRight {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+
 .amazon-multi-card {
-  width: 100%;
+  flex: 0 0 290px;
+  width: 290px;
   background: #ffffff;
   border-radius: 14px;
   border: 1px solid #e2e8f0;
@@ -5615,12 +5705,14 @@ html, body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
   text-align: left;
+  user-select: none;
 }
 .amazon-multi-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.36);
+  z-index: 2;
 }
 .amazon-multi-card__top {
   display: flex;

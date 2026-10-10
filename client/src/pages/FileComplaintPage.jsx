@@ -18,7 +18,7 @@ import {
 import { IMAGE_ACCEPT, VIDEO_ACCEPT } from '../utils/complaintMedia.js';
 import { getTranslation } from '../utils/FileComplaintTranslations.js';
 
-const emptyMedia = { productImage: null, billImage: null, productVideo: null };
+const emptyMedia = { productImage: null, productImage2: null, productImage3: null, billImage: null, productVideo: null };
 
 const SERVICE_KEYWORDS = [
   'hospital', 'clinic', 'healthcare', 'medical', 'health',
@@ -117,6 +117,7 @@ export default function FileComplaintPage() {
       phone: '',
       email: '',
       city: '',
+      pincode: '',
       address: '',
       terms: false,
     });
@@ -175,6 +176,7 @@ export default function FileComplaintPage() {
           phone: parsed.phone || '',
           email: parsed.email || '',
           city: parsed.city || '',
+          pincode: parsed.pincode || '',
           address: parsed.address || '',
           terms: Boolean(parsed.terms),
         };
@@ -185,6 +187,7 @@ export default function FileComplaintPage() {
       phone: '',
       email: '',
       city: '',
+      pincode: '',
       address: '',
       terms: false,
     };
@@ -227,11 +230,15 @@ export default function FileComplaintPage() {
   // Autosave and Loading % State (Points 4 & 5)
   const [uploadProgress, setUploadProgress] = useState({
     productImage: 0,
+    productImage2: 0,
+    productImage3: 0,
     billImage: 0,
     productVideo: 0,
   });
   const [uploadStatus, setUploadStatus] = useState({
     productImage: 'idle',
+    productImage2: 'idle',
+    productImage3: 'idle',
     billImage: 'idle',
     productVideo: 'idle',
   });
@@ -378,6 +385,11 @@ export default function FileComplaintPage() {
     if (!identity.phone.trim()) nextErrors.phone = t('errPhoneReq');
     else if (!/^(?:\+91|0)?[6-9]\d{9}$/.test(identity.phone.trim().replace(/[\s\-()]/g, ''))) nextErrors.phone = t('errPhoneInv');
     if (!identity.city.trim()) nextErrors.city = t('errCity');
+    if (!identity.pincode || !identity.pincode.trim()) {
+      nextErrors.pincode = t('errPincode');
+    } else if (!/^\d{6}$/.test(identity.pincode.trim().replace(/\s+/g, ''))) {
+      nextErrors.pincode = t('errPincodeInv');
+    }
     if (!identity.address.trim()) nextErrors.address = t('errAddress');
     if (!identity.terms) nextErrors.terms = t('errTerms');
     setErrors(nextErrors);
@@ -444,6 +456,7 @@ export default function FileComplaintPage() {
           email: identity.email.trim(),
           phone: identity.phone.trim(),
           city: identity.city.trim(),
+          pincode: identity.pincode.trim(),
           address: identity.address.trim(),
           verificationToken: otpResult.verificationToken,
           verificationMethod: 'phone',
@@ -458,6 +471,11 @@ export default function FileComplaintPage() {
           description: form.description.trim(),
           productImageUrl: uploadedMedia.productImage.url,
           productImageName: uploadedMedia.productImage.name,
+          productImages: [
+            uploadedMedia.productImage ? { url: uploadedMedia.productImage.url, name: uploadedMedia.productImage.name } : null,
+            uploadedMedia.productImage2 ? { url: uploadedMedia.productImage2.url, name: uploadedMedia.productImage2.name } : null,
+            uploadedMedia.productImage3 ? { url: uploadedMedia.productImage3.url, name: uploadedMedia.productImage3.name } : null,
+          ].filter(Boolean),
           billImageUrl: uploadedMedia.billImage.url,
           billImageName: uploadedMedia.billImage.name,
           productVideoUrl: uploadedMedia.productVideo.url,
@@ -471,6 +489,7 @@ export default function FileComplaintPage() {
         formData.append('email', identity.email.trim());
         formData.append('phone', identity.phone.trim());
         formData.append('city', identity.city.trim());
+        formData.append('pincode', identity.pincode.trim());
         formData.append('address', identity.address.trim());
         formData.append('verificationToken', otpResult.verificationToken);
         formData.append('verificationMethod', 'phone');
@@ -489,6 +508,20 @@ export default function FileComplaintPage() {
           formData.append('productImageName', uploadedMedia.productImage.name);
         } else if (mediaFiles.productImage) {
           formData.append('productImage', mediaFiles.productImage);
+        }
+
+        if (uploadedMedia.productImage2?.url) {
+          formData.append('productImage2Url', uploadedMedia.productImage2.url);
+          formData.append('productImage2Name', uploadedMedia.productImage2.name);
+        } else if (mediaFiles.productImage2) {
+          formData.append('productImage2', mediaFiles.productImage2);
+        }
+
+        if (uploadedMedia.productImage3?.url) {
+          formData.append('productImage3Url', uploadedMedia.productImage3.url);
+          formData.append('productImage3Name', uploadedMedia.productImage3.name);
+        } else if (mediaFiles.productImage3) {
+          formData.append('productImage3', mediaFiles.productImage3);
         }
 
         if (uploadedMedia.billImage?.url) {
@@ -705,18 +738,34 @@ export default function FileComplaintPage() {
                 {errors.email && <small className="field-error">{errors.email}</small>}
               </label>
 
-              <label className="field">
-                <span>{t('city')} *</span>
-                <input
-                  name="city"
-                  value={identity.city}
-                  onChange={handleIdentityChange}
-                  autoComplete="address-level2"
-                  placeholder={t('cityPlaceholder')}
-                  className={errors.city ? 'is-invalid' : ''}
-                />
-                {errors.city && <small className="field-error">{errors.city}</small>}
-              </label>
+              <div className="complaint-form-grid">
+                <label className="field">
+                  <span>{t('city')} *</span>
+                  <input
+                    name="city"
+                    value={identity.city}
+                    onChange={handleIdentityChange}
+                    autoComplete="address-level2"
+                    placeholder={t('cityPlaceholder')}
+                    className={errors.city ? 'is-invalid' : ''}
+                  />
+                  {errors.city && <small className="field-error">{errors.city}</small>}
+                </label>
+
+                <label className="field">
+                  <span>{t('pincode')} *</span>
+                  <input
+                    name="pincode"
+                    value={identity.pincode}
+                    maxLength={6}
+                    onChange={handleIdentityChange}
+                    autoComplete="postal-code"
+                    placeholder={t('pincodePlaceholder')}
+                    className={errors.pincode ? 'is-invalid' : ''}
+                  />
+                  {errors.pincode && <small className="field-error">{errors.pincode}</small>}
+                </label>
+              </div>
 
               <label className="field field--full">
                 <span>{t('address')} *</span>
@@ -992,7 +1041,7 @@ export default function FileComplaintPage() {
                 </div>
 
                 <div className="evidence-upload-grid">
-                  {/* 1. Product / Service Photo */}
+                  {/* 1. Product / Service Photo (Primary - Mandatory) */}
                   <ComplaintUploadField
                     id="productImage"
                     name="productImage"
@@ -1007,6 +1056,40 @@ export default function FileComplaintPage() {
                     isAutosaved={Boolean(uploadedMedia.productImage)}
                     onChange={(file, err) => handleMediaSelect('productImage', file, err)}
                     onRemove={() => handleMediaSelect('productImage', null)}
+                  />
+
+                  {/* 1b. Additional Photo 2 (Optional) */}
+                  <ComplaintUploadField
+                    id="productImage2"
+                    name="productImage2"
+                    label={t('productPhoto2')}
+                    helper="Optional extra photo (up to 3 total)"
+                    accept={IMAGE_ACCEPT}
+                    kind="image"
+                    file={mediaFiles.productImage2}
+                    error={errors.productImage2}
+                    uploadProgress={uploadProgress.productImage2}
+                    uploadStatus={uploadStatus.productImage2}
+                    isAutosaved={Boolean(uploadedMedia.productImage2)}
+                    onChange={(file, err) => handleMediaSelect('productImage2', file, err)}
+                    onRemove={() => handleMediaSelect('productImage2', null)}
+                  />
+
+                  {/* 1c. Additional Photo 3 (Optional) */}
+                  <ComplaintUploadField
+                    id="productImage3"
+                    name="productImage3"
+                    label={t('productPhoto3')}
+                    helper="Optional extra photo (up to 3 total)"
+                    accept={IMAGE_ACCEPT}
+                    kind="image"
+                    file={mediaFiles.productImage3}
+                    error={errors.productImage3}
+                    uploadProgress={uploadProgress.productImage3}
+                    uploadStatus={uploadStatus.productImage3}
+                    isAutosaved={Boolean(uploadedMedia.productImage3)}
+                    onChange={(file, err) => handleMediaSelect('productImage3', file, err)}
+                    onRemove={() => handleMediaSelect('productImage3', null)}
                   />
 
                   {/* 2. Bill / Purchase Proof */}

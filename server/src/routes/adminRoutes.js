@@ -9,6 +9,7 @@ import {
   getAdminStats,
   getAdminUsers,
   patchAdminCompanyStatus,
+  patchAdminEditComplaint,
   patchAdminUserRole,
   patchAdminUserStatus,
   patchComplaintStatus,
@@ -36,6 +37,7 @@ adminRouter.post('/admin/company-requests/:id/reject', postRejectCompanyRequest)
 // Complaints
 adminRouter.get('/admin/complaints', getAdminComplaints);
 adminRouter.get('/admin/complaints/:id/bill', getAdminComplaintBill);
+adminRouter.patch('/admin/complaints/:id', patchAdminEditComplaint);
 adminRouter.patch('/admin/complaints/:id/status', patchComplaintStatus);
 adminRouter.post('/admin/complaints/:id/reject-delete', postRejectDeleteRequest);
 adminRouter.post('/admin/complaints/:id/restore', postRestoreComplaint);

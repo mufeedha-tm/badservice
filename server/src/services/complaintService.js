@@ -111,6 +111,7 @@ export async function createComplaint(input, user = null, file = null, files = {
   const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
   const complainantCity = readRequiredText(input.city, 'city', 120);
   const complainantAddress = readRequiredText(input.address, 'full address', 500);
+  const complainantPincode = readRequiredPincode(input.pincode || input.pinCode);
 
   // 3. Complaint Details Validation
   const complaintType = normalizeComplaintType(input.type);
@@ -122,7 +123,7 @@ export async function createComplaint(input, user = null, file = null, files = {
   const subcategory = readOptionalText(input.subcategory, 'subcategory', 100);
   const model = readRequiredText(
     input.model || input.serviceDetails,
-    complaintType === 'Service' ? 'service details / purpose' : 'product / model',
+    complaintType === 'Service' ? 'service details' : 'product / model',
     150
   );
   const seller = readRequiredText(
@@ -141,8 +142,10 @@ export async function createComplaint(input, user = null, file = null, files = {
   const categoryRecord = await categoryRepository.findByName(category);
   const companyRecord = await resolveCompany(companyName, categoryRecord?.id);
 
-  // 4. Evidence Media Validation (All 3 mandatory - can be pre-uploaded URLs or multipart files)
+  // 4. Evidence Media Validation (1 to 3 product photos required, 1 bill proof, 1 video)
   const productImage = pickUploadedFile(files, 'productImage') || file || null;
+  const productImage2 = pickUploadedFile(files, 'productImage2') || null;
+  const productImage3 = pickUploadedFile(files, 'productImage3') || null;
   const billImage = pickUploadedFile(files, 'billImage') || null;
   let productVideo = pickUploadedFile(files, 'productVideo') || null;
 
@@ -172,6 +175,40 @@ export async function createComplaint(input, user = null, file = null, files = {
     if (productImage.size > IMAGE_MAX_BYTES) throw new ApiError(400, 'Image exceeds 10 MB.', 'FILE_TOO_LARGE');
     await assertRealMediaFile(productImage, 'image');
     productImageInfo = await saveComplaintMedia(productImage, 'productImage');
+  }
+
+  const allProductImages = [];
+  if (productImageInfo) {
+    allProductImages.push({ url: productImageInfo.url, name: productImageInfo.name });
+  }
+
+  if (productImage2) {
+    if (productImage2.size <= IMAGE_MAX_BYTES) {
+      await assertRealMediaFile(productImage2, 'image');
+      const img2 = await saveComplaintMedia(productImage2, 'productImage');
+      if (img2?.url) allProductImages.push({ url: img2.url, name: img2.name || 'product-photo-2' });
+    }
+  } else if (input.productImage2Url) {
+    allProductImages.push({ url: input.productImage2Url, name: input.productImage2Name || 'product-photo-2' });
+  }
+
+  if (productImage3) {
+    if (productImage3.size <= IMAGE_MAX_BYTES) {
+      await assertRealMediaFile(productImage3, 'image');
+      const img3 = await saveComplaintMedia(productImage3, 'productImage');
+      if (img3?.url) allProductImages.push({ url: img3.url, name: img3.name || 'product-photo-3' });
+    }
+  } else if (input.productImage3Url) {
+    allProductImages.push({ url: input.productImage3Url, name: input.productImage3Name || 'product-photo-3' });
+  }
+
+  let parsedInputImages = null;
+  if (typeof input.productImages === 'string') {
+    try {
+      parsedInputImages = JSON.parse(input.productImages);
+    } catch {}
+  } else if (Array.isArray(input.productImages)) {
+    parsedInputImages = input.productImages;
   }
 
   let billImageInfo = null;
@@ -243,6 +280,8 @@ export async function createComplaint(input, user = null, file = null, files = {
     complainantEmail,
     complainantCity,
     complainantAddress,
+    complainantPincode,
+    productImages: (parsedInputImages && parsedInputImages.length > 0) ? parsedInputImages : (allProductImages.length > 0 ? allProductImages : null),
     emailVerified: verificationMethod === 'email',
     phoneVerified: verificationMethod === 'phone',
     otpVerifiedAt: new Date().toISOString(),
@@ -412,6 +451,17 @@ function normalizeOptionalEmail(value) {
   if (value === undefined || value === null || value === '') return null;
   if (typeof value === 'string' && !value.trim()) return null;
   return normalizeEmail(value);
+}
+
+function readRequiredPincode(value) {
+  if (!value || typeof value !== 'string') {
+    throw new ApiError(400, 'PIN code is mandatory.', 'INVALID_PINCODE');
+  }
+  const cleaned = value.trim().replace(/\s+/g, '');
+  if (!/^\d{6}$/.test(cleaned)) {
+    throw new ApiError(400, 'Please enter a valid 6-digit PIN code.', 'INVALID_PINCODE');
+  }
+  return cleaned;
 }
 
 function readRequiredPhone(value) {

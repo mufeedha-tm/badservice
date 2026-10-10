@@ -17,6 +17,14 @@ export async function getComplaints(_request, response) {
   response.json({ success: true, data: complaints });
 }
 
+export async function getMyComplaints(request, response) {
+  if (!request.user?.id) {
+    throw new ApiError(401, 'Please sign in to view your complaints.', 'AUTH_REQUIRED');
+  }
+  const complaints = await getUserComplaints(request.user.id);
+  response.json({ success: true, data: complaints });
+}
+
 export async function getComplaintById(request, response) {
   const complaint = await getComplaint(request.params.id, request.user || null);
   response.json({ success: true, data: complaint });

@@ -204,12 +204,94 @@ export default function ComplaintDetailPage() {
 
         {complaint && (
           <article>
+            {/* Return Navigation to All Complaints */}
+            <div style={{ marginBottom: '1.2rem' }}>
+              <Link
+                to="/complaints"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  color: '#2563eb',
+                  textDecoration: 'none',
+                  fontWeight: 700,
+                  fontSize: '0.86rem',
+                  padding: '6px 12px',
+                  background: '#eff6ff',
+                  borderRadius: '6px',
+                  border: '1px solid #bfdbfe',
+                }}
+              >
+                ← Back to All Complaints
+              </Link>
+            </div>
+
             {/* Admin Message Banner */}
             {adminActionMessage && (
               <div style={{ padding: '0.8rem 1rem', background: '#d4edda', border: '1px solid #c3e6cb', color: '#155724', borderRadius: '6px', marginBottom: '1rem', fontWeight: 600 }}>
                 {adminActionMessage}
               </div>
             )}
+
+            {/* Complainant User Name Card at Top (Requirement 6) */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                padding: '12px 18px',
+                marginBottom: '1rem',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+              }}
+            >
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+                  color: '#fff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 800,
+                  fontSize: '1.1rem',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {(complaint.complainantName || 'U').charAt(0)}
+              </div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#64748b', fontWeight: 700, letterSpacing: '0.04em' }}>
+                  Complainant
+                </span>
+                <div style={{ fontSize: '1.05rem', fontWeight: 800, color: '#0f172a', textTransform: 'uppercase' }}>
+                  {complaint.complainantName || 'Verified Consumer'}
+                </div>
+              </div>
+              {complaint.location && (
+                <div
+                  style={{
+                    background: '#fef3c7',
+                    border: '1px solid #fde68a',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    fontSize: '0.82rem',
+                    fontWeight: 700,
+                    color: '#92400e',
+                  }}
+                >
+                  <span>📍</span>
+                  <span>{complaint.location}</span>
+                </div>
+              )}
+            </div>
 
             {/* Admin Direct Removal Button (Point 1) */}
             {isAdmin && (

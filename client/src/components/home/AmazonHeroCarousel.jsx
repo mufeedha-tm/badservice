@@ -154,8 +154,24 @@ const CURATED_COMPLAINTS = [
 
 export default function AmazonHeroCarousel({ compact = false, rankings: propRankings = null }) {
   const [items, setItems] = useState(CURATED_COMPLAINTS);
+  const [liveComplaints, setLiveComplaints] = useState([]);
   const [activeVideoModal, setActiveVideoModal] = useState(null);
   const [activeCommentsItem, setActiveCommentsItem] = useState(null);
+  const [speedLevel, setSpeedLevel] = useState('normal'); // 'slow', 'normal', 'fast'
+
+  // Fetch real approved live complaints for Row 1
+  useEffect(() => {
+    let isCurrent = true;
+    getComplaints()
+      .then((data) => {
+        if (!isCurrent) return;
+        if (Array.isArray(data) && data.length > 0) {
+          setLiveComplaints(data.slice(0, 16));
+        }
+      })
+      .catch(() => {});
+    return () => { isCurrent = false; };
+  }, []);
 
   // Populate cards using ranked complaints, avoiding redundant heavy API fetches
   useEffect(() => {
@@ -168,7 +184,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
 
       productsList.forEach((prod) => {
         const comp = prod.latestComplaint;
-        const hasImage = Boolean(comp?.productImageUrl);
+        const hasImage = Boolean(comp?.productImageUrl || comp?.productImages?.length);
         const hasVideo = Boolean(comp?.productVideoUrl);
         const count = Number(prod.count) || 1;
 
@@ -179,6 +195,10 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
 
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
+            const imageList = Array.isArray(comp?.productImages) && comp.productImages.length > 0
+              ? comp.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
+              : (comp?.productImageUrl ? [getAssetUrl(comp.productImageUrl)] : [getShowcaseImage(prod.category)]);
+
             dynamicCards.push({
               id: `real-${comp?.id || prodName}`,
               rank: dynamicCards.length + 1,
@@ -192,7 +212,8 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
               categoryIcon: comp?.type === 'Service' ? '🛠️' : '📦',
               defectTitle: comp?.title || `${prodName} Defect Report`,
               summary: comp?.description ? comp.description.slice(0, 110) + '...' : 'Verified consumer evidence record.',
-              imageUrl: comp?.productImageUrl ? getAssetUrl(comp.productImageUrl) : getShowcaseImage(prod.category),
+              imageUrl: imageList[0],
+              images: imageList,
               videoUrl: comp?.productVideoUrl ? getAssetUrl(comp.productVideoUrl) : null,
               hasVideo: Boolean(comp?.productVideoUrl),
               warningBadge: comp?.badgeLabel || 'Verified Customer Evidence',
@@ -209,11 +230,11 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         const key = `${curated.company}-${curated.productName}`.toLowerCase();
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
-          merged.push(curated);
+          merged.push({ ...curated, images: [curated.imageUrl] });
         }
       });
 
-      const finalItems = merged.slice(0, 8).map((card, idx) => ({
+      const finalItems = merged.slice(0, 12).map((card, idx) => ({
         ...card,
         rank: idx + 1,
       }));
@@ -240,115 +261,58 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
     };
   }, [propRankings]);
 
-  // Split into Row 1 (#1 to #4) and Row 2 (#5 to #8)
-  const row1 = useMemo(() => items.slice(0, 4), [items]);
-  const row2 = useMemo(() => items.slice(4, 8), [items]);
+  // Row 1: Live complaints feed (transformed into hero cards)
+  const row1LiveCards = useMemo(() => {
+    if (liveComplaints.length === 0) {
+      return items.slice(0, 6).map((item, idx) => ({
+        ...item,
+        id: `row1-${item.id}-${idx}`,
+        badge: 'LIVE COMPLAINT',
+      }));
+    }
+    return liveComplaints.map((c, idx) => {
+      const imageList = Array.isArray(c.productImages) && c.productImages.length > 0
+        ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
+        : (c.productImageUrl ? [getAssetUrl(c.productImageUrl)] : [getShowcaseImage(c.category)]);
 
-  function renderCard(item) {
+      return {
+        id: `live-${c.id}`,
+        rank: idx + 1,
+        tag: '🚨 LIVE COMPLAINT',
+        count: c.similarComplaintCount || 1,
+        company: c.company || 'Company',
+        productName: c.model || c.productName || c.title,
+        category: c.category || 'Product',
+        categoryIcon: c.type === 'Service' ? '🛠️' : '📦',
+        defectTitle: c.title,
+        summary: c.description ? c.description.slice(0, 110) + '...' : 'Verified consumer complaint record.',
+        imageUrl: imageList[0],
+        images: imageList,
+        videoUrl: c.productVideoUrl ? getAssetUrl(c.productVideoUrl) : null,
+        hasVideo: Boolean(c.productVideoUrl),
+        warningBadge: c.location || 'Verified Complaint',
+        link: `/complaints/${c.id}`,
+        colorTheme: '#dc2626',
+      };
+    });
+  }, [liveComplaints, items]);
+
+  // Row 2: Most complained products and brands
+  const row2RankCards = useMemo(() => {
+    return items;
+  }, [items]);
+
+  // Duration in seconds according to speedLevel
+  const speedSeconds = speedLevel === 'slow' ? 55 : speedLevel === 'fast' ? 22 : 36;
+
+  function renderHeroCard(item, keyPrefix = '') {
     return (
-      <article
-        key={item.id}
-        className="amazon-multi-card"
-        style={{ '--card-accent': item.colorTheme }}
-      >
-        {/* Card Top Pill */}
-        <div className="amazon-multi-card__top">
-          <span className="amazon-multi-card__rank-tag">
-            #{item.rank} Most Complained
-          </span>
-          <span className="amazon-multi-card__count-badge">
-            🔥 {item.count} {item.count === 1 ? 'Report' : 'Reports'}
-          </span>
-        </div>
-
-        {/* Company & Product Header */}
-        <div className="amazon-multi-card__titles">
-          <h3 className="amazon-multi-card__company">{item.company}</h3>
-          <h4 className="amazon-multi-card__product" title={item.productName}>
-            {item.productName}
-          </h4>
-        </div>
-
-        {/* Media Viewport: Real Photo or Video (Bills never shown) */}
-        <div className="amazon-multi-card__media-wrap">
-          <img
-            src={item.imageUrl}
-            alt={`${item.company} ${item.productName} evidence`}
-            className="amazon-multi-card__img"
-            loading="lazy"
-            onError={(e) => {
-              e.currentTarget.src = getShowcaseImage(item.category);
-            }}
-          />
-
-          {/* If card has user-submitted evidence video */}
-          {item.hasVideo && (
-            <button
-              type="button"
-              className="amazon-multi-card__video-trigger"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setActiveVideoModal(item);
-              }}
-              aria-label={`Watch real complaint video for ${item.productName}`}
-            >
-              <span className="video-play-icon">▶</span>
-              <span className="video-play-text">Real Video (30s)</span>
-            </button>
-          )}
-
-          {/* Category Pill Tag */}
-          <span className="amazon-multi-card__cat-tag">
-            {item.categoryIcon || '📦'} {item.category}
-          </span>
-        </div>
-
-        {/* Defect Highlight & Warning */}
-        <div className="amazon-multi-card__info">
-          <p className="amazon-multi-card__defect" title={item.defectTitle}>
-            ⚠️ <strong>{item.defectTitle}</strong>
-          </p>
-          <p className="amazon-multi-card__summary">{item.summary}</p>
-        </div>
-
-        {/* Card Footer with Warning Tag and Direct Link */}
-        <div className="amazon-multi-card__footer">
-          <span className="amazon-multi-card__warning-badge">
-            {item.warningBadge}
-          </span>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setActiveCommentsItem(item);
-              }}
-              style={{
-                background: '#f1f5f9',
-                border: '1px solid #cbd5e1',
-                borderRadius: '4px',
-                padding: '4px 8px',
-                fontSize: '0.74rem',
-                fontWeight: 700,
-                color: '#1e293b',
-                cursor: 'pointer',
-              }}
-              title="Open discussion and comments"
-            >
-              💬 Comments
-            </button>
-            <Link
-              to={item.link}
-              className="amazon-multi-card__action-btn"
-              aria-label={`Inspect ${item.productName} complaints`}
-            >
-              Inspect →
-            </Link>
-          </div>
-        </div>
-      </article>
+      <HeroCard
+        key={`${keyPrefix}-${item.id}`}
+        item={item}
+        onVideoClick={(videoItem) => setActiveVideoModal(videoItem)}
+        onCommentsClick={(commentsItem) => setActiveCommentsItem(commentsItem)}
+      />
     );
   }
 
@@ -357,37 +321,106 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       className={`amazon-multi-banner${compact ? ' amazon-multi-banner--compact' : ''}`}
       aria-label="Most Complained Products and Services"
     >
-      {/* Top Banner Header (Clean, no #1-4 / #5-8 text or pills) */}
+      {/* Top Banner Header */}
       <div className="amazon-multi-banner__header">
         <div className="amazon-multi-banner__title-group">
           <span className="amazon-multi-banner__live-badge">
             <span className="live-dot" /> LIVE CONSUMER WATCH
           </span>
           <h2 className="amazon-multi-banner__title">
-            🔥 Most Complained Products &amp; Services
+            🔥 CONSUMER COMPLAINT HEADQUARTERS
           </h2>
           <p className="amazon-multi-banner__subtitle">
-            Verified consumer reports with real photos and evidence videos. Warning before you spend.
+            Real-time live complaints and most complained-about products, brands, and services with verified photos &amp; evidence videos.
           </p>
         </div>
 
-        <div className="amazon-multi-banner__header-actions">
-          <Link to="/complaints?sort=most-complained" className="amazon-multi-banner__explore-btn">
-            View All Most Complained →
-          </Link>
+        {/* Speed Adjustment Controls */}
+        <div className="hero-carousel-controls">
+          <span>Carousel Speed:</span>
+          <button
+            type="button"
+            className="hero-speed-btn"
+            style={{ fontWeight: speedLevel === 'slow' ? 800 : 500, borderColor: speedLevel === 'slow' ? '#febd69' : '' }}
+            onClick={() => setSpeedLevel('slow')}
+            title="Set carousel speed to Slow"
+          >
+            Slow
+          </button>
+          <button
+            type="button"
+            className="hero-speed-btn"
+            style={{ fontWeight: speedLevel === 'normal' ? 800 : 500, borderColor: speedLevel === 'normal' ? '#febd69' : '' }}
+            onClick={() => setSpeedLevel('normal')}
+            title="Set carousel speed to Normal"
+          >
+            Normal
+          </button>
+          <button
+            type="button"
+            className="hero-speed-btn"
+            style={{ fontWeight: speedLevel === 'fast' ? 800 : 500, borderColor: speedLevel === 'fast' ? '#febd69' : '' }}
+            onClick={() => setSpeedLevel('fast')}
+            title="Set carousel speed to Fast"
+          >
+            Fast
+          </button>
         </div>
       </div>
 
-      {/* 2 Rows of 4 Cards: Row 1 has #1–4, Row 2 has #5–8 */}
       <div className="amazon-two-row-grid">
-        {/* ROW 1: #1 to #4 */}
-        <div className="amazon-grid-row" aria-label="Top 1 to 4 complained items">
-          {row1.map(renderCard)}
+        {/* ROW 1: LIVE COMPLAINTS (Endlessly moving non-stopping horizontal carousel) */}
+        <div className="hero-carousel-row-section">
+          <div className="hero-carousel-row-header">
+            <div className="hero-carousel-row-title-wrap">
+              <h3 className="hero-carousel-row-title">
+                <span>🔴</span> ROW 1 — LIVE COMPLAINTS
+              </h3>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                Endlessly streaming verified consumer reports
+              </span>
+            </div>
+            <Link to="/complaints" className="amazon-multi-banner__explore-btn">
+              View All Live Complaints →
+            </Link>
+          </div>
+
+          <div
+            className="hero-marquee-viewport"
+            style={{ '--hero-speed': `${speedSeconds}s` }}
+          >
+            <div className="hero-marquee-track hero-marquee-track--left">
+              {row1LiveCards.map((c) => renderHeroCard(c, 'orig1'))}
+              {row1LiveCards.map((c) => renderHeroCard(c, 'dup1'))}
+            </div>
+          </div>
         </div>
 
-        {/* ROW 2: #5 to #8 */}
-        <div className="amazon-grid-row" aria-label="Top 5 to 8 complained items">
-          {row2.map(renderCard)}
+        {/* ROW 2: MOST COMPLAINED PRODUCTS/SERVICES */}
+        <div className="hero-carousel-row-section">
+          <div className="hero-carousel-row-header">
+            <div className="hero-carousel-row-title-wrap">
+              <h3 className="hero-carousel-row-title">
+                <span>🔥</span> ROW 2 — MOST COMPLAINED PRODUCTS &amp; SERVICES
+              </h3>
+              <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
+                Ranked highest report frequencies with verified customer evidence
+              </span>
+            </div>
+            <Link to="/complaints?sort=most-complained" className="amazon-multi-banner__explore-btn">
+              View Most Complained →
+            </Link>
+          </div>
+
+          <div
+            className="hero-marquee-viewport"
+            style={{ '--hero-speed': `${Math.round(speedSeconds * 1.15)}s` }}
+          >
+            <div className="hero-marquee-track hero-marquee-track--right">
+              {row2RankCards.map((c) => renderHeroCard(c, 'orig2'))}
+              {row2RankCards.map((c) => renderHeroCard(c, 'dup2'))}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -458,5 +491,147 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         />
       )}
     </section>
+  );
+}
+
+function HeroCard({ item, onVideoClick, onCommentsClick }) {
+  const images = Array.isArray(item.images) && item.images.length > 0
+    ? item.images
+    : [item.imageUrl];
+
+  const [currentImgIndex, setCurrentImgIndex] = useState(0);
+
+  // Auto-rotating photo carousel for multi-image complaints
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentImgIndex((prev) => (prev + 1) % images.length);
+    }, 3800);
+    return () => clearInterval(interval);
+  }, [images]);
+
+  return (
+    <article
+      className="amazon-multi-card"
+      style={{ '--card-accent': item.colorTheme }}
+    >
+      {/* Card Top Pill */}
+      <div className="amazon-multi-card__top">
+        <span className="amazon-multi-card__rank-tag">
+          {item.tag || `#${item.rank} MOST COMPLAINED`}
+        </span>
+        <span className="amazon-multi-card__count-badge">
+          🔥 {item.count} {item.count === 1 ? 'Report' : 'Reports'}
+        </span>
+      </div>
+
+      {/* Company & Product Header */}
+      <div className="amazon-multi-card__titles">
+        <h3 className="amazon-multi-card__company">{item.company}</h3>
+        <h4 className="amazon-multi-card__product" title={item.productName}>
+          {item.productName}
+        </h4>
+      </div>
+
+      {/* Media Viewport: Real Photo or Video (Bills never shown) */}
+      <div className="amazon-multi-card__media-wrap">
+        <img
+          src={images[currentImgIndex] || item.imageUrl}
+          alt={`${item.company} ${item.productName} evidence`}
+          className="amazon-multi-card__img"
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.src = getShowcaseImage(item.category);
+          }}
+        />
+
+        {images.length > 1 && (
+          <span
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              right: '8px',
+              background: 'rgba(0,0,0,0.65)',
+              color: '#fff',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              zIndex: 3,
+            }}
+          >
+            📷 {currentImgIndex + 1}/{images.length}
+          </span>
+        )}
+
+        {/* If card has user-submitted evidence video */}
+        {item.hasVideo && (
+          <button
+            type="button"
+            className="amazon-multi-card__video-trigger"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onVideoClick(item);
+            }}
+            aria-label={`Watch real complaint video for ${item.productName}`}
+          >
+            <span className="video-play-icon">▶</span>
+            <span className="video-play-text">Real Video (30s)</span>
+          </button>
+        )}
+
+        {/* Category Pill Tag */}
+        <span className="amazon-multi-card__cat-tag">
+          {item.categoryIcon || '📦'} {item.category}
+        </span>
+      </div>
+
+      {/* Defect Highlight & Warning */}
+      <div className="amazon-multi-card__info">
+        <p className="amazon-multi-card__defect" title={item.defectTitle}>
+          ⚠️ <strong>{item.defectTitle}</strong>
+        </p>
+        <p className="amazon-multi-card__summary">{item.summary}</p>
+      </div>
+
+      {/* Card Footer with Warning Tag and Direct Link */}
+      <div className="amazon-multi-card__footer">
+        <span className="amazon-multi-card__warning-badge">
+          {item.warningBadge}
+        </span>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', justifyContent: 'space-between' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCommentsClick(item);
+            }}
+            style={{
+              background: '#f1f5f9',
+              border: '1px solid #cbd5e1',
+              borderRadius: '6px',
+              padding: '5px 10px',
+              fontSize: '0.74rem',
+              fontWeight: 700,
+              color: '#1e293b',
+              cursor: 'pointer',
+            }}
+            title="Open discussion and comments"
+          >
+            💬 Comments
+          </button>
+          <Link
+            to={item.link}
+            className="amazon-multi-card__action-btn"
+            style={{ flex: 1, textAlign: 'center' }}
+            aria-label={`Inspect ${item.productName} complaints`}
+          >
+            Inspect →
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
