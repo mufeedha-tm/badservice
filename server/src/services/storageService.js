@@ -77,29 +77,37 @@ export async function saveComplaintMedia(file, mediaType) {
 }
 
 export function getAdminBillImageSource(complaint) {
-  if (!complaint?.billImageUrl) return null;
+  if (!complaint?.billImageUrl && !complaint?.billImagePublicId) return null;
 
-  if (complaint.billImagePublicId) {
-    cloudinary.config({
-      cloud_name: env.cloudinaryCloudName || process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: env.cloudinaryApiKey || process.env.CLOUDINARY_API_KEY,
-      api_secret: env.cloudinaryApiSecret || process.env.CLOUDINARY_API_SECRET,
-      secure: true,
-    });
-    return {
-      type: 'remote',
-      url: cloudinary.url(complaint.billImagePublicId, {
+  const cloudName = env.cloudinaryCloudName || process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = env.cloudinaryApiKey || process.env.CLOUDINARY_API_KEY;
+  const apiSecret = env.cloudinaryApiSecret || process.env.CLOUDINARY_API_SECRET;
+
+  if (complaint.billImagePublicId && cloudName && apiKey && apiSecret) {
+    try {
+      cloudinary.config({
+        cloud_name: cloudName,
+        api_key: apiKey,
+        api_secret: apiSecret,
+        secure: true,
+      });
+      const signedUrl = cloudinary.url(complaint.billImagePublicId, {
         resource_type: 'image',
         type: 'authenticated',
         sign_url: true,
         secure: true,
         version: complaint.billImageVersion,
         format: path.extname(complaint.billImageName || '').slice(1),
-      }),
-    };
+      });
+      if (signedUrl) {
+        return { type: 'remote', url: signedUrl };
+      }
+    } catch (err) {
+      console.warn('Could not generate signed Cloudinary URL, falling back to billImageUrl:', err.message);
+    }
   }
 
-  if (/^https?:\/\//i.test(complaint.billImageUrl)) {
+  if (complaint.billImageUrl && /^https?:\/\//i.test(complaint.billImageUrl)) {
     return { type: 'remote', url: complaint.billImageUrl };
   }
 

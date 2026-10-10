@@ -252,8 +252,8 @@ export async function getAdminComplaints(params = {}) {
   return response.data.data;
 }
 
-export async function updateAdminComplaintStatus(id, status) {
-  const response = await api.patch(`/admin/complaints/${encodeURIComponent(id)}/status`, { status });
+export async function updateAdminComplaintStatus(id, status, reason = '') {
+  const response = await api.patch(`/admin/complaints/${encodeURIComponent(id)}/status`, { status, reason });
   return response.data.data;
 }
 
@@ -318,8 +318,8 @@ export async function cancelDeleteComplaint(id) {
   return response.data.data;
 }
 
-export async function rejectAdminDeleteRequest(id) {
-  const response = await api.post(`/admin/complaints/${encodeURIComponent(id)}/reject-delete`);
+export async function rejectAdminDeleteRequest(id, reason = '') {
+  const response = await api.post(`/admin/complaints/${encodeURIComponent(id)}/reject-delete`, { reason });
   return response.data.data;
 }
 

@@ -175,14 +175,26 @@ export default function AdminDashboardPage() {
   }
 
   async function handleComplaintStatusChange(id, newStatus) {
+    let reason = '';
+    if (newStatus === 'REJECTED') {
+      const promptRes = window.prompt(
+        'Please enter the mandatory reason for REJECTING this complaint:\n(The complainant will see this reason when tracking their complaint)'
+      );
+      if (promptRes === null) return;
+      if (!promptRes.trim()) {
+        alert('A rejection reason is strictly mandatory so the complainant knows why their complaint was rejected.');
+        return;
+      }
+      reason = promptRes.trim();
+    }
     try {
-      await updateAdminComplaintStatus(id, newStatus);
+      await updateAdminComplaintStatus(id, newStatus, reason);
       showMessage(`Complaint status updated to ${newStatus}`);
       setComplaints((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+        prev.map((c) => (c.id === id ? { ...c, status: newStatus, deleteAdminNote: reason || c.deleteAdminNote } : c))
       );
       if (selectedComplaint?.id === id) {
-        setSelectedComplaint((prev) => ({ ...prev, status: newStatus }));
+        setSelectedComplaint((prev) => ({ ...prev, status: newStatus, deleteAdminNote: reason || prev.deleteAdminNote }));
       }
       loadStats();
     } catch (err) {
@@ -192,12 +204,16 @@ export default function AdminDashboardPage() {
 
   async function handleDeleteComplaint(id) {
     const reason = window.prompt(
-      'Soft delete this complaint?\n\nIt will be hidden from the public website but safely kept in database archives for auditing and restoration.\n\nEnter deletion note / reason (optional):'
+      'Soft delete this complaint?\n\nIt will be hidden from the public website but safely kept in database archives.\n\nEnter deletion note / reason (mandatory):'
     );
     if (reason === null) return;
+    if (!reason.trim()) {
+      alert('A deletion reason is strictly mandatory so the complainant can understand why their complaint was removed when tracking.');
+      return;
+    }
     try {
-      await deleteAdminComplaint(id, reason.trim() || 'Admin deleted');
-      showMessage('Complaint safely archived (soft-deleted) in database.');
+      await deleteAdminComplaint(id, reason.trim());
+      showMessage('Complaint safely archived (soft-deleted) in database with mandatory note.');
       setComplaints((prev) => prev.filter((c) => c.id !== id));
       if (selectedComplaint?.id === id) {
         setSelectedComplaint(null);
@@ -209,9 +225,17 @@ export default function AdminDashboardPage() {
   }
 
   async function handleApproveDeleteRequest(id) {
-    if (!window.confirm('Approve this deletion request? The complaint will be removed from the public website and safely archived in the database.')) return;
+    const reason = window.prompt(
+      'Approve this user deletion request?\n\nEnter approval note / reason (mandatory, visible to user upon tracking):',
+      'User deletion request approved by Admin'
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('A reason is mandatory for approving deletion.');
+      return;
+    }
     try {
-      await deleteAdminComplaint(id, 'User deletion request approved by Admin');
+      await deleteAdminComplaint(id, reason.trim());
       showMessage('Delete request approved. Complaint safely archived in database.');
       setComplaints((prev) => prev.filter((c) => c.id !== id));
       if (selectedComplaint?.id === id) {
@@ -238,14 +262,22 @@ export default function AdminDashboardPage() {
   }
 
   async function handleRejectDeleteRequest(id) {
+    const reason = window.prompt(
+      'Enter the mandatory reason for rejecting this user deletion request:\n(The complainant will see this update when tracking their complaint)'
+    );
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('A reason is strictly mandatory when rejecting a deletion request.');
+      return;
+    }
     try {
-      await rejectAdminDeleteRequest(id);
-      showMessage('Delete request rejected. Complaint remains active.', 'info');
+      await rejectAdminDeleteRequest(id, reason.trim());
+      showMessage('Delete request rejected with explanation note.', 'info');
       setComplaints((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, deleteRequested: false, deleteReason: null } : c))
+        prev.map((c) => (c.id === id ? { ...c, deleteRequested: false, deleteReason: null, statusNote: `Admin rejected deletion request: ${reason.trim()}` } : c))
       );
       if (selectedComplaint?.id === id) {
-        setSelectedComplaint((prev) => ({ ...prev, deleteRequested: false, deleteReason: null }));
+        setSelectedComplaint((prev) => ({ ...prev, deleteRequested: false, deleteReason: null, statusNote: `Admin rejected deletion request: ${reason.trim()}` }));
       }
       loadStats();
     } catch (err) {

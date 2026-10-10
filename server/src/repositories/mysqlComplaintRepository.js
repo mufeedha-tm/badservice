@@ -243,11 +243,9 @@ export async function findByPhone(phone) {
 
   const [rows] = await pool.execute(`
     ${baseQuery}
-    WHERE (
-      REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(c.complainant_phone, ' ', ''), '-', ''), '+', ''), '(', ''), ')', '') LIKE CONCAT('%', ?)
-    )
+    WHERE c.complainant_phone LIKE ?
     ORDER BY c.created_at DESC
-  `, [last10]);
+  `, [`%${last10}%`]);
 
   return rows.map(mapComplaint);
 }
@@ -612,28 +610,42 @@ export async function requestDeletion(id, reason = '') {
   return findById(id);
 }
 
-export async function cancelDeleteRequest(id) {
-  const [result] = await pool.execute(
-    `UPDATE complaints SET delete_requested = 0, delete_reason = NULL, delete_requested_at = NULL WHERE id = ?`,
-    [id]
-  );
+export async function cancelDeleteRequest(id, adminNote = '') {
+  let sql = 'UPDATE complaints SET delete_requested = 0, delete_reason = NULL, delete_requested_at = NULL';
+  const params = [];
+  if (adminNote) {
+    sql += ', status_note = ?';
+    params.push(`Admin rejected deletion request: ${adminNote}`);
+  }
+  sql += ' WHERE id = ?';
+  params.push(id);
+
+  const [result] = await pool.execute(sql, params);
   if (result.affectedRows === 0) {
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
   return findById(id);
 }
 
-export async function updateStatus(id, status) {
+export async function updateStatus(id, status, reason = '') {
   const allowedStatuses = ['PENDING', 'APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED', 'REJECTED'];
   if (!allowedStatuses.includes(status)) {
     throw new ApiError(400, `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`, 'INVALID_STATUS');
   }
 
   const requiresApproval = ['COMPANY_RESPONDED', 'RESOLVED'].includes(status);
-  const [result] = await pool.execute(
-    `UPDATE complaints SET status = ? WHERE id = ?${requiresApproval ? " AND status IN ('APPROVED', 'COMPANY_RESPONDED')" : ''}`,
-    [status, id]
-  );
+  let sql = 'UPDATE complaints SET status = ?';
+  const params = [status];
+
+  if (status === 'REJECTED' && reason) {
+    sql += ', delete_admin_note = ?';
+    params.push(reason);
+  }
+
+  sql += ` WHERE id = ?${requiresApproval ? " AND status IN ('APPROVED', 'COMPANY_RESPONDED')" : ''}`;
+  params.push(id);
+
+  const [result] = await pool.execute(sql, params);
 
   if (result.affectedRows === 0) {
     if (requiresApproval && await findById(id)) {

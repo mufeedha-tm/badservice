@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import CompanySelector from '../components/complaints/CompanySelector.jsx';
 import ComplaintTypeSelector from '../components/complaints/ComplaintTypeSelector.jsx';
@@ -19,6 +19,32 @@ import { IMAGE_ACCEPT, VIDEO_ACCEPT } from '../utils/complaintMedia.js';
 import { getTranslation } from '../utils/FileComplaintTranslations.js';
 
 const emptyMedia = { productImage: null, billImage: null, productVideo: null };
+
+const SERVICE_KEYWORDS = [
+  'hospital', 'clinic', 'healthcare', 'medical', 'health',
+  'hotel', 'resort', 'stay', 'inn', 'lodge', 'oyo',
+  'flight', 'airline', 'airways', 'indigo', 'spicejet', 'air india', 'vistara', 'train', 'railway', 'irctc',
+  'restaurant', 'cafe', 'dine', 'dining', 'food delivery', 'swiggy', 'zomato', 'eats',
+  'bank', 'finance', 'banking', 'insurance', 'loan', 'upi', 'paytm', 'phonepe', 'gpay', 'sbi', 'hdfc', 'icici', 'axis',
+  'telecom', 'network', 'broadband', 'internet', 'airtel', 'jio', 'vi ', 'bsnl',
+  'courier', 'delivery', 'logistics', 'dtdc', 'bluedart', 'delhivery', 'shadowfax', 'fedex',
+  'service center', 'repair service', 'coaching', 'academy', 'school', 'college', 'university', 'consultancy',
+];
+
+const SERVICE_CATEGORY_SLUGS = [
+  'hospital-healthcare', 'flights-trains', 'hotel-travel', 'hotels', 'hospitals', 'flights',
+  'services', 'banking-finance', 'telecom-internet', 'restaurants-food',
+];
+
+export function isServiceCompany(company) {
+  if (!company) return false;
+  const name = (company.name || '').toLowerCase();
+  const cat = (company.category || company.categoryId || company.category_id || '').toLowerCase();
+
+  if (SERVICE_CATEGORY_SLUGS.some((slug) => cat.includes(slug))) return true;
+  if (SERVICE_KEYWORDS.some((kw) => name.includes(kw))) return true;
+  return false;
+}
 
 export const PRODUCT_CATEGORIES = [
   'Mobiles & Smartphones',
@@ -116,6 +142,14 @@ export default function FileComplaintPage() {
   const [categories, setCategories] = useState([]);
   const [companies, setCompanies] = useState([]);
   const [companiesLoading, setCompaniesLoading] = useState(true);
+
+  const productCompanies = useMemo(() => {
+    return companies.filter((c) => !isServiceCompany(c));
+  }, [companies]);
+
+  const serviceCompanies = useMemo(() => {
+    return companies.filter((c) => isServiceCompany(c));
+  }, [companies]);
 
   // Form State
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -358,7 +392,6 @@ export default function FileComplaintPage() {
       if (!form.model.trim()) nextErrors.model = t('errModel');
       if (!form.seller.trim()) nextErrors.seller = t('errSeller');
     } else {
-      if (!form.serviceType.trim()) nextErrors.serviceType = t('errServiceType');
       if (!form.company.trim()) nextErrors.company = t('errServiceProvider');
       if (!form.model.trim()) nextErrors.model = t('errServiceDetails');
     }
@@ -734,7 +767,23 @@ export default function FileComplaintPage() {
             <form onSubmit={handleSubmit} noValidate>
               <ComplaintTypeSelector
                 value={form.type}
-                onChange={(type) => setForm((prev) => ({ ...prev, type }))}
+                onChange={(type) => {
+                  setForm((prev) => ({
+                    ...prev,
+                    type,
+                    category: '',
+                    serviceType: '',
+                    company: '',
+                    model: '',
+                  }));
+                  setErrors((prev) => ({
+                    ...prev,
+                    category: '',
+                    serviceType: '',
+                    company: '',
+                    model: '',
+                  }));
+                }}
                 heading={t('typeOfComplaint')}
                 productLabel={t('product')}
                 serviceLabel={t('service')}
@@ -762,7 +811,7 @@ export default function FileComplaintPage() {
                     </label>
 
                     <CompanySelector
-                      companies={companies}
+                      companies={productCompanies}
                       value={form.company}
                       onChange={(company) => {
                         setForm((prev) => ({ ...prev, company }));
@@ -844,29 +893,15 @@ export default function FileComplaintPage() {
                 <>
                   <div className="complaint-form-grid">
                     <label className="field">
-                      <span>{t('serviceType')} *</span>
-                      <select
-                        name="serviceType"
-                        value={form.serviceType}
-                        onChange={handleServiceTypeChange}
-                        className={errors.serviceType ? 'is-invalid' : ''}
-                      >
-                        <option value="">{t('selectServiceType')}</option>
-                        {SERVICE_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt.value} value={opt.value}>
-                            {opt.icon} {opt.label}
-                          </option>
-                        ))}
-                      </select>
-                      {errors.serviceType && <small className="field-error">{errors.serviceType}</small>}
-                    </label>
-
-                    <label className="field">
                       <span>{t('category')} *</span>
                       <select
                         name="category"
                         value={form.category}
-                        onChange={handleServiceCategoryChange}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setForm((prev) => ({ ...prev, category: val, serviceType: val }));
+                          setErrors((prev) => ({ ...prev, category: '', serviceType: '' }));
+                        }}
                         className={errors.category ? 'is-invalid' : ''}
                       >
                         <option value="">{t('selectCategory')}</option>
@@ -878,11 +913,9 @@ export default function FileComplaintPage() {
                       </select>
                       {errors.category && <small className="field-error">{errors.category}</small>}
                     </label>
-                  </div>
 
-                  <div className="complaint-form-grid">
                     <CompanySelector
-                      companies={companies}
+                      companies={serviceCompanies}
                       value={form.company}
                       onChange={(company) => {
                         setForm((prev) => ({ ...prev, company }));
@@ -894,7 +927,9 @@ export default function FileComplaintPage() {
                       loadingLabel={t('loadingCompanies')}
                       loading={companiesLoading}
                     />
+                  </div>
 
+                  <div className="complaint-form-grid">
                     <label className="field">
                       <span>{t('serviceDetails')} *</span>
                       <input
@@ -906,9 +941,7 @@ export default function FileComplaintPage() {
                       />
                       {errors.model && <small className="field-error">{errors.model}</small>}
                     </label>
-                  </div>
 
-                  <div className="complaint-form-grid">
                     <LocationAutocomplete
                       label={`${t('incidentLocation')} *`}
                       value={form.location}
@@ -919,8 +952,10 @@ export default function FileComplaintPage() {
                       placeholder={t('locationPlaceholder')}
                       error={errors.location}
                     />
+                  </div>
 
-                    <label className="field">
+                  <div className="complaint-form-grid">
+                    <label className="field field--full">
                       <span>{t('complaintTitle')} *</span>
                       <input
                         name="title"
@@ -932,6 +967,7 @@ export default function FileComplaintPage() {
                       {errors.title && <small className="field-error">{errors.title}</small>}
                     </label>
                   </div>
+
 
                   <label className="field field--full">
                     <span>{t('fullDetails')} *</span>

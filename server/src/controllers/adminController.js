@@ -56,13 +56,20 @@ export async function getAdminComplaints(request, response) {
 }
 
 export async function patchComplaintStatus(request, response) {
-  const { status } = request.body || {};
-  const updated = await complaintRepository.updateStatus(request.params.id, status);
+  const { status, reason } = request.body || {};
+  if (status === 'REJECTED' && (!reason || !reason.trim())) {
+    throw new ApiError(400, 'A reason is mandatory when rejecting a complaint.', 'REASON_REQUIRED');
+  }
+  const updated = await complaintRepository.updateStatus(request.params.id, status, reason ? reason.trim() : '');
   response.json({ success: true, data: toAdminComplaint(updated) });
 }
 
 export async function postRejectDeleteRequest(request, response) {
-  const updated = await complaintRepository.cancelDeleteRequest(request.params.id);
+  const { reason } = request.body || {};
+  if (!reason || !reason.trim()) {
+    throw new ApiError(400, 'A reason is mandatory when rejecting a deletion request.', 'REASON_REQUIRED');
+  }
+  const updated = await complaintRepository.cancelDeleteRequest(request.params.id, reason.trim());
   response.json({ success: true, data: toAdminComplaint(updated) });
 }
 
@@ -80,29 +87,41 @@ export async function getAdminComplaintBill(request, response, next) {
   });
 
   if (source.type === 'local') {
-    response.sendFile(source.path, (error) => {
-      if (error) next(error);
+    const fs = await import('node:fs');
+    if (!fs.existsSync(source.path)) {
+      throw new ApiError(404, 'Bill image file not found on server.', 'BILL_FILE_NOT_FOUND');
+    }
+    return response.sendFile(source.path, (error) => {
+      if (error && !response.headersSent) next(error);
     });
-    return;
   }
 
-  // Fast direct redirect for remote authenticated URLs if accessible, or stream efficiently
-  if (source.url.startsWith('https://res.cloudinary.com')) {
-    return response.redirect(302, source.url);
-  }
+  try {
+    let imageResponse = await fetch(source.url);
+    if (!imageResponse.ok && complaint.billImageUrl && complaint.billImageUrl !== source.url) {
+      imageResponse = await fetch(complaint.billImageUrl);
+    }
+    if (!imageResponse.ok || !imageResponse.body) {
+      throw new ApiError(502, 'The bill image could not be retrieved from storage.', 'BILL_IMAGE_STORAGE_ERROR');
+    }
 
-  const imageResponse = await fetch(source.url);
-  if (!imageResponse.ok || !imageResponse.body) {
-    throw new ApiError(502, 'The bill image could not be retrieved from storage.', 'BILL_IMAGE_STORAGE_ERROR');
-  }
+    const contentType = imageResponse.headers.get('content-type') || getBillContentType(complaint.billImageName);
+    response.set('Content-Type', contentType);
 
-  const { Readable } = await import('node:stream');
-  Readable.fromWeb(imageResponse.body).pipe(response);
+    const { Readable } = await import('node:stream');
+    return Readable.fromWeb(imageResponse.body).pipe(response);
+  } catch (fetchErr) {
+    if (fetchErr instanceof ApiError) throw fetchErr;
+    throw new ApiError(502, `Failed to load bill image: ${fetchErr.message}`, 'BILL_IMAGE_FETCH_ERROR');
+  }
 }
 
 export async function deleteComplaint(request, response) {
   const { reason } = request.body || {};
-  await complaintRepository.remove(request.params.id, request.user?.id || null, reason || 'Deleted by administrator');
+  if (!reason || !reason.trim()) {
+    throw new ApiError(400, 'A reason is mandatory when deleting a complaint.', 'REASON_REQUIRED');
+  }
+  await complaintRepository.remove(request.params.id, request.user?.id || null, reason.trim());
   response.json({ success: true, message: 'Complaint removed and safely preserved in database.' });
 }
 
