@@ -70,12 +70,19 @@ export async function runSeed() {
     );
   }
 
-  // 4. Ensure admin users exist
-  await pool.query(`
-    INSERT INTO users (id, name, email, password_salt, password_hash, role, status, created_at)
-    VALUES ('admin-system-id', 'Administrator', 'admin@badservice.in', '0000000000000000', 'admin', 'ADMIN', 'ACTIVE', UTC_TIMESTAMP())
-    ON DUPLICATE KEY UPDATE role = 'ADMIN', status = 'ACTIVE'
-  `);
+  // 4. Ensure admin user exists safely without duplicate entry errors
+  const [existingAdmin] = await pool.query(
+    'SELECT id, role, status FROM users WHERE LOWER(email) = ? LIMIT 1',
+    ['badservice97@gmail.com']
+  );
+  if (existingAdmin.length === 0) {
+    await pool.query(`
+      INSERT INTO users (id, name, email, password_salt, password_hash, role, status, created_at)
+      VALUES (?, 'BadService Admin', 'badservice97@gmail.com', '0000000000000000', 'admin', 'ADMIN', 'ACTIVE', UTC_TIMESTAMP())
+    `, [randomUUID()]);
+  } else if (existingAdmin[0].role !== 'ADMIN' || existingAdmin[0].status !== 'ACTIVE') {
+    await pool.query("UPDATE users SET role = 'ADMIN', status = 'ACTIVE' WHERE id = ?", [existingAdmin[0].id]);
+  }
   await pool.query(`UPDATE users SET role = 'USER' WHERE LOWER(email) = 'mufeedha059@gmail.com'`);
 
  

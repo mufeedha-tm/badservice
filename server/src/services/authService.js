@@ -117,11 +117,14 @@ export async function loginAdminAccount(input) {
     throw new ApiError(401, 'Admin username or password is incorrect.', 'INVALID_ADMIN_CREDENTIALS');
   }
 
-  let adminUser = await authRepository.findActiveAdminUser();
+  let adminUser = await authRepository.findUserByEmail('badservice97@gmail.com');
+  if (!adminUser) {
+    adminUser = await authRepository.findActiveAdminUser();
+  }
   if (!adminUser) {
     // Auto-provision system admin account if missing
     const newAdmin = {
-      id: 'admin-system-id',
+      id: randomUUID(),
       name: 'BadService Admin',
       email: 'badservice97@gmail.com',
       phone: null,
@@ -134,7 +137,7 @@ export async function loginAdminAccount(input) {
     try {
       adminUser = await authRepository.insertUser(newAdmin);
     } catch {
-      adminUser = await authRepository.findActiveAdminUser();
+      adminUser = (await authRepository.findUserByEmail('badservice97@gmail.com')) || (await authRepository.findActiveAdminUser());
     }
     if (!adminUser) {
       adminUser = newAdmin;
