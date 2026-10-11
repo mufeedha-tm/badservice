@@ -19,7 +19,9 @@ export default function ComplaintCard({ complaint }) {
       <ComplaintMeta items={complaint.metadata} />
 
       <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginTop: '10px' }}>
-        <ComplaintActionButton label={complaint.actionLabel || 'View Details'} complaintId={complaint.id} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <ComplaintActionButton label={complaint.actionLabel || 'View Details'} complaintId={complaint.id} />
+        </div>
         <button
           type="button"
           onClick={() => setCommentsOpen(true)}
@@ -27,14 +29,17 @@ export default function ComplaintCard({ complaint }) {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '4px',
-            padding: '7px 12px',
-            fontSize: '0.82rem',
-            fontWeight: 700,
-            color: '#1e293b',
-            backgroundColor: '#f1f5f9',
+            padding: '0 8px',
+            height: '32px',
+            fontSize: '0.72rem',
+            fontWeight: 600,
+            color: '#334155',
+            backgroundColor: '#f8fafc',
             border: '1px solid #cbd5e1',
             borderRadius: '6px',
             cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            flexShrink: 0,
             transition: 'background-color 0.15s',
           }}
           title="Read and post public comments"

@@ -144,8 +144,8 @@ export default function ComplaintCommentsModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '390px',
-          maxHeight: '68vh',
+          maxWidth: '360px',
+          maxHeight: '62vh',
           backgroundColor: '#fff',
           borderRadius: '10px',
           boxShadow: '0 16px 36px rgba(0,0,0,0.22)',
