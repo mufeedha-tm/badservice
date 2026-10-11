@@ -76,9 +76,6 @@ export default function HomePage() {
         if (current && rankingData) {
           setRankings(rankingData);
         }
-      })
-      .catch((err) => current && setError(getErrorMessage(err, 'We could not load the latest complaint data.')))
-      .finally(() => current && setLoading(false));
       .catch((err) => current && setError(getErrorMessage(err, 'We could not load the latest complaint data.')))
       .finally(() => current && setLoading(false));
     return () => { current = false; };
