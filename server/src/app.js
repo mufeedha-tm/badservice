@@ -49,6 +49,8 @@ const defaultOrigins = [
 
 const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
 
+const app = express();
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
