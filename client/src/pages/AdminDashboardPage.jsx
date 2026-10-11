@@ -1460,6 +1460,27 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <form onSubmit={handleSaveEdit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', background: '#f0f9ff', padding: '0.75rem 1rem', borderRadius: '6px', border: '1px solid #bae6fd' }}>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#0369a1', fontWeight: 800 }}>Type &amp; Category</span>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0c4a6e' }}>
+                          {editingComplaint.type || 'Product'} · {editingComplaint.category || 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#0369a1', fontWeight: 800 }}>Company / Provider</span>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0c4a6e' }}>
+                          {editingComplaint.company || 'N/A'}
+                        </div>
+                      </div>
+                      <div>
+                        <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#0369a1', fontWeight: 800 }}>Current Status</span>
+                        <div style={{ fontSize: '0.86rem', fontWeight: 700, color: editingComplaint.status === 'APPROVED' ? '#15803d' : '#854d0e' }}>
+                          ● {editingComplaint.status || 'PENDING'}
+                        </div>
+                      </div>
+                    </div>
+
                     <div>
                       <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
                         Complaint Title

@@ -9,6 +9,7 @@ import Skeleton from '../components/ui/Skeleton.jsx';
 import { getCategories, getComplaintRankings, getErrorMessage, searchComplaints } from '../services/api.js';
 import { getComplaintMedia } from '../utils/complaintMedia.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
+import { getCompanyLogo } from '../utils/companyLogos.js';
 
 const trustPoints = [
   { number: '01', title: 'Real complaints', text: 'Consumer-submitted records, not product advertisements.' },
@@ -295,19 +296,48 @@ export default function HomePage() {
                 { name: 'Samsung', count: 7 },
                 { name: 'Flipkart', count: 5 },
                 { name: 'Airtel', count: 4 },
-              ]).map((comp) => (
-                <Link
-                  key={comp.name}
-                  to={`/complaints?company=${encodeURIComponent(comp.name)}`}
-                  className="amazon-quad-item"
-                >
-                  <div className="amazon-quad-item__thumb">
-                    <img src={getShowcaseImage('TV & Electronics')} alt={comp.name} loading="lazy" />
-                  </div>
-                  <span className="amazon-quad-item__name">{comp.name}</span>
-                  <span className="amazon-quad-item__count">{comp.count} complaints</span>
-                </Link>
-              ))}
+              ]).map((comp) => {
+                const logo = getCompanyLogo(comp.name);
+                return (
+                  <Link
+                    key={comp.name}
+                    to={`/complaints?company=${encodeURIComponent(comp.name)}`}
+                    className="amazon-quad-item"
+                  >
+                    <div className="amazon-quad-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
+                      {logo ? (
+                        <img
+                          src={logo}
+                          alt={`${comp.name} logo`}
+                          loading="lazy"
+                          style={{ objectFit: 'contain', padding: '6px' }}
+                          onError={(e) => {
+                            e.currentTarget.src = getShowcaseImage('TV & Electronics');
+                          }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 800,
+                            fontSize: '1.2rem',
+                            color: '#1e293b',
+                            background: '#e2e8f0',
+                          }}
+                        >
+                          {(comp.name || 'B')[0].toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <span className="amazon-quad-item__name">{comp.name}</span>
+                    <span className="amazon-quad-item__count">{comp.count} complaints</span>
+                  </Link>
+                );
+              })}
             </div>
             <Link to="/companies" className="amazon-box-card__link">
               Compare all brands →

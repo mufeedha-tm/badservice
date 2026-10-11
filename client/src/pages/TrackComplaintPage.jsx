@@ -4,10 +4,10 @@ import MainLayout from '../components/layout/MainLayout.jsx';
 import { trackComplaint, requestDeleteComplaint, cancelDeleteComplaint, getErrorMessage } from '../services/api.js';
 
 const STATUS_STEPS = [
-  { key: 'SUBMITTED', label: 'Complaint Submitted', desc: 'Complaint registered and queued for verification' },
-  { key: 'UNDER_REVIEW', label: 'Under Review', desc: 'Admin verifying bill evidence and details' },
-  { key: 'COMPANY_RESPONDED', label: 'Brand Contacted', desc: 'Company notified or response in progress' },
-  { key: 'RESOLVED', label: 'Approved & Resolved', desc: 'Complaint verified and active or resolved' },
+  { key: 'SUBMITTED', label: '1. Complaint Submitted', desc: 'Complaint registered and queued for verification' },
+  { key: 'APPROVED', label: '2. Admin Approved', desc: 'Verified and approved by admin team; published to public directory' },
+  { key: 'COMPANY_RESPONDED', label: '3. Brand Responded', desc: 'Brand / service provider contacted and communication ongoing' },
+  { key: 'RESOLVED', label: '4. Issue Resolved', desc: 'Complaint successfully resolved with customer confirmation' },
 ];
 
 function getStepIndex(status) {
@@ -15,10 +15,11 @@ function getStepIndex(status) {
     case 'PENDING':
       return 0;
     case 'UNDER_REVIEW':
+      return 0;
+    case 'APPROVED':
       return 1;
     case 'COMPANY_RESPONDED':
       return 2;
-    case 'APPROVED':
     case 'RESOLVED':
       return 3;
     case 'REJECTED':
@@ -298,22 +299,24 @@ export default function TrackComplaintPage() {
                       {STATUS_STEPS.map((step, idx) => {
                         const isDone = currentStep >= idx;
                         const isCurrent = currentStep === idx;
+                        const isNext = currentStep + 1 === idx;
                         return (
                           <div
                             key={step.key}
                             style={{
-                              borderLeft: `4px solid ${isDone ? '#28a745' : '#ccc'}`,
+                              borderLeft: `4px solid ${isDone ? '#28a745' : isNext ? '#3b82f6' : '#ccc'}`,
                               paddingLeft: '0.65rem',
-                              background: isCurrent ? '#e8f5e9' : 'transparent',
+                              background: isCurrent ? '#e8f5e9' : isNext ? '#f0f9ff' : 'transparent',
                               borderRadius: '0 4px 4px 0',
-                              paddingTop: '0.25rem',
-                              paddingBottom: '0.25rem',
+                              paddingTop: '0.35rem',
+                              paddingBottom: '0.35rem',
                             }}
                           >
-                            <div style={{ fontSize: '0.85rem', fontWeight: isDone ? 700 : 500, color: isDone ? '#155724' : '#888' }}>
-                              {isDone ? '✓ ' : `${idx + 1}. `} {step.label}
+                            <div style={{ fontSize: '0.85rem', fontWeight: isDone ? 700 : isNext ? 700 : 500, color: isDone ? '#155724' : isNext ? '#1d4ed8' : '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <span>{isDone ? '✓ ' : isNext ? '👉 Next: ' : '○ '}</span>
+                              <span>{step.label}</span>
                             </div>
-                            <div style={{ fontSize: '0.72rem', color: isDone ? '#555' : '#aaa', marginTop: '2px' }}>
+                            <div style={{ fontSize: '0.72rem', color: isDone ? '#555' : isNext ? '#1e40af' : '#aaa', marginTop: '2px' }}>
                               {step.desc}
                             </div>
                           </div>

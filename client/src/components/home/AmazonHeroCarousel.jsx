@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssetUrl, getComplaintRankings, getComplaints } from '../../services/api.js';
 import { getShowcaseImage } from '../../utils/showcaseImages.js';
+import { getCompanyLogo } from '../../utils/companyLogos.js';
 import ComplaintCommentsModal from '../complaints/ComplaintCommentsModal.jsx';
 
 // Verified reference records so the carousel is always vibrant and informative
@@ -11,6 +12,7 @@ const CURATED_COMPLAINTS = [
     rank: 1,
     tag: '🔥 #1 MOST COMPLAINED',
     count: 14,
+    type: 'Product',
     company: 'Maruti Suzuki',
     productName: 'Swift ZXI+ / Dzire AMT',
     category: 'Vehicles & Automotive',
@@ -29,6 +31,7 @@ const CURATED_COMPLAINTS = [
     rank: 2,
     tag: '📱 HARDWARE DEFECT ALERT',
     count: 11,
+    type: 'Product',
     company: 'OnePlus',
     productName: 'OnePlus 11 / 11R 5G',
     category: 'Mobiles',
@@ -47,6 +50,7 @@ const CURATED_COMPLAINTS = [
     rank: 3,
     tag: '💻 MOTHERBOARD BURNOUT',
     count: 9,
+    type: 'Product',
     company: 'HP',
     productName: 'HP Victus Gaming Laptop',
     category: 'Computers',
@@ -65,6 +69,7 @@ const CURATED_COMPLAINTS = [
     rank: 4,
     tag: '🏥 OVERBILLING RECORD',
     count: 8,
+    type: 'Service',
     company: 'Apollo Hospitals',
     productName: 'Emergency ICU Care',
     category: 'Hospital & Healthcare',
@@ -83,6 +88,7 @@ const CURATED_COMPLAINTS = [
     rank: 5,
     tag: '✈️ FLIGHT DELAY WATCH',
     count: 8,
+    type: 'Service',
     company: 'IndiGo Airlines',
     productName: 'Domestic Flight 6E',
     category: 'Flights & Trains',
@@ -101,6 +107,7 @@ const CURATED_COMPLAINTS = [
     rank: 6,
     tag: '📱 CAMERA MOTOR FAILURE',
     count: 7,
+    type: 'Product',
     company: 'Samsung',
     productName: 'Galaxy S22 Ultra',
     category: 'Mobiles',
@@ -119,6 +126,7 @@ const CURATED_COMPLAINTS = [
     rank: 7,
     tag: '📦 E-COMMERCE RETURN DENIAL',
     count: 7,
+    type: 'Service',
     company: 'Flipkart',
     productName: 'Refurbished Phone / Open Box',
     category: 'Mobiles',
@@ -137,6 +145,7 @@ const CURATED_COMPLAINTS = [
     rank: 8,
     tag: '🏦 BANKING OVERCHARGE',
     count: 6,
+    type: 'Service',
     company: 'State Bank of India',
     productName: 'Savings Account & Cards',
     category: 'Banking',
@@ -199,6 +208,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
               ? comp.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
               : (comp?.productImageUrl ? [getAssetUrl(comp.productImageUrl)] : [getShowcaseImage(prod.category)]);
 
+            const itemType = comp?.type || (comp?.category && ['Hospital & Healthcare', 'Flights & Trains', 'Hotel & Travel', 'Banking', 'Restaurants & Food', 'Telecom'].includes(comp.category) ? 'Service' : 'Product');
             dynamicCards.push({
               id: `real-${comp?.id || prodName}`,
               rank: dynamicCards.length + 1,
@@ -206,10 +216,11 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
                 ? `🔥 ${count} CONSUMER REPORTS`
                 : '🚨 VERIFIED USER EVIDENCE',
               count,
+              type: itemType,
               company: companyName,
               productName: prodName,
               category: prod.category || comp?.category || 'Product',
-              categoryIcon: comp?.type === 'Service' ? '🛠️' : '📦',
+              categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
               defectTitle: comp?.title || `${prodName} Defect Report`,
               summary: comp?.description ? comp.description.slice(0, 110) + '...' : 'Verified consumer evidence record.',
               imageUrl: imageList[0],
@@ -275,15 +286,17 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
         : (c.productImageUrl ? [getAssetUrl(c.productImageUrl)] : [getShowcaseImage(c.category)]);
 
+      const itemType = c.type || 'Product';
       return {
         id: `live-${c.id}`,
         rank: idx + 1,
         tag: '🚨 LIVE COMPLAINT',
         count: c.similarComplaintCount || 1,
+        type: itemType,
         company: c.company || 'Company',
         productName: c.model || c.productName || c.title,
         category: c.category || 'Product',
-        categoryIcon: c.type === 'Service' ? '🛠️' : '📦',
+        categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
         defectTitle: c.title,
         summary: c.description ? c.description.slice(0, 110) + '...' : 'Verified consumer complaint record.',
         imageUrl: imageList[0],
@@ -517,20 +530,84 @@ function HeroCard({ item, onVideoClick, onCommentsClick }) {
     >
       {/* Card Top Pill */}
       <div className="amazon-multi-card__top">
-        <span className="amazon-multi-card__rank-tag">
-          {item.tag || `#${item.rank} MOST COMPLAINED`}
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span className="amazon-multi-card__rank-tag">
+            {item.tag || `#${item.rank} MOST COMPLAINED`}
+          </span>
+          <span
+            style={{
+              fontSize: '0.62rem',
+              fontWeight: 800,
+              padding: '2px 6px',
+              borderRadius: '4px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+              background: item.type === 'Service' ? '#fef3c7' : '#e0e7ff',
+              color: item.type === 'Service' ? '#92400e' : '#3730a3',
+              border: item.type === 'Service' ? '1px solid #fde68a' : '1px solid #c7d2fe',
+            }}
+          >
+            {item.type === 'Service' ? 'SERVICE' : 'PRODUCT'}
+          </span>
+        </div>
         <span className="amazon-multi-card__count-badge">
           🔥 {item.count} {item.count === 1 ? 'Report' : 'Reports'}
         </span>
       </div>
 
-      {/* Company & Product Header */}
-      <div className="amazon-multi-card__titles">
-        <h3 className="amazon-multi-card__company">{item.company}</h3>
-        <h4 className="amazon-multi-card__product" title={item.productName}>
-          {item.productName}
-        </h4>
+      {/* Company & Product Header with Logo or Branded Mark */}
+      <div className="amazon-multi-card__titles" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        {getCompanyLogo(item.company) ? (
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '8px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              padding: '4px',
+              overflow: 'hidden',
+            }}
+          >
+            <img
+              src={getCompanyLogo(item.company)}
+              alt={`${item.company} logo`}
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
+          </div>
+        ) : (
+          <div
+            style={{
+              width: '38px',
+              height: '38px',
+              borderRadius: '8px',
+              background: item.type === 'Service' ? '#fff7ed' : '#eff6ff',
+              border: item.type === 'Service' ? '1px solid #fed7aa' : '1px solid #bfdbfe',
+              color: item.type === 'Service' ? '#c2410c' : '#1d4ed8',
+              fontWeight: 800,
+              fontSize: '0.9rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {(item.company || 'B')[0].toUpperCase()}
+          </div>
+        )}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 className="amazon-multi-card__company">{item.company}</h3>
+          <h4 className="amazon-multi-card__product" title={item.productName}>
+            {item.productName}
+          </h4>
+        </div>
       </div>
 
       {/* Media Viewport: Real Photo or Video (Bills never shown) */}

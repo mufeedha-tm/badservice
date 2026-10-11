@@ -5677,22 +5677,25 @@ html, body {
   width: max-content;
   will-change: transform;
 }
-.hero-marquee-track--left {
-  animation: heroMarqueeLeft var(--hero-speed, 35s) linear infinite;
-}
-.hero-marquee-track--right {
-  animation: heroMarqueeRight var(--hero-speed, 40s) linear infinite;
+.hero-marquee-track--left,
+.hero-marquee-track--right,
+.hero-marquee-track--ltr {
+  animation: heroMarqueeLtr var(--hero-speed, 32s) linear infinite;
 }
 .hero-marquee-viewport:hover .hero-marquee-track {
   animation-play-state: paused;
 }
+@keyframes heroMarqueeLtr {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
+}
 @keyframes heroMarqueeLeft {
-  0% { transform: translateX(0); }
-  100% { transform: translateX(-50%); }
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0%); }
 }
 @keyframes heroMarqueeRight {
   0% { transform: translateX(-50%); }
-  100% { transform: translateX(0); }
+  100% { transform: translateX(0%); }
 }
 
 .amazon-multi-card {
