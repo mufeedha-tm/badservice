@@ -70,6 +70,12 @@ export default function ComplaintCommentsModal({
         authorEmail: authorEmail.trim() || undefined,
         body: body.trim(),
       });
+      // Store locally created comment IDs in localStorage so the user can edit/delete their comment even if guest
+      try {
+        const myComments = JSON.parse(localStorage.getItem('my_comment_ids') || '[]');
+        myComments.push(newComment.id);
+        localStorage.setItem('my_comment_ids', JSON.stringify(myComments));
+      } catch (_e) {}
       setComments((prev) => [...prev, newComment]);
       setBody('');
       setSuccess('✓ Comment posted successfully!');
@@ -218,9 +224,17 @@ export default function ComplaintCommentsModal({
           )}
 
           {!loading && comments.map((cmt) => {
+            let myCommentIds = [];
+            try {
+              myCommentIds = JSON.parse(localStorage.getItem('my_comment_ids') || '[]');
+            } catch (_e) {}
+
             const isAuthorOrAdmin = Boolean(
               isAdmin ||
-              (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())
+              myCommentIds.includes(cmt.id) ||
+              (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase()) ||
+              (account?.name && cmt.authorName && account.name.toLowerCase() === cmt.authorName.toLowerCase()) ||
+              (!cmt.authorEmail && !account) // If viewing as anonymous and comment has no email, let user manage
             );
             const isEditing = editingId === cmt.id;
 

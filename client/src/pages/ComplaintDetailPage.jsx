@@ -160,6 +160,11 @@ export default function ComplaintDetailPage() {
         authorEmail: commentAuthorEmail.trim() || undefined,
         body: commentBody.trim(),
       });
+      try {
+        const myComments = JSON.parse(localStorage.getItem('my_comment_ids') || '[]');
+        myComments.push(newComment.id);
+        localStorage.setItem('my_comment_ids', JSON.stringify(myComments));
+      } catch (_e) {}
       setComments((prev) => [...prev, newComment]);
       setCommentBody('');
       setCommentSuccess('✓ Comment posted successfully!');
@@ -601,9 +606,17 @@ export default function ComplaintDetailPage() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {comments.map((cmt) => {
+                  let myCommentIds = [];
+                  try {
+                    myCommentIds = JSON.parse(localStorage.getItem('my_comment_ids') || '[]');
+                  } catch (_e) {}
+
                   const isAuthorOrAdmin = Boolean(
                     isAdmin ||
-                    (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())
+                    myCommentIds.includes(cmt.id) ||
+                    (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase()) ||
+                    (account?.name && cmt.authorName && account.name.toLowerCase() === cmt.authorName.toLowerCase()) ||
+                    (!cmt.authorEmail && !account) // Guest author on guest comment
                   );
                   const isEditing = editingCommentId === cmt.id;
 

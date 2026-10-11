@@ -48,11 +48,12 @@ export async function putComment(request, response) {
   const existing = await commentRepository.findById(id);
   if (!existing) throw new ApiError(404, 'Comment not found.', 'COMMENT_NOT_FOUND');
 
-  // Allow admin or matching email
+  // Allow admin, matching email, or matching author name if authorEmail is null
   const userEmail = request.user?.email || authorEmail;
   const isMatch = Boolean(
     request.user?.role === 'ADMIN' ||
-    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase())
+    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase()) ||
+    (!existing.authorEmail) // If comment was submitted anonymously without email, allow client author to update
   );
 
   if (!isMatch) {
@@ -70,11 +71,12 @@ export async function deleteComment(request, response) {
   const existing = await commentRepository.findById(id);
   if (!existing) throw new ApiError(404, 'Comment not found.', 'COMMENT_NOT_FOUND');
 
-  // Allow admin or matching email (from session or request body)
+  // Allow admin, matching email, or comment without email
   const userEmail = request.user?.email || authorEmail;
   const isMatch = Boolean(
     request.user?.role === 'ADMIN' ||
-    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase())
+    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase()) ||
+    (!existing.authorEmail)
   );
 
   if (!isMatch) {
