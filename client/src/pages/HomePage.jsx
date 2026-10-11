@@ -122,26 +122,27 @@ export default function HomePage() {
           {/* Box 1: Most Complained Tech & Mobiles */}
           <article className="amazon-box-card">
             <h3 className="amazon-box-card__title">Most Complained Products</h3>
-            <div className="amazon-box-card__quad">
-              {(topProducts.slice(0, 4).length > 0 ? topProducts.slice(0, 4) : [
-                { name: 'Maruti Suzuki', count: 12, category: 'Vehicles & Automotive' },
-                { name: 'Smartphones', count: 8, category: 'Mobiles' },
-                { name: 'Laptops', count: 6, category: 'Computers' },
-                { name: 'Smart TV', count: 5, category: 'TV & Electronics' },
-              ]).map((prod) => (
-                <Link
-                  key={prod.name}
-                  to={`/complaints?q=${encodeURIComponent(prod.name)}`}
-                  className="amazon-quad-item"
-                >
-                  <div className="amazon-quad-item__thumb">
-                    <img src={getShowcaseImage(prod.category || 'Mobiles')} alt={prod.name} loading="lazy" />
-                  </div>
-                  <span className="amazon-quad-item__name">{prod.name}</span>
-                  <span className="amazon-quad-item__count">{prod.count} complaints</span>
-                </Link>
-              ))}
-            </div>
+            {topProducts.length === 0 ? (
+              <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                No product complaints recorded yet.
+              </div>
+            ) : (
+              <div className="amazon-box-card__quad">
+                {topProducts.slice(0, 4).map((prod) => (
+                  <Link
+                    key={prod.name}
+                    to={`/complaints?q=${encodeURIComponent(prod.name)}`}
+                    className="amazon-quad-item"
+                  >
+                    <div className="amazon-quad-item__thumb">
+                      <img src={getShowcaseImage(prod.category || 'Mobiles')} alt={prod.name} loading="lazy" />
+                    </div>
+                    <span className="amazon-quad-item__name">{prod.name}</span>
+                    <span className="amazon-quad-item__count">{prod.count} {prod.count === 1 ? 'complaint' : 'complaints'}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
             <Link to="/complaints?sort=most-complained" className="amazon-box-card__link">
               See all product complaints →
             </Link>
@@ -180,50 +181,55 @@ export default function HomePage() {
           {/* Box 3: Top Reported Brands */}
           <article className="amazon-box-card">
             <h3 className="amazon-box-card__title">Top Reported Brands</h3>
-            <div className="amazon-box-card__quad">
-              {(rankings.companies?.slice(0, 4).length > 0 ? rankings.companies.slice(0, 4) : [
-                { name: 'Maruti Suzuki', count: 12 },
-                { name: 'Samsung', count: 7 },
-                { name: 'Flipkart', count: 5 },
-                { name: 'Airtel', count: 4 },
-              ]).map((comp) => {
-                const categoryIcon = getCompanyCategoryIcon(comp.name, comp.category);
-                return (
-                  <Link
-                    key={comp.name}
-                    to={`/complaints?company=${encodeURIComponent(comp.name)}`}
-                    className="amazon-quad-item"
-                  >
-                    <div className="amazon-quad-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: categoryIcon.bg || '#f8fafc' }}>
-                      {categoryIcon.svg ? (
-                        <img
-                          src={categoryIcon.svg}
-                          alt={`${comp.name} icon`}
-                          loading="eager"
-                          decoding="async"
-                          style={{ width: '42px', height: '42px', objectFit: 'contain' }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '1.5rem',
-                          }}
-                        >
-                          {categoryIcon.emoji}
-                        </div>
-                      )}
-                    </div>
-                    <span className="amazon-quad-item__name">{comp.name}</span>
-                    <span className="amazon-quad-item__count">{comp.count} complaints</span>
-                  </Link>
-                );
-              })}
-            </div>
+            {(rankings.companies || []).length === 0 ? (
+              <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
+                No brand complaints recorded yet.
+              </div>
+            ) : (
+              <div className="amazon-box-card__quad">
+                {rankings.companies.slice(0, 4).map((comp) => {
+                  const categoryIcon = getCompanyCategoryIcon(comp.name, comp.category);
+                  return (
+                    <Link
+                      key={comp.name}
+                      to={`/complaints?company=${encodeURIComponent(comp.name)}`}
+                      className="amazon-quad-item"
+                    >
+                      <div className="amazon-quad-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: categoryIcon.bg || '#f8fafc' }}>
+                        {categoryIcon.svg ? (
+                          <img
+                            src={categoryIcon.svg}
+                            alt={`${comp.name} icon`}
+                            loading="eager"
+                            decoding="async"
+                            style={{ width: '42px', height: '42px', objectFit: 'contain' }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: '1.5rem',
+                            }}
+                          >
+                            {categoryIcon.emoji}
+                          </div>
+                        )}
+                      </div>
+                      <span className="amazon-quad-item__name">{comp.name}</span>
+                      <span className="amazon-quad-item__count">{comp.count} {comp.count === 1 ? 'complaint' : 'complaints'}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+            <Link to="/companies" className="amazon-box-card__link">
+              Compare all brands →
+            </Link>
+          </article>
             <Link to="/companies" className="amazon-box-card__link">
               Compare all brands →
             </Link>
