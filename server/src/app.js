@@ -14,12 +14,26 @@ import healthRouter from './routes/healthRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-try {
-  await runMigrations();
-  await runSeed();
-} catch (err) {
-  console.warn('⚠️ Database migration/seed status:', err.message);
+async function initializeDatabaseWithRetry(maxAttempts = 3, delayMs = 1500) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      await runMigrations();
+      await runSeed();
+      return;
+    } catch (err) {
+      const isNetworkDrop = err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ETIMEDOUT';
+      if (isNetworkDrop && attempt < maxAttempts) {
+        console.warn(`⚠️ Database connection reset during startup (attempt ${attempt}/${maxAttempts}). Reconnecting in ${delayMs}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        console.warn('⚠️ Database migration/seed status:', err.message);
+        break;
+      }
+    }
+  }
 }
+
+await initializeDatabaseWithRetry();
 
 const app = express();
 

@@ -24,10 +24,13 @@ const pool = mysql.createPool({
   timezone: 'Z',
   waitForConnections: true,
   connectionLimit: 10,
+  maxIdle: 10,
+  idleTimeout: 60000,
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 10000,
+  keepAliveInitialDelay: 0,
   connectTimeout: 30000,
+  decimalNumbers: true,
 });
 
 export default pool;
