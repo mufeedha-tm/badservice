@@ -167,8 +167,27 @@ export default function SearchBar({ onSearch }) {
   }
 
   return (
-    <div className="search-bar-wrapper" ref={containerRef} style={{ position: 'relative', flex: '1 1 24rem', maxWidth: '50rem', margin: '0 auto' }}>
-      <form className="search-bar" role="search" onSubmit={handleSubmit}>
+    <div
+      className="search-bar-wrapper"
+      ref={containerRef}
+      style={{
+        position: 'relative',
+        flex: '1 1 auto',
+        width: '100%',
+        maxWidth: 'none',
+        margin: '0',
+      }}
+    >
+      <form
+        className="search-bar"
+        role="search"
+        onSubmit={handleSubmit}
+        style={{
+          width: '100%',
+          maxWidth: 'none',
+          margin: '0',
+        }}
+      >
         <label className="visually-hidden" htmlFor="search-category">
           Search category
         </label>
