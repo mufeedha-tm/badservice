@@ -134,43 +134,6 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       };
     });
   }, [liveComplaints]);
-    return liveComplaints.map((c, idx) => {
-      const imageList = Array.isArray(c.productImages) && c.productImages.length > 0
-        ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
-        : (c.productImageUrl ? [getAssetUrl(c.productImageUrl)] : [getShowcaseImage(c.category)]);
-
-      const cat = (c.category || '').toLowerCase();
-      const comp = (c.company || '').toLowerCase();
-      const isService = cat.includes('hospital') || cat.includes('health') || cat.includes('flight') ||
-        cat.includes('hotel') || cat.includes('travel') || cat.includes('restaurant') ||
-        cat.includes('bank') || cat.includes('finance') || cat.includes('telecom') ||
-        cat.includes('courier') || cat.includes('delivery') || comp.includes('hospital') ||
-        comp.includes('apollo') || comp.includes('indigo') || comp.includes('oyo');
-
-      const itemType = isService ? 'Service' : (c.type || 'Product');
-      return {
-        id: `live-${c.id}`,
-        complaintId: c.id,
-        rank: idx + 1,
-        tag: '🚨 LIVE COMPLAINT',
-        count: c.similarComplaintCount || 1,
-        type: itemType,
-        company: c.company || 'Company',
-        productName: c.model || c.productName || c.title,
-        category: c.category || (isService ? 'Hospital & Healthcare' : 'Product'),
-        categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
-        defectTitle: c.title,
-        summary: c.description ? c.description.slice(0, 110) + '...' : 'Verified consumer complaint record.',
-        imageUrl: imageList[0],
-        images: imageList,
-        videoUrl: c.productVideoUrl ? getAssetUrl(c.productVideoUrl) : null,
-        hasVideo: Boolean(c.productVideoUrl),
-        warningBadge: c.location || 'Verified Complaint',
-        link: `/complaints/${c.id}`,
-        colorTheme: '#dc2626',
-      };
-    });
-  }, [liveComplaints]);
 
   // Seamless marquee lists repeated only if needed to fill viewport
   const row1MarqueeList = useMemo(() => {

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AmazonHeroCarousel from '../components/home/AmazonHeroCarousel.jsx';
 import EvidenceCarousel from '../components/media/EvidenceCarousel.jsx';
-import MediaCarousel from '../components/media/MediaCarousel.jsx';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import EmptyState from '../components/ui/EmptyState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
@@ -10,30 +9,6 @@ import { getCategories, getComplaintRankings, getErrorMessage, searchComplaints 
 import { getComplaintMedia } from '../utils/complaintMedia.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
 import { getCompanyLogo, getCompanyCategoryIcon } from '../utils/companyLogos.js';
-
-const trustPoints = [
-  { number: '01', title: 'Real complaints', text: 'Consumer-submitted records, not product advertisements.' },
-  { number: '02', title: 'Useful evidence', text: 'Photos, bills and short customer videos where available.' },
-  { number: '03', title: 'Before you buy', text: 'Spot repeated problems before spending your money.' },
-];
-
-const marutiReferenceMedia = [
-  {
-    id: 'maruti-public-photo',
-    type: 'image',
-    url: '/maruthi.avif',
-    label: 'Maruti photo',
-    referenceNotice: 'Public reference · not complaint evidence',
-  },
-  {
-    id: 'maruti-public-video',
-    type: 'video',
-    url: '/maruthi%20video.mp4',
-    label: 'Maruti reference video',
-    referenceNotice: 'Public reference · not complaint evidence',
-    maxDurationSeconds: 15,
-  },
-];
 
 const DEFAULT_CATEGORIES = [
   { id: 'automotive', name: 'Vehicles & Automotive', slug: 'automotive' },
@@ -76,6 +51,7 @@ export default function HomePage() {
         if (current && rankingData) {
           setRankings(rankingData);
         }
+      })
       .catch((err) => current && setError(getErrorMessage(err, 'We could not load the latest complaint data.')))
       .finally(() => current && setLoading(false));
     return () => { current = false; };
@@ -230,10 +206,6 @@ export default function HomePage() {
               Compare all brands →
             </Link>
           </article>
-            <Link to="/companies" className="amazon-box-card__link">
-              Compare all brands →
-            </Link>
-          </article>
 
           {/* Box 4: Top Categories */}
           <article className="amazon-box-card">
@@ -279,27 +251,13 @@ export default function HomePage() {
               {topProducts.map((product, index) => (
                 <article className="product-rank-card" key={`${product.companyId || product.company}-${product.name}`}>
                   <div className="product-rank-card__top"><span>#{index + 1}</span><span>{product.count} {product.count === 1 ? 'complaint' : 'complaints'}</span></div>
-                  {product.company?.toLowerCase().includes('maruti') && product.name?.toLowerCase().includes('maruti') ? (
-                    <>
-                      <MediaCarousel
-                        items={marutiReferenceMedia}
-                        alt="Maruti photo and video reference media"
-                        compact
-                        autoPlay
-                      />
-                      <p className="product-rank-card__media-credit">
-                        Photo and video shown are public reference media, not complaint evidence. Bills and sensitive proofs are kept private and accessible only to admins.
-                      </p>
-                    </>
-                  ) : (
-                    <EvidenceCarousel
-                      complaint={product.latestComplaint || { company: product.company, category: product.category, productName: product.name }}
-                      category={product.category}
-                      productName={product.name}
-                      compact
-                      autoPlay
-                    />
-                  )}
+                  <EvidenceCarousel
+                    complaint={product.latestComplaint || { company: product.company, category: product.category, productName: product.name }}
+                    category={product.category}
+                    productName={product.name}
+                    compact
+                    autoPlay
+                  />
                   <div className="product-rank-card__body"><span>{product.category || 'Product'}</span><h3>{product.name}</h3><p>{product.company}</p><Link to={`/complaints?q=${encodeURIComponent(product.name)}`}>See complaints →</Link></div>
                 </article>
               ))}

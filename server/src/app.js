@@ -35,9 +35,43 @@ async function initializeDatabaseWithRetry(maxAttempts = 3, delayMs = 1500) {
 
 await initializeDatabaseWithRetry();
 
-const app = express();
+const configuredOrigins = (env.clientOrigin || '')
+  .split(',')
+  .map((o) => o.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
 
-app.use(cors({ origin: [env.clientOrigin, "http://localhost:5173"], credentials: true }));
+const defaultOrigins = [
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
+const allowedOrigins = Array.from(new Set([...configuredOrigins, ...defaultOrigins]));
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    const normalized = origin.replace(/\/+$/, '');
+    if (allowedOrigins.includes(normalized) || !env.production) {
+      return callback(null, true);
+    }
+    const isDomainMatch = allowedOrigins.some((allowed) => {
+      try {
+        const allowedHost = new URL(allowed).hostname;
+        const originHost = new URL(normalized).hostname;
+        return originHost === allowedHost || originHost.endsWith(`.${allowedHost}`);
+      } catch {
+        return false;
+      }
+    });
+    if (isDomainMatch) {
+      return callback(null, true);
+    }
+    return callback(null, false);
+  },
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
