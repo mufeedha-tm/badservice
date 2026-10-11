@@ -53,8 +53,10 @@ export default function AdminDashboardPage() {
   const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
   const [viewDeleted, setViewDeleted] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
-  const [previewBillUrl, setPreviewBillUrl] = useState(null);
   const [editingComplaint, setEditingComplaint] = useState(null);
+  const [previewBillUrl, setPreviewBillUrl] = useState(null);
+  const [billImageLoading, setBillImageLoading] = useState(true);
+  const [billImageError, setBillImageError] = useState(false);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -884,7 +886,11 @@ export default function AdminDashboardPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button
                                 type="button"
-                                onClick={() => setPreviewBillUrl(getAssetUrl(c.billImageUrl))}
+                                onClick={() => {
+                                  setBillImageLoading(true);
+                                  setBillImageError(false);
+                                  setPreviewBillUrl(getAssetUrl(c.billImageUrl));
+                                }}
                                 style={{
                                   background: '#e0f2fe',
                                   border: '1px solid #7dd3fc',
@@ -2001,26 +2007,72 @@ export default function AdminDashboardPage() {
                   padding: '16px',
                   overflowY: 'auto',
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   background: '#f1f5f9',
-                  minHeight: '300px',
+                  minHeight: '320px',
+                  position: 'relative',
                 }}
               >
-                <img
-                  src={previewBillUrl}
-                  alt="Bill preview"
-                  loading="eager"
-                  decoding="async"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '75vh',
-                    objectFit: 'contain',
-                    borderRadius: '6px',
-                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
-                    background: '#fff',
-                  }}
-                />
+                {billImageLoading && !billImageError && (
+                  <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>⏳</span> Loading bill proof...
+                  </div>
+                )}
+
+                {billImageError ? (
+                  <div style={{ textAlign: 'center', padding: '2.5rem 1rem', maxWidth: '420px' }}>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📄</div>
+                    <strong style={{ display: 'block', fontSize: '1.02rem', color: '#1e293b', marginBottom: '6px' }}>
+                      Unable to render inline image preview
+                    </strong>
+                    <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '16px', lineHeight: 1.5 }}>
+                      The file may be a PDF or saved in a secure format. You can open or download it directly below.
+                    </p>
+                    <a
+                      href={previewBillUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '9px 18px',
+                        background: '#0284c7',
+                        color: '#fff',
+                        borderRadius: '6px',
+                        fontSize: '0.88rem',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                        boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <span>📥</span> Open / Download Bill Proof ↗
+                    </a>
+                  </div>
+                ) : (
+                  <img
+                    src={previewBillUrl}
+                    alt="Bill preview"
+                    loading="eager"
+                    decoding="async"
+                    onLoad={() => setBillImageLoading(false)}
+                    onError={() => {
+                      setBillImageLoading(false);
+                      setBillImageError(true);
+                    }}
+                    style={{
+                      display: billImageLoading ? 'none' : 'block',
+                      maxWidth: '100%',
+                      maxHeight: '75vh',
+                      objectFit: 'contain',
+                      borderRadius: '6px',
+                      boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                      background: '#fff',
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>

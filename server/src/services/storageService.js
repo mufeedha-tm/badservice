@@ -111,8 +111,18 @@ export function getAdminBillImageSource(complaint) {
     return { type: 'remote', url: complaint.billImageUrl };
   }
 
+  if (complaint.billImageUrl?.startsWith('/uploads/proofs/')) {
+    const filename = complaint.billImageUrl.slice('/uploads/proofs/'.length);
+    if (filename && path.basename(filename) === filename) {
+      return {
+        type: 'local',
+        path: path.resolve(legacyUploadDir, filename),
+      };
+    }
+  }
+
   const prefix = '/uploads/complaints/bills/';
-  const filename = complaint.billImageUrl.startsWith(prefix)
+  const filename = complaint.billImageUrl?.startsWith(prefix)
     ? complaint.billImageUrl.slice(prefix.length)
     : '';
   if (!filename || path.basename(filename) !== filename) {
