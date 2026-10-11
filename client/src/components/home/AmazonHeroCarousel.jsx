@@ -5,164 +5,8 @@ import { getShowcaseImage } from '../../utils/showcaseImages.js';
 import { getCompanyLogo, getCompanyCategoryIcon } from '../../utils/companyLogos.js';
 import ComplaintCommentsModal from '../complaints/ComplaintCommentsModal.jsx';
 
-// Verified reference records so the carousel is always vibrant and informative
-const CURATED_COMPLAINTS = [
-  {
-    id: 'curated-maruti',
-    rank: 1,
-    tag: '🔥 #1 MOST COMPLAINED',
-    count: 14,
-    type: 'Product',
-    company: 'Maruti Suzuki',
-    productName: 'Swift ZXI+ / Dzire AMT',
-    category: 'Vehicles & Automotive',
-    categoryIcon: '🚗',
-    defectTitle: 'AMT Transmission Shudder & Defect',
-    summary: 'Violent jerking at low gears and steering lock reported after 15,000 km. Dealership refuses warranty claim.',
-    imageUrl: '/maruthi.avif',
-    videoUrl: '/maruthi%20video.mp4',
-    hasVideo: true,
-    warningBadge: 'Dealership Warranty Denied',
-    link: '/complaints?q=Maruti',
-    colorTheme: '#c45500',
-  },
-  {
-    id: 'curated-oneplus',
-    rank: 2,
-    tag: '📱 HARDWARE DEFECT ALERT',
-    count: 11,
-    type: 'Product',
-    company: 'OnePlus',
-    productName: 'OnePlus 11 / 11R 5G',
-    category: 'Mobiles',
-    categoryIcon: '📱',
-    defectTitle: 'Green Vertical Screen Line',
-    summary: 'Permanent green and pink line defect appeared on AMOLED screen immediately after OxygenOS 14 software update.',
-    imageUrl: getShowcaseImage('Mobiles'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: '₹14,500 Screen Quote',
-    link: '/complaints?q=OnePlus',
-    colorTheme: '#dc2626',
-  },
-  {
-    id: 'curated-hp',
-    rank: 3,
-    tag: '💻 MOTHERBOARD BURNOUT',
-    count: 9,
-    type: 'Product',
-    company: 'HP',
-    productName: 'HP Victus Gaming Laptop',
-    category: 'Computers',
-    categoryIcon: '💻',
-    defectTitle: 'Motherboard Dead & Hinge Crack',
-    summary: 'Laptop died completely with power rail short circuit 2 weeks past standard 1-year warranty. No good-will repair.',
-    imageUrl: getShowcaseImage('Computers'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'Repairs Exceed Laptop Value',
-    link: '/complaints?q=HP',
-    colorTheme: '#2563eb',
-  },
-  {
-    id: 'curated-apollo',
-    rank: 4,
-    tag: '🏥 OVERBILLING RECORD',
-    count: 8,
-    type: 'Service',
-    company: 'Apollo Hospitals',
-    productName: 'Emergency ICU Care',
-    category: 'Hospital & Healthcare',
-    categoryIcon: '🏥',
-    defectTitle: 'Inflated Consumables & Detained Patient',
-    summary: 'Patient billed ₹48,000 for non-medical consumables. Discharge delayed for 7 hours awaiting cash payment.',
-    imageUrl: getShowcaseImage('Hospital & Healthcare'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'TPA Insurance Denied',
-    link: '/complaints?q=Apollo',
-    colorTheme: '#059669',
-  },
-  {
-    id: 'curated-indigo',
-    rank: 5,
-    tag: '✈️ FLIGHT DELAY WATCH',
-    count: 8,
-    type: 'Service',
-    company: 'IndiGo Airlines',
-    productName: 'Domestic Flight 6E',
-    category: 'Flights & Trains',
-    categoryIcon: '✈️',
-    defectTitle: '8+ Hours Flight Delay Without Food',
-    summary: 'Stranded passengers received no hotel accommodation or mandatory statutory compensation under DGCA CAR rules.',
-    imageUrl: getShowcaseImage('Flights & Trains'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'Refund Withheld',
-    link: '/complaints?q=IndiGo',
-    colorTheme: '#7c3aed',
-  },
-  {
-    id: 'curated-samsung',
-    rank: 6,
-    tag: '📱 CAMERA MOTOR FAILURE',
-    count: 7,
-    type: 'Product',
-    company: 'Samsung',
-    productName: 'Galaxy S22 Ultra',
-    category: 'Mobiles',
-    categoryIcon: '📱',
-    defectTitle: '10x Periscope Lens Rattling & Blur',
-    summary: 'Optical Image Stabilization sensor motor seized, resulting in permanent blurry photography and camera app crash.',
-    imageUrl: getShowcaseImage('Mobiles'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'Camera Module Defect',
-    link: '/complaints?q=Samsung',
-    colorTheme: '#ea580c',
-  },
-  {
-    id: 'curated-flipkart',
-    rank: 7,
-    tag: '📦 E-COMMERCE RETURN DENIAL',
-    count: 7,
-    type: 'Service',
-    company: 'Flipkart',
-    productName: 'Delivery & Return Dispute',
-    category: 'Courier & Delivery',
-    categoryIcon: '📦',
-    defectTitle: 'Wrong Item Delivered & Return Cancelled',
-    summary: 'Received duplicate model with damaged camera instead of brand new item. Open box delivery dispute rejected.',
-    imageUrl: getShowcaseImage('Courier & Delivery'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'Return Window Closed',
-    link: '/complaints?q=Flipkart',
-    colorTheme: '#2563eb',
-  },
-  {
-    id: 'curated-sbi',
-    rank: 8,
-    tag: '🏦 BANKING OVERCHARGE',
-    count: 6,
-    type: 'Service',
-    company: 'State Bank of India',
-    productName: 'Savings Account & Cards',
-    category: 'Banking',
-    categoryIcon: '🏦',
-    defectTitle: 'Unauthorized Insurance Premium Debit',
-    summary: '₹1,499 deducted without consent for accidental insurance. Branch refused reversal despite multiple complaints.',
-    imageUrl: getShowcaseImage('Banking'),
-    videoUrl: null,
-    hasVideo: false,
-    warningBadge: 'Unauthorized Deduction',
-    link: '/complaints?q=SBI',
-    colorTheme: '#0284c7',
-  },
-];
-
 export default function AmazonHeroCarousel({ compact = false, rankings: propRankings = null }) {
-  const [items, setItems] = useState(CURATED_COMPLAINTS);
+  const [items, setItems] = useState([]);
   const [liveComplaints, setLiveComplaints] = useState([]);
   const [activeVideoModal, setActiveVideoModal] = useState(null);
   const [activeCommentsItem, setActiveCommentsItem] = useState(null);
@@ -193,67 +37,45 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
 
       productsList.forEach((prod) => {
         const comp = prod.latestComplaint;
-        const hasImage = Boolean(comp?.productImageUrl || comp?.productImages?.length);
-        const hasVideo = Boolean(comp?.productVideoUrl);
+        const prodName = prod.name || comp?.productName || comp?.serviceName || comp?.model || comp?.title || 'Product';
+        const companyName = prod.company || comp?.company || 'Company';
+        const key = `${companyName}-${prodName}`.toLowerCase();
         const count = Number(prod.count) || 1;
 
-        if (hasImage || hasVideo || count > 1) {
-          const prodName = prod.name || comp?.productName || comp?.serviceName || comp?.model || comp?.title || 'Product';
-          const companyName = prod.company || comp?.company || 'Company';
-          const key = `${companyName}-${prodName}`.toLowerCase();
-
-          if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            const imageList = Array.isArray(comp?.productImages) && comp.productImages.length > 0
-              ? comp.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
-              : (comp?.productImageUrl ? [getAssetUrl(comp.productImageUrl)] : [getShowcaseImage(prod.category)]);
-
-            const itemType = comp?.type || (comp?.category && ['Hospital & Healthcare', 'Flights & Trains', 'Hotel & Travel', 'Banking', 'Restaurants & Food', 'Telecom'].includes(comp.category) ? 'Service' : 'Product');
-            dynamicCards.push({
-              id: `real-${comp?.id || prodName}`,
-              complaintId: comp?.id || null,
-              rank: dynamicCards.length + 1,
-              tag: count > 1
-                ? `🔥 ${count} CONSUMER REPORTS`
-                : '🚨 VERIFIED USER EVIDENCE',
-              count,
-              type: itemType,
-              company: companyName,
-              productName: prodName,
-              category: prod.category || comp?.category || 'Product',
-              categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
-              defectTitle: comp?.title || `${prodName} Defect Report`,
-              summary: comp?.description ? comp.description.slice(0, 110) + '...' : 'Verified consumer evidence record.',
-              imageUrl: imageList[0],
-              images: imageList,
-              videoUrl: comp?.productVideoUrl ? getAssetUrl(comp.productVideoUrl) : null,
-              hasVideo: Boolean(comp?.productVideoUrl),
-              warningBadge: comp?.badgeLabel || 'Verified Customer Evidence',
-              link: comp?.id ? `/complaints/${comp.id}` : `/complaints?q=${encodeURIComponent(prodName)}`,
-              colorTheme: hasVideo ? '#dc2626' : '#c45500',
-            });
-          }
-        }
-      });
-
-      // Merge dynamic real complaints with curated records to ensure an 8-card deck
-      const merged = [...dynamicCards];
-      CURATED_COMPLAINTS.forEach((curated) => {
-        const key = `${curated.company}-${curated.productName}`.toLowerCase();
         if (!seenKeys.has(key)) {
           seenKeys.add(key);
-          merged.push({ ...curated, images: [curated.imageUrl] });
+          const imageList = Array.isArray(comp?.productImages) && comp.productImages.length > 0
+            ? comp.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
+            : (comp?.productImageUrl ? [getAssetUrl(comp.productImageUrl)] : [getShowcaseImage(prod.category)]);
+
+          const itemType = comp?.type || (comp?.category && ['Hospital & Healthcare', 'Flights & Trains', 'Hotel & Travel', 'Banking', 'Restaurants & Food', 'Telecom'].includes(comp.category) ? 'Service' : 'Product');
+          dynamicCards.push({
+            id: `real-${comp?.id || prodName}`,
+            complaintId: comp?.id || null,
+            rank: dynamicCards.length + 1,
+            tag: count > 1
+              ? `🔥 ${count} CONSUMER REPORTS`
+              : '🚨 VERIFIED USER EVIDENCE',
+            count,
+            type: itemType,
+            company: companyName,
+            productName: prodName,
+            category: prod.category || comp?.category || 'Product',
+            categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
+            defectTitle: comp?.title || `${prodName} Defect Report`,
+            summary: comp?.description ? comp.description.slice(0, 110) + '...' : 'Verified consumer evidence record.',
+            imageUrl: imageList[0],
+            images: imageList,
+            videoUrl: comp?.productVideoUrl ? getAssetUrl(comp.productVideoUrl) : null,
+            hasVideo: Boolean(comp?.productVideoUrl),
+            warningBadge: comp?.badgeLabel || comp?.location || 'Verified Customer Evidence',
+            link: comp?.id ? `/complaints/${comp.id}` : `/complaints?q=${encodeURIComponent(prodName)}`,
+            colorTheme: comp?.productVideoUrl ? '#dc2626' : '#c45500',
+          });
         }
       });
 
-      const finalItems = merged.slice(0, 12).map((card, idx) => ({
-        ...card,
-        rank: idx + 1,
-      }));
-
-      if (finalItems.length > 0) {
-        setItems(finalItems);
-      }
+      setItems(dynamicCards.slice(0, 12));
     };
 
     if (propRankings?.products?.length) {
@@ -275,14 +97,6 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
 
   // Row 1: Live complaints feed (transformed into hero cards)
   const row1LiveCards = useMemo(() => {
-    if (liveComplaints.length === 0) {
-      return items.slice(0, 6).map((item, idx) => ({
-        ...item,
-        id: `row1-${item.id}-${idx}`,
-        complaintId: item.complaintId || null,
-        badge: 'LIVE COMPLAINT',
-      }));
-    }
     return liveComplaints.map((c, idx) => {
       const imageList = Array.isArray(c.productImages) && c.productImages.length > 0
         ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
@@ -319,10 +133,65 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         colorTheme: '#dc2626',
       };
     });
-  }, [liveComplaints, items]);
+  }, [liveComplaints]);
+    return liveComplaints.map((c, idx) => {
+      const imageList = Array.isArray(c.productImages) && c.productImages.length > 0
+        ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
+        : (c.productImageUrl ? [getAssetUrl(c.productImageUrl)] : [getShowcaseImage(c.category)]);
 
-  // Row 2: Most complained products and brands
-  const row2RankCards = useMemo(() => {
+      const cat = (c.category || '').toLowerCase();
+      const comp = (c.company || '').toLowerCase();
+      const isService = cat.includes('hospital') || cat.includes('health') || cat.includes('flight') ||
+        cat.includes('hotel') || cat.includes('travel') || cat.includes('restaurant') ||
+        cat.includes('bank') || cat.includes('finance') || cat.includes('telecom') ||
+        cat.includes('courier') || cat.includes('delivery') || comp.includes('hospital') ||
+        comp.includes('apollo') || comp.includes('indigo') || comp.includes('oyo');
+
+      const itemType = isService ? 'Service' : (c.type || 'Product');
+      return {
+        id: `live-${c.id}`,
+        complaintId: c.id,
+        rank: idx + 1,
+        tag: '🚨 LIVE COMPLAINT',
+        count: c.similarComplaintCount || 1,
+        type: itemType,
+        company: c.company || 'Company',
+        productName: c.model || c.productName || c.title,
+        category: c.category || (isService ? 'Hospital & Healthcare' : 'Product'),
+        categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
+        defectTitle: c.title,
+        summary: c.description ? c.description.slice(0, 110) + '...' : 'Verified consumer complaint record.',
+        imageUrl: imageList[0],
+        images: imageList,
+        videoUrl: c.productVideoUrl ? getAssetUrl(c.productVideoUrl) : null,
+        hasVideo: Boolean(c.productVideoUrl),
+        warningBadge: c.location || 'Verified Complaint',
+        link: `/complaints/${c.id}`,
+        colorTheme: '#dc2626',
+      };
+    });
+  }, [liveComplaints]);
+
+  // Seamless marquee lists repeated only if needed to fill viewport
+  const row1MarqueeList = useMemo(() => {
+    if (row1LiveCards.length === 0) return [];
+    if (row1LiveCards.length < 6) {
+      const times = Math.ceil(6 / row1LiveCards.length);
+      const arr = [];
+      for (let i = 0; i < times; i++) arr.push(...row1LiveCards);
+      return arr;
+    }
+    return row1LiveCards;
+  }, [row1LiveCards]);
+
+  const row2MarqueeList = useMemo(() => {
+    if (items.length === 0) return [];
+    if (items.length < 6) {
+      const times = Math.ceil(6 / items.length);
+      const arr = [];
+      for (let i = 0; i < times; i++) arr.push(...items);
+      return arr;
+    }
     return items;
   }, [items]);
 
@@ -377,15 +246,23 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             </Link>
           </div>
 
-          <div
-            className="hero-marquee-viewport"
-            style={{ '--hero-speed': `${speedSeconds}s` }}
-          >
-            <div className="hero-marquee-track hero-marquee-track--left">
-              {row1LiveCards.map((c) => renderHeroCard(c, 'orig1'))}
-              {row1LiveCards.map((c) => renderHeroCard(c, 'dup1'))}
+          {row1LiveCards.length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1', margin: '0.5rem 0' }}>
+              <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>📋</div>
+              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>No Live Complaints Yet</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>Real-time consumer complaints will appear here immediately once filed.</div>
             </div>
-          </div>
+          ) : (
+            <div
+              className="hero-marquee-viewport"
+              style={{ '--hero-speed': `${speedSeconds}s` }}
+            >
+              <div className="hero-marquee-track hero-marquee-track--left">
+                {row1MarqueeList.map((c, idx) => renderHeroCard(c, `orig1-${idx}`))}
+                {row1MarqueeList.map((c, idx) => renderHeroCard(c, `dup1-${idx}`))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ROW 2: MOST COMPLAINED PRODUCTS/SERVICES */}
@@ -404,15 +281,23 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             </Link>
           </div>
 
-          <div
-            className="hero-marquee-viewport"
-            style={{ '--hero-speed': `${Math.round(speedSeconds * 1.15)}s` }}
-          >
-            <div className="hero-marquee-track hero-marquee-track--right">
-              {row2RankCards.map((c) => renderHeroCard(c, 'orig2'))}
-              {row2RankCards.map((c) => renderHeroCard(c, 'dup2'))}
+          {items.length === 0 ? (
+            <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1', margin: '0.5rem 0' }}>
+              <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>📊</div>
+              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>No Ranked Complaints Yet</div>
+              <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>Most complained products and services will rank automatically as consumers file grievances.</div>
             </div>
-          </div>
+          ) : (
+            <div
+              className="hero-marquee-viewport"
+              style={{ '--hero-speed': `${Math.round(speedSeconds * 1.15)}s` }}
+            >
+              <div className="hero-marquee-track hero-marquee-track--right">
+                {row2MarqueeList.map((c, idx) => renderHeroCard(c, `orig2-${idx}`))}
+                {row2MarqueeList.map((c, idx) => renderHeroCard(c, `dup2-${idx}`))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
