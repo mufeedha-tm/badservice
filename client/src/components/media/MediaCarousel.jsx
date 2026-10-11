@@ -56,9 +56,11 @@ export default function MediaCarousel({
       if (!node) return;
       if (index !== activeIndex) {
         node.pause();
+      } else if (!paused) {
+        node.play().catch(() => {});
       }
     });
-  }, [activeIndex, mediaItems]);
+  }, [activeIndex, mediaItems, paused]);
 
   useEffect(() => {
     if (!autoPlay || paused || mediaItems.length <= 1) return undefined;
@@ -108,15 +110,22 @@ export default function MediaCarousel({
               ) : item.type === 'video' ? (
                 <video
                   ref={(node) => {
-                    if (node) videoRefs.current[item.id] = node;
-                    else delete videoRefs.current[item.id];
+                    if (node) {
+                      videoRefs.current[item.id] = node;
+                      if (isActive && !paused) {
+                        node.play().catch(() => {});
+                      }
+                    } else {
+                      delete videoRefs.current[item.id];
+                    }
                   }}
                   className="media-carousel__media"
                   controls
                   playsInline
                   muted
-                  preload="none"
-                  onPlay={() => setPaused(true)}
+                  autoPlay
+                  loop
+                  preload="auto"
                   onTimeUpdate={(event) => {
                     if (
                       item.maxDurationSeconds

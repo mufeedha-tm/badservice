@@ -1,11 +1,12 @@
 import MediaCarousel from './MediaCarousel.jsx';
 import { getComplaintMedia } from '../../utils/complaintMedia.js';
+import { getShowcaseImage } from '../../utils/showcaseImages.js';
 
 /**
  * A consistent two-slide evidence rail used across complaints, product cards,
  * company, and category views.
- * Slide 1: Actual uploaded product/service photo
- * Slide 2: Actual uploaded product/service video
+ * Slide 1: Actual uploaded product/service photo (or showcase photo fallback)
+ * Slide 2: Actual uploaded product/service video (or video evidence)
  * Bill evidence is private and is available only to admins.
  */
 export default function EvidenceCarousel({
@@ -22,27 +23,34 @@ export default function EvidenceCarousel({
 
   const photoLabel = isService ? 'Service photo' : 'Product photo';
   const videoLabel = isService ? 'Service video' : 'Product video';
+  const catName = category || source.category || 'Computers';
 
   let items = [];
   if (real.length > 0) {
-    items = real;
+    // If has video but no image, prepend the showcase image so user sees photo first then auto-plays video
+    const hasImage = real.some((it) => it.type === 'image');
+    if (!hasImage) {
+      items = [
+        {
+          id: `${source.id || productName}-showcase-img`,
+          kind: 'product',
+          type: 'image',
+          url: getShowcaseImage(catName),
+          label: `${catName} reference photo`,
+        },
+        ...real,
+      ];
+    } else {
+      items = real;
+    }
   } else {
     items = [
       {
-        id: `${source.id || productName}-product-missing`,
-        type: 'placeholder',
-        label: photoLabel,
-        placeholderTitle: 'Evidence unavailable',
-        placeholderText: `${photoLabel} was not provided with this record.`,
-        kind: 'product-missing',
-      },
-      {
-        id: `${source.id || productName}-video-missing`,
-        type: 'placeholder',
-        label: videoLabel,
-        placeholderTitle: videoLabel,
-        placeholderText: 'Customer video will appear here after it is submitted and verified.',
-        kind: 'video-missing',
+        id: `${source.id || productName}-product-showcase`,
+        kind: 'product',
+        type: 'image',
+        url: getShowcaseImage(catName),
+        label: `${catName} photo`,
       },
     ];
   }

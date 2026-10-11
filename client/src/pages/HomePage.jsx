@@ -400,10 +400,14 @@ export default function HomePage() {
                         Photo and video shown are public reference media, not complaint evidence. Bills and sensitive proofs are kept private and accessible only to admins.
                       </p>
                     </>
-                  ) : product.latestComplaint ? (
-                    <EvidenceCarousel complaint={product.latestComplaint} category={product.category} productName={product.name} compact autoPlay />
                   ) : (
-                    <div className="product-rank-card__media-placeholder"><span>Evidence unavailable</span><small>No customer media has been submitted yet.</small></div>
+                    <EvidenceCarousel
+                      complaint={product.latestComplaint || { company: product.company, category: product.category, productName: product.name }}
+                      category={product.category}
+                      productName={product.name}
+                      compact
+                      autoPlay
+                    />
                   )}
                   <div className="product-rank-card__body"><span>{product.category || 'Product'}</span><h3>{product.name}</h3><p>{product.company}</p><Link to={`/complaints?q=${encodeURIComponent(product.name)}`}>See complaints →</Link></div>
                 </article>
