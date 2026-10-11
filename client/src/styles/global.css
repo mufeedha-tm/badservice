@@ -5699,23 +5699,24 @@ html, body {
 }
 
 .amazon-multi-card {
-  flex: 0 0 290px;
-  width: 290px;
+  flex: 0 0 295px;
+  width: 295px;
   background: #ffffff;
   border-radius: 14px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.28s ease;
   text-align: left;
   user-select: none;
 }
 .amazon-multi-card:hover {
-  transform: translateY(-6px) scale(1.02);
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.36);
-  z-index: 2;
+  transform: translateY(-8px) scale(1.04);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.38);
+  border-color: #febd69;
+  z-index: 10;
 }
 .amazon-multi-card__top {
   display: flex;
@@ -5776,7 +5777,7 @@ html, body {
   transition: transform 0.35s ease;
 }
 .amazon-multi-card:hover .amazon-multi-card__img {
-  transform: scale(1.05);
+  transform: scale(1.10);
 }
 .amazon-multi-card__video-trigger {
   position: absolute;

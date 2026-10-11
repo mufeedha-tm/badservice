@@ -540,9 +540,6 @@ export default function AdminDashboardPage() {
           <button style={tabStyle('overview')} onClick={() => setActiveTab('overview')}>
             Overview
           </button>
-          <button style={tabStyle('requests')} onClick={() => setActiveTab('requests')}>
-            Company Requests {stats?.pendingCompanyRequests > 0 && `(${stats.pendingCompanyRequests})`}
-          </button>
           <button style={tabStyle('complaints')} onClick={() => setActiveTab('complaints')}>
             Complaints ({stats?.totalComplaints || 0})
           </button>
@@ -561,17 +558,6 @@ export default function AdminDashboardPage() {
         {activeTab === 'overview' && (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Pending Company Requests</p>
-                <h2 style={{ margin: '0.5rem 0', color: '#d9534f' }}>{stats?.pendingCompanyRequests || 0}</h2>
-                <button
-                  onClick={() => { setActiveTab('requests'); setRequestFilter('PENDING'); }}
-                  style={{ background: 'none', border: 'none', color: '#0066cc', padding: 0, cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  Review requests &rarr;
-                </button>
-              </div>
-
               <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
                 <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Total Complaints</p>
                 <h2 style={{ margin: '0.5rem 0' }}>{stats?.totalComplaints || 0}</h2>

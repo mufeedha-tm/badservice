@@ -211,6 +211,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             const itemType = comp?.type || (comp?.category && ['Hospital & Healthcare', 'Flights & Trains', 'Hotel & Travel', 'Banking', 'Restaurants & Food', 'Telecom'].includes(comp.category) ? 'Service' : 'Product');
             dynamicCards.push({
               id: `real-${comp?.id || prodName}`,
+              complaintId: comp?.id || null,
               rank: dynamicCards.length + 1,
               tag: count > 1
                 ? `🔥 ${count} CONSUMER REPORTS`
@@ -278,6 +279,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       return items.slice(0, 6).map((item, idx) => ({
         ...item,
         id: `row1-${item.id}-${idx}`,
+        complaintId: item.complaintId || null,
         badge: 'LIVE COMPLAINT',
       }));
     }
@@ -289,6 +291,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       const itemType = c.type || 'Product';
       return {
         id: `live-${c.id}`,
+        complaintId: c.id,
         rank: idx + 1,
         tag: '🚨 LIVE COMPLAINT',
         count: c.similarComplaintCount || 1,
@@ -315,8 +318,8 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
     return items;
   }, [items]);
 
-  // Duration in seconds according to speedLevel
-  const speedSeconds = speedLevel === 'slow' ? 55 : speedLevel === 'fast' ? 22 : 36;
+  // Normal, consistent, smooth speed for nonstop continuous marquee
+  const speedSeconds = 32;
 
   function renderHeroCard(item, keyPrefix = '') {
     return (
@@ -347,38 +350,6 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             Real-time live complaints and most complained-about products, brands, and services with verified photos &amp; evidence videos.
           </p>
         </div>
-
-        {/* Speed Adjustment Controls */}
-        <div className="hero-carousel-controls">
-          <span>Carousel Speed:</span>
-          <button
-            type="button"
-            className="hero-speed-btn"
-            style={{ fontWeight: speedLevel === 'slow' ? 800 : 500, borderColor: speedLevel === 'slow' ? '#febd69' : '' }}
-            onClick={() => setSpeedLevel('slow')}
-            title="Set carousel speed to Slow"
-          >
-            Slow
-          </button>
-          <button
-            type="button"
-            className="hero-speed-btn"
-            style={{ fontWeight: speedLevel === 'normal' ? 800 : 500, borderColor: speedLevel === 'normal' ? '#febd69' : '' }}
-            onClick={() => setSpeedLevel('normal')}
-            title="Set carousel speed to Normal"
-          >
-            Normal
-          </button>
-          <button
-            type="button"
-            className="hero-speed-btn"
-            style={{ fontWeight: speedLevel === 'fast' ? 800 : 500, borderColor: speedLevel === 'fast' ? '#febd69' : '' }}
-            onClick={() => setSpeedLevel('fast')}
-            title="Set carousel speed to Fast"
-          >
-            Fast
-          </button>
-        </div>
       </div>
 
       <div className="amazon-two-row-grid">
@@ -387,7 +358,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
           <div className="hero-carousel-row-header">
             <div className="hero-carousel-row-title-wrap">
               <h3 className="hero-carousel-row-title">
-                <span>🔴</span> ROW 1 — LIVE COMPLAINTS
+                <span>🔴</span> LIVE COMPLAINTS
               </h3>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                 Endlessly streaming verified consumer reports
@@ -414,7 +385,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
           <div className="hero-carousel-row-header">
             <div className="hero-carousel-row-title-wrap">
               <h3 className="hero-carousel-row-title">
-                <span>🔥</span> ROW 2 — MOST COMPLAINED PRODUCTS &amp; SERVICES
+                <span>🔥</span> MOST COMPLAINED PRODUCTS &amp; SERVICES
               </h3>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
                 Ranked highest report frequencies with verified customer evidence
@@ -496,7 +467,12 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       {/* Modal for Hero Card Comments */}
       {activeCommentsItem && (
         <ComplaintCommentsModal
-          complaintId={activeCommentsItem.id}
+          complaintId={
+            activeCommentsItem.complaintId ||
+            (typeof activeCommentsItem.id === 'string'
+              ? activeCommentsItem.id.replace(/^(live|real|row1)-/, '')
+              : activeCommentsItem.id)
+          }
           complaintTitle={activeCommentsItem.productName || activeCommentsItem.defectTitle}
           companyName={activeCommentsItem.company}
           isOpen={Boolean(activeCommentsItem)}

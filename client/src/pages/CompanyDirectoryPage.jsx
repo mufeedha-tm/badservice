@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { getCategories, getCompanies, getComplaintRankings, getErrorMessage } from '../services/api.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
+import { getCompanyLogo } from '../utils/companyLogos.js';
 
 const directoryCategories = ['Computers', 'Mobiles', 'Vehicles & Automotive', 'Hospital & Healthcare', 'Hotel & Travel', 'Flights & Trains', 'Restaurants & Food', 'Banking'];
 
@@ -72,10 +73,61 @@ export default function CompanyDirectoryPage() {
             {filteredCompanies.map((company, index) => {
               const category = company.category || company.categoryName || directoryCategories[index % directoryCategories.length];
               const count = counts.get(String(company.id)) ?? counts.get(String(company.name)) ?? company.complaintCount ?? 0;
-              return <Link className="company-directory-modern__card" key={company.id || company.name} to={`/companies/${encodeURIComponent(company.id)}`}>
-                <div className="company-directory-modern__media"><img src={getShowcaseImage(category)} alt="" loading="lazy" /><span>{count} {count === 1 ? 'complaint' : 'complaints'}</span></div>
-                <div className="company-directory-modern__body"><span>{category}</span><h2>{company.name}</h2><p>View complaint record, product evidence and recent reports.</p><b>View company →</b></div>
-              </Link>;
+              const logo = getCompanyLogo(company.name);
+
+              return (
+                <Link className="company-directory-modern__card" key={company.id || company.name} to={`/companies/${encodeURIComponent(company.id)}`}>
+                  <div
+                    className="company-directory-modern__media"
+                    style={{
+                      background: '#f8fafc',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: '16px',
+                      position: 'relative',
+                    }}
+                  >
+                    {logo ? (
+                      <img
+                        src={logo}
+                        alt={`${company.name} logo`}
+                        style={{ maxWidth: '85%', maxHeight: '80px', objectFit: 'contain' }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          width: '70px',
+                          height: '70px',
+                          borderRadius: '12px',
+                          background: '#eff6ff',
+                          border: '2px solid #bfdbfe',
+                          color: '#1d4ed8',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '1.75rem',
+                          fontWeight: 800,
+                        }}
+                      >
+                        {(company.name || 'C')[0].toUpperCase()}
+                      </div>
+                    )}
+                    <span style={{ position: 'absolute', bottom: '8px', right: '8px' }}>
+                      {count} {count === 1 ? 'complaint' : 'complaints'}
+                    </span>
+                  </div>
+                  <div className="company-directory-modern__body">
+                    <span>{category}</span>
+                    <h2>{company.name}</h2>
+                    <p>View verified complaints, product/service reports and customer evidence.</p>
+                    <b>View company →</b>
+                  </div>
+                </Link>
+              );
             })}
           </div>
         )}

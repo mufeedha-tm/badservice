@@ -364,8 +364,8 @@ export default function ComplaintDetailPage() {
 
                 <div style={{ textAlign: 'center', padding: '8px', borderRadius: '6px', background: isApproved ? '#e2f9e5' : '#fff8e1', border: isApproved ? '1px solid #a6e9b4' : '1px solid #ffe082' }}>
                   <div style={{ fontSize: '1.2rem', marginBottom: '2px' }}>{isApproved ? '✓' : '⏳'}</div>
-                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: isApproved ? '#1b5e20' : '#b78103' }}>2. Admin Review</div>
-                  <div style={{ fontSize: '0.68rem', color: isApproved ? '#388e3c' : '#795548' }}>{isApproved ? 'Approved' : 'In Review'}</div>
+                  <div style={{ fontSize: '0.78rem', fontWeight: 700, color: isApproved ? '#1b5e20' : '#b78103' }}>2. {isApproved ? 'Approved' : 'In Review'}</div>
+                  <div style={{ fontSize: '0.68rem', color: isApproved ? '#388e3c' : '#795548' }}>{isApproved ? 'Verified & Published' : 'In Review'}</div>
                 </div>
 
                 <div style={{ textAlign: 'center', padding: '8px', borderRadius: '6px', background: isCompanyResponded ? '#e2f9e5' : '#f1f5f9', border: isCompanyResponded ? '1px solid #a6e9b4' : '1px solid #cbd5e1' }}>

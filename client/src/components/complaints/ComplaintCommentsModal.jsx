@@ -212,7 +212,7 @@ export default function ComplaintCommentsModal({
               <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
                 {cmt.body}
               </p>
-              {isAdmin && (
+              {(isAdmin || (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())) && (
                 <div style={{ marginTop: '8px', textAlign: 'right' }}>
                   <button
                     type="button"
@@ -227,7 +227,7 @@ export default function ComplaintCommentsModal({
                       padding: 0,
                     }}
                   >
-                    Delete (Admin)
+                    Delete {isAdmin ? '(Admin)' : ''}
                   </button>
                 </div>
               )}
