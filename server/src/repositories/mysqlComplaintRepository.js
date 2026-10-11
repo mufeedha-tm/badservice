@@ -17,7 +17,19 @@ function mapComplaint(row) {
     companyId: row.companyId,
     category: row.categoryName,
     categoryId: row.categoryId,
-    type: row.complaintType || 'Product',
+    type: (function() {
+      const explicitType = row.complaintType;
+      const cat = (row.categoryName || row.categoryId || '').toLowerCase();
+      const comp = (row.companyName || '').toLowerCase();
+      const isService = cat.includes('hospital') || cat.includes('health') || cat.includes('flight') ||
+        cat.includes('hotel') || cat.includes('travel') || cat.includes('restaurant') ||
+        cat.includes('bank') || cat.includes('finance') || cat.includes('telecom') ||
+        cat.includes('courier') || cat.includes('delivery') || comp.includes('hospital') ||
+        comp.includes('apollo') || comp.includes('indigo') || comp.includes('oyo');
+      if (isService) return 'Service';
+      if (explicitType === 'Service') return 'Service';
+      return 'Product';
+    })(),
     subcategory: row.subcategory ?? '',
     model: row.productModel ?? '',
     seller: row.sellerName ?? '',
@@ -636,8 +648,9 @@ export async function updateComplaintAdmin(id, updates = {}, adminId = null) {
   const fieldsToUpdate = {};
   const allowedFields = [
     'title', 'description', 'model', 'seller', 'location',
-    'complainantName', 'complainantCity', 'complainantAddress', 'complainantPincode',
-    'statusNote',
+    'complainantName', 'complainantPhone', 'complainantEmail',
+    'complainantCity', 'complainantAddress', 'complainantPincode',
+    'subcategory', 'serviceType', 'statusNote',
   ];
 
   for (const field of allowedFields) {
@@ -682,6 +695,14 @@ export async function updateComplaintAdmin(id, updates = {}, adminId = null) {
     sqlSets.push('complainant_name = ?');
     params.push(fieldsToUpdate.complainantName);
   }
+  if (fieldsToUpdate.complainantPhone !== undefined) {
+    sqlSets.push('complainant_phone = ?');
+    params.push(fieldsToUpdate.complainantPhone);
+  }
+  if (fieldsToUpdate.complainantEmail !== undefined) {
+    sqlSets.push('complainant_email = ?');
+    params.push(fieldsToUpdate.complainantEmail);
+  }
   if (fieldsToUpdate.complainantCity !== undefined) {
     sqlSets.push('complainant_city = ?');
     params.push(fieldsToUpdate.complainantCity);
@@ -693,6 +714,14 @@ export async function updateComplaintAdmin(id, updates = {}, adminId = null) {
   if (fieldsToUpdate.complainantPincode !== undefined) {
     sqlSets.push('complainant_pincode = ?');
     params.push(fieldsToUpdate.complainantPincode);
+  }
+  if (fieldsToUpdate.subcategory !== undefined) {
+    sqlSets.push('subcategory = ?');
+    params.push(fieldsToUpdate.subcategory);
+  }
+  if (fieldsToUpdate.serviceType !== undefined) {
+    sqlSets.push('service_type = ?');
+    params.push(fieldsToUpdate.serviceType);
   }
   if (fieldsToUpdate.statusNote !== undefined) {
     sqlSets.push('status_note = ?');

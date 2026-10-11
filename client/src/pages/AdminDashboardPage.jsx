@@ -53,6 +53,7 @@ export default function AdminDashboardPage() {
   const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
   const [viewDeleted, setViewDeleted] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
+  const [previewBillUrl, setPreviewBillUrl] = useState(null);
   const [editingComplaint, setEditingComplaint] = useState(null);
   const [editForm, setEditForm] = useState({
     title: '',
@@ -305,13 +306,17 @@ export default function AdminDashboardPage() {
     setEditForm({
       title: complaint.title || '',
       description: complaint.description || '',
-      model: complaint.model || '',
-      seller: complaint.seller || '',
+      model: complaint.model || complaint.productModel || complaint.serviceDetails || '',
+      seller: complaint.seller || complaint.sellerName || '',
       location: complaint.location || '',
-      complainantName: complaint.complainantName || '',
-      complainantCity: complaint.complainantCity || '',
-      complainantAddress: complaint.complainantAddress || '',
-      complainantPincode: complaint.complainantPincode || '',
+      subcategory: complaint.subcategory || '',
+      serviceType: complaint.serviceType || '',
+      complainantName: complaint.complainantName || complaint.name || '',
+      complainantPhone: complaint.complainantPhone || complaint.phone || '',
+      complainantEmail: complaint.complainantEmail || complaint.email || '',
+      complainantCity: complaint.complainantCity || complaint.city || '',
+      complainantAddress: complaint.complainantAddress || complaint.address || '',
+      complainantPincode: complaint.complainantPincode || complaint.pincode || '',
       statusNote: complaint.statusNote || '',
     });
   }
@@ -876,9 +881,28 @@ export default function AdminDashboardPage() {
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                           {c.billImageUrl ? (
-                            <a href={getAssetUrl(c.billImageUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#0066cc', fontWeight: 500 }}>
-                              🔒 View Bill
-                            </a>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewBillUrl(getAssetUrl(c.billImageUrl))}
+                                style={{
+                                  background: '#e0f2fe',
+                                  border: '1px solid #7dd3fc',
+                                  color: '#0369a1',
+                                  padding: '3px 8px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.78rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer',
+                                }}
+                                title="Click for instant preview without opening new tab"
+                              >
+                                🔒 View Bill
+                              </button>
+                              <a href={getAssetUrl(c.billImageUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', fontSize: '0.75rem' }} title="Open in new tab">
+                                ↗
+                              </a>
+                            </div>
                           ) : (
                             <span style={{ color: '#aaa' }}>None</span>
                           )}
@@ -1275,6 +1299,8 @@ export default function AdminDashboardPage() {
                             <img
                               src={getAssetUrl(selectedComplaint.billImageUrl)}
                               alt="Bill Evidence"
+                              loading="eager"
+                              decoding="async"
                               style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', background: '#f5f5f5', borderRadius: '4px', border: '1px solid #eee' }}
                             />
                             <a
@@ -1480,16 +1506,28 @@ export default function AdminDashboardPage() {
                       />
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
-                          Product Model / Details
+                          Product Model / Service
                         </label>
                         <input
                           type="text"
                           value={editForm.model}
                           onChange={(e) => setEditForm({ ...editForm, model: e.target.value })}
                           placeholder="e.g. iPhone 15 Pro, AC Repair"
+                          style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          Subcategory / Service Type
+                        </label>
+                        <input
+                          type="text"
+                          value={editForm.subcategory || editForm.serviceType}
+                          onChange={(e) => setEditForm({ ...editForm, subcategory: e.target.value, serviceType: e.target.value })}
+                          placeholder="e.g. Hospital, Smartphone, Delivery"
                           style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.9rem' }}
                         />
                       </div>
@@ -1523,7 +1561,7 @@ export default function AdminDashboardPage() {
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#232f3e' }}>
                         👤 Complainant Contact & Address Details
                       </h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
                         <div>
                           <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
                             Complainant Name
@@ -1532,6 +1570,30 @@ export default function AdminDashboardPage() {
                             type="text"
                             value={editForm.complainantName}
                             onChange={(e) => setEditForm({ ...editForm, complainantName: e.target.value })}
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            Phone Number
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.complainantPhone}
+                            onChange={(e) => setEditForm({ ...editForm, complainantPhone: e.target.value })}
+                            placeholder="Mobile number"
+                            style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
+                          />
+                        </div>
+                        <div>
+                          <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                            Email Address
+                          </label>
+                          <input
+                            type="email"
+                            value={editForm.complainantEmail}
+                            onChange={(e) => setEditForm({ ...editForm, complainantEmail: e.target.value })}
+                            placeholder="Email address"
                             style={{ width: '100%', padding: '0.45rem', borderRadius: '4px', border: '1px solid #ccc', fontSize: '0.85rem' }}
                           />
                         </div>
@@ -1851,6 +1913,116 @@ export default function AdminDashboardPage() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Quick Instant Bill Viewer Modal */}
+        {previewBillUrl && (
+          <div
+            onClick={() => setPreviewBillUrl(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.75)',
+              zIndex: 10000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+              backdropFilter: 'blur(4px)',
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                backgroundColor: '#fff',
+                borderRadius: '12px',
+                maxWidth: '850px',
+                width: '100%',
+                maxHeight: '90vh',
+                display: 'flex',
+                flexDirection: 'column',
+                overflow: 'hidden',
+                boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+              }}
+            >
+              <div
+                style={{
+                  padding: '12px 18px',
+                  borderBottom: '1px solid #e2e8f0',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#f8fafc',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                  <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Bill / Purchase Proof (Admin Confidential)</strong>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <a
+                    href={previewBillUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '4px 10px',
+                      background: '#0284c7',
+                      color: '#fff',
+                      borderRadius: '4px',
+                      fontSize: '0.8rem',
+                      textDecoration: 'none',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Open Full Size ↗
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewBillUrl(null)}
+                    style={{
+                      background: '#e2e8f0',
+                      border: 'none',
+                      borderRadius: '50%',
+                      width: '28px',
+                      height: '28px',
+                      cursor: 'pointer',
+                      fontSize: '0.9rem',
+                      fontWeight: 700,
+                      color: '#475569',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              <div
+                style={{
+                  padding: '16px',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: '#f1f5f9',
+                  minHeight: '300px',
+                }}
+              >
+                <img
+                  src={previewBillUrl}
+                  alt="Bill preview"
+                  loading="eager"
+                  decoding="async"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '75vh',
+                    objectFit: 'contain',
+                    borderRadius: '6px',
+                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)',
+                    background: '#fff',
+                  }}
+                />
+              </div>
+            </div>
           </div>
         )}
       </section>

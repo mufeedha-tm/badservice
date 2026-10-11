@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssetUrl, getComplaintRankings, getComplaints } from '../../services/api.js';
 import { getShowcaseImage } from '../../utils/showcaseImages.js';
-import { getCompanyLogo } from '../../utils/companyLogos.js';
+import { getCompanyLogo, getCompanyCategoryIcon } from '../../utils/companyLogos.js';
 import ComplaintCommentsModal from '../complaints/ComplaintCommentsModal.jsx';
 
 // Verified reference records so the carousel is always vibrant and informative
@@ -128,12 +128,12 @@ const CURATED_COMPLAINTS = [
     count: 7,
     type: 'Service',
     company: 'Flipkart',
-    productName: 'Refurbished Phone / Open Box',
-    category: 'Mobiles',
+    productName: 'Delivery & Return Dispute',
+    category: 'Courier & Delivery',
     categoryIcon: '📦',
     defectTitle: 'Wrong Item Delivered & Return Cancelled',
     summary: 'Received duplicate model with damaged camera instead of brand new item. Open box delivery dispute rejected.',
-    imageUrl: getShowcaseImage('Mobiles'),
+    imageUrl: getShowcaseImage('Courier & Delivery'),
     videoUrl: null,
     hasVideo: false,
     warningBadge: 'Return Window Closed',
@@ -288,7 +288,15 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         ? c.productImages.map((img) => (typeof img === 'string' ? getAssetUrl(img) : getAssetUrl(img.url)))
         : (c.productImageUrl ? [getAssetUrl(c.productImageUrl)] : [getShowcaseImage(c.category)]);
 
-      const itemType = c.type || 'Product';
+      const cat = (c.category || '').toLowerCase();
+      const comp = (c.company || '').toLowerCase();
+      const isService = cat.includes('hospital') || cat.includes('health') || cat.includes('flight') ||
+        cat.includes('hotel') || cat.includes('travel') || cat.includes('restaurant') ||
+        cat.includes('bank') || cat.includes('finance') || cat.includes('telecom') ||
+        cat.includes('courier') || cat.includes('delivery') || comp.includes('hospital') ||
+        comp.includes('apollo') || comp.includes('indigo') || comp.includes('oyo');
+
+      const itemType = isService ? 'Service' : (c.type || 'Product');
       return {
         id: `live-${c.id}`,
         complaintId: c.id,
@@ -298,7 +306,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
         type: itemType,
         company: c.company || 'Company',
         productName: c.model || c.productName || c.title,
-        category: c.category || 'Product',
+        category: c.category || (isService ? 'Hospital & Healthcare' : 'Product'),
         categoryIcon: itemType === 'Service' ? '🛠️' : '📦',
         defectTitle: c.title,
         summary: c.description ? c.description.slice(0, 110) + '...' : 'Verified consumer complaint record.',
@@ -531,60 +539,45 @@ function HeroCard({ item, onVideoClick, onCommentsClick }) {
         </span>
       </div>
 
-      {/* Company & Product Header with Logo or Branded Mark */}
-      <div className="amazon-multi-card__titles" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {getCompanyLogo(item.company) ? (
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '8px',
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-              padding: '4px',
-              overflow: 'hidden',
-            }}
-          >
-            <img
-              src={getCompanyLogo(item.company)}
-              alt={`${item.company} logo`}
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-              onError={(e) => {
-                e.currentTarget.style.display = 'none';
+      {/* Company & Product Header with Matching Icon */}
+      {(() => {
+        const catIcon = getCompanyCategoryIcon(item.company, item.category);
+        return (
+          <div className="amazon-multi-card__titles" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div
+              style={{
+                width: '38px',
+                height: '38px',
+                borderRadius: '8px',
+                background: catIcon.bg || (item.type === 'Service' ? '#fff7ed' : '#eff6ff'),
+                border: `1px solid ${catIcon.border || '#e2e8f0'}`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                padding: '4px',
+                overflow: 'hidden',
               }}
-            />
+            >
+              {catIcon.svg ? (
+                <img
+                  src={catIcon.svg}
+                  alt={`${item.company} icon`}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                />
+              ) : (
+                <span style={{ fontSize: '1.2rem' }}>{catIcon.emoji}</span>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <h3 className="amazon-multi-card__company">{item.company}</h3>
+              <h4 className="amazon-multi-card__product" title={item.productName}>
+                {item.productName}
+              </h4>
+            </div>
           </div>
-        ) : (
-          <div
-            style={{
-              width: '38px',
-              height: '38px',
-              borderRadius: '8px',
-              background: item.type === 'Service' ? '#fff7ed' : '#eff6ff',
-              border: item.type === 'Service' ? '1px solid #fed7aa' : '1px solid #bfdbfe',
-              color: item.type === 'Service' ? '#c2410c' : '#1d4ed8',
-              fontWeight: 800,
-              fontSize: '0.9rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            {(item.company || 'B')[0].toUpperCase()}
-          </div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 className="amazon-multi-card__company">{item.company}</h3>
-          <h4 className="amazon-multi-card__product" title={item.productName}>
-            {item.productName}
-          </h4>
-        </div>
-      </div>
+        );
+      })()}
 
       {/* Media Viewport: Real Photo or Video (Bills never shown) */}
       <div className="amazon-multi-card__media-wrap">

@@ -9,7 +9,7 @@ import Skeleton from '../components/ui/Skeleton.jsx';
 import { getCategories, getComplaintRankings, getErrorMessage, searchComplaints } from '../services/api.js';
 import { getComplaintMedia } from '../utils/complaintMedia.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
-import { getCompanyLogo } from '../utils/companyLogos.js';
+import { getCompanyLogo, getCompanyCategoryIcon } from '../utils/companyLogos.js';
 
 const trustPoints = [
   { number: '01', title: 'Real complaints', text: 'Consumer-submitted records, not product advertisements.' },
@@ -135,18 +135,18 @@ const DEFAULT_RANKINGS = {
       },
     },
     {
-      name: 'Open Box Delivery',
+      name: 'Delivery & Return Dispute',
       company: 'Flipkart',
       companyId: 'flipkart',
       count: 7,
-      category: 'Mobiles',
+      category: 'Courier & Delivery',
       latestComplaint: {
         id: 'curated-flipkart',
         title: 'Wrong Item Delivered & Return Cancelled',
         company: 'Flipkart',
-        category: 'Mobiles',
-        productImageUrl: '/showcase/mobiles.webp',
-        metadata: ['Flipkart', 'Mobiles', 'Hyderabad', 'Recent'],
+        category: 'Courier & Delivery',
+        productImageUrl: '/showcase/courier.webp',
+        metadata: ['Flipkart', 'Courier & Delivery', 'Hyderabad', 'Recent'],
       },
     },
   ],
@@ -297,23 +297,21 @@ export default function HomePage() {
                 { name: 'Flipkart', count: 5 },
                 { name: 'Airtel', count: 4 },
               ]).map((comp) => {
-                const logo = getCompanyLogo(comp.name);
+                const categoryIcon = getCompanyCategoryIcon(comp.name, comp.category);
                 return (
                   <Link
                     key={comp.name}
                     to={`/complaints?company=${encodeURIComponent(comp.name)}`}
                     className="amazon-quad-item"
                   >
-                    <div className="amazon-quad-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc' }}>
-                      {logo ? (
+                    <div className="amazon-quad-item__thumb" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: categoryIcon.bg || '#f8fafc' }}>
+                      {categoryIcon.svg ? (
                         <img
-                          src={logo}
-                          alt={`${comp.name} logo`}
-                          loading="lazy"
-                          style={{ objectFit: 'contain', padding: '6px' }}
-                          onError={(e) => {
-                            e.currentTarget.src = getShowcaseImage('TV & Electronics');
-                          }}
+                          src={categoryIcon.svg}
+                          alt={`${comp.name} icon`}
+                          loading="eager"
+                          decoding="async"
+                          style={{ width: '42px', height: '42px', objectFit: 'contain' }}
                         />
                       ) : (
                         <div
@@ -323,13 +321,10 @@ export default function HomePage() {
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontWeight: 800,
-                            fontSize: '1.2rem',
-                            color: '#1e293b',
-                            background: '#e2e8f0',
+                            fontSize: '1.5rem',
                           }}
                         >
-                          {(comp.name || 'B')[0].toUpperCase()}
+                          {categoryIcon.emoji}
                         </div>
                       )}
                     </div>

@@ -144,34 +144,34 @@ export default function ComplaintCommentsModal({
         onClick={(e) => e.stopPropagation()}
         style={{
           width: '100%',
-          maxWidth: '560px',
-          maxHeight: '88vh',
+          maxWidth: '390px',
+          maxHeight: '68vh',
           backgroundColor: '#fff',
-          borderRadius: '14px',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.22)',
+          borderRadius: '10px',
+          boxShadow: '0 16px 36px rgba(0,0,0,0.22)',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          animation: 'fadeInUp 0.2s ease-out',
+          animation: 'fadeInUp 0.15s ease-out',
         }}
       >
         {/* Header */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '8px 12px',
             borderBottom: '1px solid #e2e8f0',
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '12px',
+            gap: '8px',
             backgroundColor: '#f8fafc',
           }}
         >
           <div>
-            <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#e65100', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              💬 Discussion & Consumer Reviews
+            <span style={{ fontSize: '0.65rem', fontWeight: 800, color: '#e65100', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              💬 Discussion
             </span>
-            <h3 style={{ margin: '4px 0 0 0', fontSize: '1.1rem', color: '#0f172a', fontWeight: 700, lineHeight: 1.3 }}>
+            <h3 style={{ margin: '1px 0 0 0', fontSize: '0.86rem', color: '#0f172a', fontWeight: 700, lineHeight: 1.2 }}>
               {companyName ? `${companyName} — ` : ''}{complaintTitle}
             </h3>
           </div>
@@ -183,13 +183,13 @@ export default function ComplaintCommentsModal({
               background: '#e2e8f0',
               border: 'none',
               borderRadius: '50%',
-              width: '32px',
-              height: '32px',
+              width: '24px',
+              height: '24px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              fontSize: '1rem',
+              fontSize: '0.78rem',
               color: '#334155',
               flexShrink: 0,
             }}
@@ -201,12 +201,12 @@ export default function ComplaintCommentsModal({
         {/* Scrollable Comments List */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: '10px 12px',
             overflowY: 'auto',
             flex: 1,
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
+            gap: '8px',
           }}
         >
           {loading && (
@@ -355,33 +355,33 @@ export default function ComplaintCommentsModal({
         <form
           onSubmit={handleSubmit}
           style={{
-            padding: '14px 20px',
+            padding: '8px 12px',
             borderTop: '1px solid #e2e8f0',
             backgroundColor: '#ffffff',
           }}
         >
           {error && (
-            <p style={{ color: '#dc2626', fontSize: '0.8rem', margin: '0 0 8px 0', fontWeight: 600 }}>
+            <p style={{ color: '#dc2626', fontSize: '0.75rem', margin: '0 0 6px 0', fontWeight: 600 }}>
               {error}
             </p>
           )}
           {success && (
-            <p style={{ color: '#16a34a', fontSize: '0.8rem', margin: '0 0 8px 0', fontWeight: 600 }}>
+            <p style={{ color: '#16a34a', fontSize: '0.75rem', margin: '0 0 6px 0', fontWeight: 600 }}>
               {success}
             </p>
           )}
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', marginBottom: '6px' }}>
             <input
               type="text"
               placeholder="Your Name *"
               value={authorName}
               onChange={(e) => setAuthorName(e.target.value)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
+                fontSize: '0.78rem',
                 outline: 'none',
                 width: '100%',
                 boxSizing: 'border-box',
@@ -394,10 +394,10 @@ export default function ComplaintCommentsModal({
               value={authorEmail}
               onChange={(e) => setAuthorEmail(e.target.value)}
               style={{
-                padding: '8px 12px',
-                borderRadius: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
+                fontSize: '0.78rem',
                 outline: 'none',
                 width: '100%',
                 boxSizing: 'border-box',
@@ -405,22 +405,24 @@ export default function ComplaintCommentsModal({
             />
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div style={{ display: 'flex', gap: '6px' }}>
             <textarea
               rows={2}
-              placeholder="Write a comment or share your experience…"
+              placeholder="Write a comment…"
               value={body}
               onChange={(e) => setBody(e.target.value)}
               style={{
                 flex: 1,
-                padding: '8px 12px',
-                borderRadius: '8px',
+                padding: '6px 8px',
+                borderRadius: '6px',
                 border: '1px solid #cbd5e1',
-                fontSize: '0.85rem',
+                fontSize: '0.78rem',
                 outline: 'none',
                 resize: 'none',
                 fontFamily: 'inherit',
                 boxSizing: 'border-box',
+                minHeight: '36px',
+                maxHeight: '60px',
               }}
               required
             />
@@ -431,16 +433,16 @@ export default function ComplaintCommentsModal({
                 backgroundColor: '#232f3e',
                 color: '#fff',
                 border: 'none',
-                borderRadius: '8px',
-                padding: '0 16px',
+                borderRadius: '6px',
+                padding: '0 12px',
                 fontWeight: 700,
-                fontSize: '0.85rem',
+                fontSize: '0.78rem',
                 cursor: 'pointer',
                 flexShrink: 0,
                 transition: 'background-color 0.2s',
               }}
             >
-              {submitting ? 'Posting…' : 'Post'}
+              {submitting ? '…' : 'Post'}
             </button>
           </div>
         </form>

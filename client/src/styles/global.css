@@ -4538,23 +4538,27 @@ body { background: var(--bs-bg); color: var(--bs-ink); }
 /* File complaint flow and its search-adjacent header action */
 .primary-header {
   display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
-  gap: clamp(10px, 1.5vw, 22px);
+  grid-template-columns: auto auto 1fr auto;
+  align-items: center;
+  gap: clamp(12px, 2vw, 24px);
+  width: 100%;
 }
 
 .primary-header > .search-bar {
-  width: min(100%, 770px);
+  width: 100%;
+  max-width: 100%;
   min-width: 0;
-  justify-self: center;
+  justify-self: stretch;
   margin: 0;
 }
 
 .primary-header > .header-actions-group {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   justify-self: end;
   flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .primary-header > .file-complaint-button {
@@ -4563,6 +4567,7 @@ body { background: var(--bs-bg); color: var(--bs-ink); }
 
 .search-bar {
   margin: 0;
+  width: 100%;
 }
 
 .file-complaint-button {

@@ -539,42 +539,42 @@ export default function ComplaintDetailPage() {
               </div>
 
               {/* Add Comment Form */}
-              <form onSubmit={handlePostComment} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '1.2rem', marginBottom: '1.8rem' }}>
-                <h3 style={{ margin: '0 0 0.8rem 0', fontSize: '0.95rem', color: '#1e293b' }}>
-                  Leave a Comment
+              <form onSubmit={handlePostComment} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '10px 14px', marginBottom: '1.2rem', maxWidth: '480px' }}>
+                <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.85rem', color: '#1e293b' }}>
+                  💬 Leave a Comment
                 </h3>
 
                 {commentError && (
-                  <p style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '0.6rem', fontWeight: 600 }}>{commentError}</p>
+                  <p style={{ color: '#dc2626', fontSize: '0.78rem', marginBottom: '0.4rem', fontWeight: 600 }}>{commentError}</p>
                 )}
                 {commentSuccess && (
-                  <p style={{ color: '#16a34a', fontSize: '0.85rem', marginBottom: '0.6rem', fontWeight: 600 }}>{commentSuccess}</p>
+                  <p style={{ color: '#16a34a', fontSize: '0.78rem', marginBottom: '0.4rem', fontWeight: 600 }}>{commentSuccess}</p>
                 )}
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '8px', marginBottom: '8px' }}>
                   <input
                     type="text"
                     placeholder="Your Name *"
                     value={commentAuthorName}
                     onChange={(e) => setCommentAuthorName(e.target.value)}
-                    style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                    style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem' }}
                     required
                   />
                   <input
                     type="email"
-                    placeholder="Your Email (Optional, kept private)"
+                    placeholder="Your Email (Optional)"
                     value={commentAuthorEmail}
                     onChange={(e) => setCommentAuthorEmail(e.target.value)}
-                    style={{ padding: '8px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                    style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem' }}
                   />
                 </div>
 
                 <textarea
-                  rows={3}
-                  placeholder="Write your comment, reply, or question about this complaint…"
+                  rows={2}
+                  placeholder="Write your comment, reply, or question…"
                   value={commentBody}
                   onChange={(e) => setCommentBody(e.target.value)}
-                  style={{ width: '100%', padding: '10px 12px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem', boxSizing: 'border-box', marginBottom: '10px' }}
+                  style={{ width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.8rem', boxSizing: 'border-box', marginBottom: '8px', minHeight: '44px', maxHeight: '70px', resize: 'vertical' }}
                   required
                 />
 
@@ -582,13 +582,13 @@ export default function ComplaintDetailPage() {
                   type="submit"
                   disabled={commentSubmitting}
                   style={{
-                    padding: '8px 18px',
+                    padding: '6px 14px',
                     background: '#232f3e',
                     color: '#fff',
                     border: 'none',
                     borderRadius: '6px',
                     fontWeight: 600,
-                    fontSize: '0.85rem',
+                    fontSize: '0.78rem',
                     cursor: 'pointer',
                   }}
                 >

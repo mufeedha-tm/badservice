@@ -6,6 +6,7 @@ import EmptyState from '../components/ui/EmptyState.jsx';
 import Skeleton from '../components/ui/Skeleton.jsx';
 import { getCompany, getErrorMessage } from '../services/api.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
+import { getCompanyLogo } from '../utils/companyLogos.js';
 
 export default function CompanyPage() {
   const { id } = useParams();
@@ -21,6 +22,7 @@ export default function CompanyPage() {
 
   const complaints = result.company?.recentComplaints || [];
   const category = result.company?.category || result.company?.categoryName || 'Computers';
+  const categoryIcon = result.company ? getCompanyCategoryIcon(result.company.name, category) : null;
 
   return (
     <MainLayout>
@@ -31,8 +33,30 @@ export default function CompanyPage() {
         {result.company && (
           <>
             <header className="company-page-modern__hero">
-              <div><span className="home-section__eyebrow">Company complaint record</span><h1 id="company-page-title">{result.company.name}</h1><p>{result.company.complaintCount || 0} {(result.company.complaintCount || 0) === 1 ? 'complaint' : 'complaints'} currently on record. Review the evidence and complaint history before making a decision.</p><Link className="home-primary" to="/file-complaint">File a Complaint</Link></div>
-              <img src={getShowcaseImage(category)} alt={`${result.company.name} category`} />
+              <div>
+                <span className="home-section__eyebrow">Company complaint record</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', margin: '8px 0' }}>
+                  {categoryIcon && (
+                    <div style={{ width: '56px', height: '56px', borderRadius: '12px', background: categoryIcon.bg || '#fff', border: `2px solid ${categoryIcon.border || '#cbd5e1'}`, padding: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      {categoryIcon.svg ? (
+                        <img
+                          src={categoryIcon.svg}
+                          alt={`${result.company.name} icon`}
+                          loading="eager"
+                          decoding="async"
+                          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: '2rem' }}>{categoryIcon.emoji}</span>
+                      )}
+                    </div>
+                  )}
+                  <h1 id="company-page-title" style={{ margin: 0 }}>{result.company.name}</h1>
+                </div>
+                <p>{result.company.complaintCount || 0} {(result.company.complaintCount || 0) === 1 ? 'complaint' : 'complaints'} currently on record. Review the evidence and complaint history before making a decision.</p>
+                <Link className="home-primary" to="/file-complaint">File a Complaint</Link>
+              </div>
+              <img src={getShowcaseImage(category)} alt={`${result.company.name}`} loading="eager" decoding="async" />
             </header>
             <section className="home-section company-page-modern__complaints"><div className="home-section__heading"><div><span className="home-section__eyebrow">Recent reports</span><h2>Complaints about {result.company.name}</h2></div></div>{complaints.length ? <ComplaintGrid complaints={complaints} /> : <EmptyState title="No complaints have been submitted for this company yet." message="If you had a problem with this brand, you can file a public complaint with evidence." />}</section>
           </>

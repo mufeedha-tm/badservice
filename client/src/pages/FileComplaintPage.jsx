@@ -882,6 +882,9 @@ export default function FileComplaintPage() {
                         value={form.model}
                         onChange={handleFieldChange}
                         placeholder={t('modelPlaceholder')}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
                         className={errors.model ? 'is-invalid' : ''}
                       />
                       {errors.model && <small className="field-error">{errors.model}</small>}
@@ -894,6 +897,9 @@ export default function FileComplaintPage() {
                         value={form.seller}
                         onChange={handleFieldChange}
                         placeholder={t('sellerPlaceholder')}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
                         className={errors.seller ? 'is-invalid' : ''}
                       />
                       {errors.seller && <small className="field-error">{errors.seller}</small>}
@@ -986,6 +992,9 @@ export default function FileComplaintPage() {
                         value={form.model}
                         onChange={handleFieldChange}
                         placeholder={t('serviceDetailsPlaceholder')}
+                        autoComplete="off"
+                        autoCorrect="off"
+                        spellCheck="false"
                         className={errors.model ? 'is-invalid' : ''}
                       />
                       {errors.model && <small className="field-error">{errors.model}</small>}

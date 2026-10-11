@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { getCategories, getCompanies, getComplaintRankings, getErrorMessage } from '../services/api.js';
 import { getShowcaseImage } from '../utils/showcaseImages.js';
-import { getCompanyLogo } from '../utils/companyLogos.js';
+import { getCompanyLogo, getCompanyCategoryIcon } from '../utils/companyLogos.js';
 
 const directoryCategories = ['Computers', 'Mobiles', 'Vehicles & Automotive', 'Hospital & Healthcare', 'Hotel & Travel', 'Flights & Trains', 'Restaurants & Food', 'Banking'];
 
@@ -73,47 +73,46 @@ export default function CompanyDirectoryPage() {
             {filteredCompanies.map((company, index) => {
               const category = company.category || company.categoryName || directoryCategories[index % directoryCategories.length];
               const count = counts.get(String(company.id)) ?? counts.get(String(company.name)) ?? company.complaintCount ?? 0;
-              const logo = getCompanyLogo(company.name);
+              const categoryIcon = getCompanyCategoryIcon(company.name, category);
 
               return (
                 <Link className="company-directory-modern__card" key={company.id || company.name} to={`/companies/${encodeURIComponent(company.id)}`}>
                   <div
                     className="company-directory-modern__media"
                     style={{
-                      background: '#f8fafc',
+                      background: categoryIcon.bg || '#f8fafc',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      padding: '16px',
+                      padding: '20px 16px',
                       position: 'relative',
+                      borderBottom: `2px solid ${categoryIcon.border || '#e2e8f0'}`,
                     }}
                   >
-                    {logo ? (
+                    {categoryIcon.svg ? (
                       <img
-                        src={logo}
-                        alt={`${company.name} logo`}
-                        style={{ maxWidth: '85%', maxHeight: '80px', objectFit: 'contain' }}
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
+                        src={categoryIcon.svg}
+                        alt={`${company.name} icon`}
+                        loading="eager"
+                        decoding="async"
+                        style={{ width: '68px', height: '68px', objectFit: 'contain' }}
                       />
                     ) : (
                       <div
                         style={{
-                          width: '70px',
-                          height: '70px',
-                          borderRadius: '12px',
-                          background: '#eff6ff',
-                          border: '2px solid #bfdbfe',
-                          color: '#1d4ed8',
+                          width: '68px',
+                          height: '68px',
+                          borderRadius: '16px',
+                          background: categoryIcon.bg,
+                          border: `2px solid ${categoryIcon.border}`,
+                          color: categoryIcon.color,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: '1.75rem',
-                          fontWeight: 800,
+                          fontSize: '2.4rem',
                         }}
                       >
-                        {(company.name || 'C')[0].toUpperCase()}
+                        {categoryIcon.emoji}
                       </div>
                     )}
                     <span style={{ position: 'absolute', bottom: '8px', right: '8px' }}>
