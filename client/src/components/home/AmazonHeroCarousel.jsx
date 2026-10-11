@@ -364,7 +364,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
                 Endlessly streaming verified consumer reports
               </span>
             </div>
-            <Link to="/complaints" className="amazon-multi-banner__explore-btn">
+            <Link to="/complaints/live" className="amazon-multi-banner__explore-btn">
               View All Live Complaints →
             </Link>
           </div>

@@ -23,6 +23,7 @@ export default function App() {
 
       <Route path="/" element={<HomePage />} />
       <Route path="/complaints" element={<ComplaintsSearchPage />} />
+      <Route path="/complaints/live" element={<ComplaintCollectionPage title="Live Complaints" search={{ sort: 'latest' }} />} />
       <Route path="/complaints/today" element={<ComplaintCollectionPage title="Today's Complaints" search={{ period: 'today', sort: 'latest' }} />} />
       <Route path="/complaints/most-complained" element={<ComplaintCollectionPage title="Most Complained Companies" search={{ sort: 'most-complained' }} />} />
       <Route path="/complaints/new" element={<ComplaintCollectionPage title="New Complaints" search={{ sort: 'latest' }} />} />
