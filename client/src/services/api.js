@@ -298,8 +298,15 @@ export async function postComment(complaintId, { authorName, authorEmail, body, 
   return response.data.data;
 }
 
-export async function deleteComment(id) {
-  const response = await api.delete(`/comments/${encodeURIComponent(id)}`);
+export async function editComment(id, { body, authorEmail }) {
+  const response = await api.put(`/comments/${encodeURIComponent(id)}`, { body, authorEmail });
+  return response.data.data;
+}
+
+export async function deleteComment(id, authorEmail = '') {
+  const response = await api.delete(`/comments/${encodeURIComponent(id)}`, {
+    data: authorEmail ? { authorEmail } : undefined,
+  });
   return response.data;
 }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAccount } from '../../context/AccountContext.jsx';
-import { getComments, postComment, deleteComment, getErrorMessage } from '../../services/api.js';
+import { getComments, postComment, editComment, deleteComment, getErrorMessage } from '../../services/api.js';
 
 export default function ComplaintCommentsModal({
   complaintId,
@@ -20,6 +20,11 @@ export default function ComplaintCommentsModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+
+  // Comment edit state
+  const [editingId, setEditingId] = useState(null);
+  const [editingBody, setEditingBody] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     if (account?.name && !authorName) setAuthorName(account.name);
@@ -76,13 +81,34 @@ export default function ComplaintCommentsModal({
     }
   }
 
-  async function handleDelete(commentId) {
+  async function handleDelete(commentId, authorEmailToDelete = '') {
     if (!window.confirm('Delete this comment?')) return;
     try {
-      await deleteComment(commentId);
+      await deleteComment(commentId, authorEmailToDelete || account?.email || '');
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err) {
       alert(getErrorMessage(err, 'Failed to delete comment.'));
+    }
+  }
+
+  async function handleSaveEdit(cmt) {
+    if (!editingBody.trim()) {
+      alert('Comment message cannot be empty.');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const updated = await editComment(cmt.id, {
+        body: editingBody.trim(),
+        authorEmail: cmt.authorEmail || account?.email || '',
+      });
+      setComments((prev) => prev.map((c) => (c.id === cmt.id ? { ...c, body: updated.body || editingBody.trim() } : c)));
+      setEditingId(null);
+      setEditingBody('');
+    } catch (err) {
+      alert(getErrorMessage(err, 'Failed to save comment edits.'));
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -191,48 +217,124 @@ export default function ComplaintCommentsModal({
             </div>
           )}
 
-          {!loading && comments.map((cmt) => (
-            <div
-              key={cmt.id}
-              style={{
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-                borderRadius: '10px',
-                padding: '12px 14px',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e293b' }}>
-                  {cmt.authorName}
-                </span>
-                <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                  {cmt.createdAt ? new Date(cmt.createdAt).toLocaleDateString() : ''}
-                </span>
-              </div>
-              <p style={{ margin: 0, fontSize: '0.88rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.45 }}>
-                {cmt.body}
-              </p>
-              {(isAdmin || (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())) && (
-                <div style={{ marginTop: '8px', textAlign: 'right' }}>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(cmt.id)}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#dc2626',
-                      fontSize: '0.75rem',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      padding: 0,
-                    }}
-                  >
-                    Delete {isAdmin ? '(Admin)' : ''}
-                  </button>
+          {!loading && comments.map((cmt) => {
+            const isAuthorOrAdmin = Boolean(
+              isAdmin ||
+              (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())
+            );
+            const isEditing = editingId === cmt.id;
+
+            return (
+              <div
+                key={cmt.id}
+                style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div
+                      style={{
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        background: '#e0e7ff',
+                        color: '#3730a3',
+                        fontWeight: 700,
+                        fontSize: '0.68rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {(cmt.authorName || 'U')[0].toUpperCase()}
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b' }}>
+                      {cmt.authorName}
+                    </span>
+                    <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                      {cmt.createdAt ? new Date(cmt.createdAt).toLocaleDateString() : ''}
+                    </span>
+                  </div>
+
+                  {isAuthorOrAdmin && !isEditing && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingId(cmt.id);
+                          setEditingBody(cmt.body);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#2563eb',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(cmt.id, cmt.authorEmail)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#dc2626',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: 0,
+                        }}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))}
+
+                {isEditing ? (
+                  <div style={{ marginTop: '4px' }}>
+                    <textarea
+                      value={editingBody}
+                      onChange={(e) => setEditingBody(e.target.value)}
+                      rows={2}
+                      style={{ width: '100%', padding: '6px 8px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '4px' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingId(null)}
+                        disabled={savingEdit}
+                        style={{ padding: '3px 8px', fontSize: '0.72rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSaveEdit(cmt)}
+                        disabled={savingEdit}
+                        style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        {savingEdit ? 'Saving…' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: '#334155', whiteSpace: 'pre-wrap', lineHeight: 1.4 }}>
+                    {cmt.body}
+                  </p>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Comment Input Form */}

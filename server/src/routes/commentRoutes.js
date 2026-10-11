@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getComments,
   postComment,
+  putComment,
   deleteComment,
   patchCommentStatus,
 } from '../controllers/commentController.js';
@@ -12,6 +13,7 @@ const commentRouter = Router();
 // Comments are publicly readable and writeable, with automatic user attach
 commentRouter.get('/complaints/:complaintId/comments', getComments);
 commentRouter.post('/complaints/:complaintId/comments', attachUser, postComment);
+commentRouter.put('/comments/:id', attachUser, putComment);
 commentRouter.delete('/comments/:id', attachUser, deleteComment);
 commentRouter.patch('/comments/:id/status', requireAuth, patchCommentStatus);
 

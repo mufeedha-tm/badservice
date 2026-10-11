@@ -37,14 +37,47 @@ export async function postComment(request, response) {
   response.status(201).json({ success: true, data: comment });
 }
 
-export async function deleteComment(request, response) {
+export async function putComment(request, response) {
   const { id } = request.params;
+  const { body, authorEmail } = request.body || {};
   if (!id) throw new ApiError(400, 'Comment ID is required.', 'MISSING_COMMENT_ID');
+  if (!body || typeof body !== 'string' || !body.trim()) {
+    throw new ApiError(400, 'Comment text cannot be empty.', 'MISSING_BODY');
+  }
+
   const existing = await commentRepository.findById(id);
   if (!existing) throw new ApiError(404, 'Comment not found.', 'COMMENT_NOT_FOUND');
 
   // Allow admin or matching email
-  if (request.user?.role !== 'ADMIN' && request.user?.email !== existing.authorEmail) {
+  const userEmail = request.user?.email || authorEmail;
+  const isMatch = Boolean(
+    request.user?.role === 'ADMIN' ||
+    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase())
+  );
+
+  if (!isMatch) {
+    throw new ApiError(403, 'Permission denied to edit this comment.', 'FORBIDDEN');
+  }
+
+  const updated = await commentRepository.updateBody(id, body.trim());
+  response.json({ success: true, data: updated });
+}
+
+export async function deleteComment(request, response) {
+  const { id } = request.params;
+  const authorEmail = request.body?.authorEmail || request.query?.authorEmail;
+  if (!id) throw new ApiError(400, 'Comment ID is required.', 'MISSING_COMMENT_ID');
+  const existing = await commentRepository.findById(id);
+  if (!existing) throw new ApiError(404, 'Comment not found.', 'COMMENT_NOT_FOUND');
+
+  // Allow admin or matching email (from session or request body)
+  const userEmail = request.user?.email || authorEmail;
+  const isMatch = Boolean(
+    request.user?.role === 'ADMIN' ||
+    (userEmail && existing.authorEmail && userEmail.toLowerCase() === existing.authorEmail.toLowerCase())
+  );
+
+  if (!isMatch) {
     throw new ApiError(403, 'Permission denied to delete this comment.', 'FORBIDDEN');
   }
 

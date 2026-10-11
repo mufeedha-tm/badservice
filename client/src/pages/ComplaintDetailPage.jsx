@@ -14,6 +14,7 @@ import {
   getComplaint,
   getErrorMessage,
   postComment,
+  editComment,
   requestDeleteComplaint,
 } from '../services/api.js';
 
@@ -170,13 +171,43 @@ export default function ComplaintDetailPage() {
     }
   }
 
-  async function handleDeleteComment(commentId) {
+  async function handleDeleteComment(commentId, authorEmail = '') {
     if (!window.confirm('Delete this comment?')) return;
     try {
-      await deleteComment(commentId);
+      await deleteComment(commentId, authorEmail || account?.email || '');
       setComments((prev) => prev.filter((c) => c.id !== commentId));
     } catch (err) {
       alert(getErrorMessage(err, 'Failed to delete comment.'));
+    }
+  }
+
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentBody, setEditingCommentBody] = useState('');
+  const [editCommentLoading, setEditCommentLoading] = useState(false);
+
+  function handleStartEditComment(cmt) {
+    setEditingCommentId(cmt.id);
+    setEditingCommentBody(cmt.body);
+  }
+
+  async function handleSaveEditComment(cmt) {
+    if (!editingCommentBody.trim()) {
+      alert('Comment message cannot be empty.');
+      return;
+    }
+    setEditCommentLoading(true);
+    try {
+      const updated = await editComment(cmt.id, {
+        body: editingCommentBody.trim(),
+        authorEmail: cmt.authorEmail || account?.email || '',
+      });
+      setComments((prev) => prev.map((c) => (c.id === cmt.id ? { ...c, body: updated.body || editingCommentBody.trim() } : c)));
+      setEditingCommentId(null);
+      setEditingCommentBody('');
+    } catch (err) {
+      alert(getErrorMessage(err, 'Failed to save comment edits.'));
+    } finally {
+      setEditCommentLoading(false);
     }
   }
 
@@ -568,62 +599,109 @@ export default function ComplaintDetailPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {comments.map((cmt) => (
-                  <div
-                    key={cmt.id}
-                    style={{
-                      background: '#fff',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      padding: '1rem',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '6px',
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div
-                          style={{
-                            width: '28px',
-                            height: '28px',
-                            borderRadius: '50%',
-                            background: '#e0e7ff',
-                            color: '#3730a3',
-                            fontWeight: 700,
-                            fontSize: '0.8rem',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {(cmt.authorName || 'U')[0].toUpperCase()}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {comments.map((cmt) => {
+                  const isAuthorOrAdmin = Boolean(
+                    isAdmin ||
+                    (account?.email && cmt.authorEmail && account.email.toLowerCase() === cmt.authorEmail.toLowerCase())
+                  );
+                  const isEditing = editingCommentId === cmt.id;
+
+                  return (
+                    <div
+                      key={cmt.id}
+                      style={{
+                        background: '#ffffff',
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <div
+                            style={{
+                              width: '22px',
+                              height: '22px',
+                              borderRadius: '50%',
+                              background: '#e0e7ff',
+                              color: '#3730a3',
+                              fontWeight: 700,
+                              fontSize: '0.72rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {(cmt.authorName || 'U')[0].toUpperCase()}
+                          </div>
+                          <span style={{ fontWeight: 700, fontSize: '0.8rem', color: '#1e293b' }}>
+                            {cmt.authorName}
+                          </span>
+                          <span style={{ fontSize: '0.7rem', color: '#94a3b8' }}>
+                            {cmt.createdAt ? new Date(cmt.createdAt).toLocaleDateString() : 'Recently'}
+                          </span>
                         </div>
-                        <span style={{ fontWeight: 700, fontSize: '0.88rem', color: '#1e293b' }}>
-                          {cmt.authorName}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
-                          {cmt.createdAt ? new Date(cmt.createdAt).toLocaleDateString() : 'Recently'}
-                        </span>
+
+                        {isAuthorOrAdmin && !isEditing && (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditComment(cmt)}
+                              style={{ border: 'none', background: 'transparent', color: '#2563eb', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteComment(cmt.id, cmt.authorEmail)}
+                              style={{ border: 'none', background: 'transparent', color: '#dc2626', fontSize: '0.72rem', cursor: 'pointer', fontWeight: 600, padding: 0 }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
                       </div>
 
-                      {(isAdmin || (account?.email && account.email === cmt.authorEmail)) && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteComment(cmt.id)}
-                          style={{ border: 'none', background: 'transparent', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
-                        >
-                          Delete
-                        </button>
+                      {isEditing ? (
+                        <div style={{ marginTop: '4px' }}>
+                          <textarea
+                            value={editingCommentBody}
+                            onChange={(e) => setEditingCommentBody(e.target.value)}
+                            rows={2}
+                            style={{ width: '100%', padding: '6px 8px', fontSize: '0.8rem', borderRadius: '4px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+                          />
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', marginTop: '4px' }}>
+                            <button
+                              type="button"
+                              onClick={() => setEditingCommentId(null)}
+                              disabled={editCommentLoading}
+                              style={{ padding: '3px 8px', fontSize: '0.72rem', background: '#f1f5f9', border: '1px solid #cbd5e1', borderRadius: '4px', cursor: 'pointer' }}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEditComment(cmt)}
+                              disabled={editCommentLoading}
+                              style={{ padding: '3px 10px', fontSize: '0.72rem', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600 }}
+                            >
+                              {editCommentLoading ? 'Saving…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p style={{ margin: 0, fontSize: '0.8rem', color: '#334155', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                          {cmt.body}
+                        </p>
                       )}
                     </div>
-
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.88rem', color: '#334155', lineHeight: '1.5', whiteSpace: 'pre-wrap' }}>
-                      {cmt.body}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           </article>
