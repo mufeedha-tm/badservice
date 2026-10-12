@@ -440,22 +440,122 @@ function HeroCard({ item, onVideoClick, onCommentsClick }) {
         />
 
         {images.length > 1 && (
-          <span
-            style={{
-              position: 'absolute',
-              bottom: '8px',
-              right: '8px',
-              background: 'rgba(0,0,0,0.65)',
-              color: '#fff',
-              fontSize: '0.65rem',
-              fontWeight: 800,
-              padding: '2px 6px',
-              borderRadius: '4px',
-              zIndex: 3,
-            }}
-          >
-            📷 {currentImgIndex + 1}/{images.length}
-          </span>
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentImgIndex((prev) => (prev - 1 + images.length) % images.length);
+              }}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                left: '6px',
+                transform: 'translateY(-50%)',
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: 'rgba(15, 23, 42, 0.75)',
+                color: '#fff',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                zIndex: 4,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+              aria-label="Previous photo"
+            >
+              ‹
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setCurrentImgIndex((prev) => (prev + 1) % images.length);
+              }}
+              style={{
+                position: 'absolute',
+                top: '50%',
+                right: '6px',
+                transform: 'translateY(-50%)',
+                width: '26px',
+                height: '26px',
+                borderRadius: '50%',
+                background: 'rgba(15, 23, 42, 0.75)',
+                color: '#fff',
+                border: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.1rem',
+                cursor: 'pointer',
+                zIndex: 4,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              }}
+              aria-label="Next photo"
+            >
+              ›
+            </button>
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '8px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                gap: '4px',
+                zIndex: 4,
+                background: 'rgba(0,0,0,0.5)',
+                padding: '3px 6px',
+                borderRadius: '12px',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {images.map((_, dotIdx) => (
+                <button
+                  key={dotIdx}
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setCurrentImgIndex(dotIdx);
+                  }}
+                  style={{
+                    width: dotIdx === currentImgIndex ? '16px' : '6px',
+                    height: '6px',
+                    borderRadius: '3px',
+                    background: dotIdx === currentImgIndex ? '#38bdf8' : 'rgba(255,255,255,0.6)',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  aria-label={`Photo ${dotIdx + 1}`}
+                />
+              ))}
+            </div>
+            <span
+              style={{
+                position: 'absolute',
+                bottom: '8px',
+                right: '8px',
+                background: 'rgba(0,0,0,0.65)',
+                color: '#fff',
+                fontSize: '0.62rem',
+                fontWeight: 800,
+                padding: '2px 6px',
+                borderRadius: '4px',
+                zIndex: 3,
+              }}
+            >
+              📷 {currentImgIndex + 1}/{images.length}
+            </span>
+          </>
         )}
 
         {/* If card has user-submitted evidence video */}
