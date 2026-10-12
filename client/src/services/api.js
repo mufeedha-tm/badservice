@@ -8,6 +8,18 @@ const api = axios.create({
   },
 });
 
+api.interceptors.request.use((config) => {
+  try {
+    const token = localStorage.getItem('badservice_token') || sessionStorage.getItem('badservice_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+  return config;
+});
+
 export function getAssetUrl(path) {
   if (!path) return '';
 
@@ -204,17 +216,29 @@ export async function submitCompanyRequest({ companyName, categoryId, descriptio
 // Authentication
 export async function registerAccount(account) {
   const response = await api.post('/auth/register', account);
-  return response.data.data;
+  const data = response.data.data;
+  if (data?.token) {
+    try { localStorage.setItem('badservice_token', data.token); } catch {}
+  }
+  return data;
 }
 
 export async function loginAccount(credentials) {
   const response = await api.post('/auth/login', credentials);
-  return response.data.data;
+  const data = response.data.data;
+  if (data?.token) {
+    try { localStorage.setItem('badservice_token', data.token); } catch {}
+  }
+  return data;
 }
 
 export async function loginAdminAccount(credentials) {
   const response = await api.post('/auth/admin/login', credentials);
-  return response.data.data;
+  const data = response.data.data;
+  if (data?.token) {
+    try { localStorage.setItem('badservice_token', data.token); } catch {}
+  }
+  return data;
 }
 
 export async function getCurrentAccount() {
@@ -223,8 +247,15 @@ export async function getCurrentAccount() {
 }
 
 export async function logoutAccount() {
-  const response = await api.post('/auth/logout');
-  return response.data.data;
+  try {
+    const response = await api.post('/auth/logout');
+    return response.data.data;
+  } finally {
+    try {
+      localStorage.removeItem('badservice_token');
+      sessionStorage.removeItem('badservice_token');
+    } catch {}
+  }
 }
 
 // Admin APIs
