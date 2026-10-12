@@ -21,7 +21,11 @@ async function initializeDatabaseWithRetry(maxAttempts = 3, delayMs = 1500) {
       await runSeed();
       return;
     } catch (err) {
-      const isNetworkDrop = err.code === 'ECONNRESET' || err.code === 'PROTOCOL_CONNECTION_LOST' || err.code === 'ETIMEDOUT';
+      const isNetworkDrop = err.code === 'ECONNRESET' ||
+        err.code === 'PROTOCOL_CONNECTION_LOST' ||
+        err.code === 'ETIMEDOUT' ||
+        err.code === 'ENOTFOUND' ||
+        err.code === 'EAI_AGAIN';
       if (isNetworkDrop && attempt < maxAttempts) {
         console.warn(`⚠️ Database connection reset during startup (attempt ${attempt}/${maxAttempts}). Reconnecting in ${delayMs}ms...`);
         await new Promise((resolve) => setTimeout(resolve, delayMs));
