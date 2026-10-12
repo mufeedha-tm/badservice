@@ -314,17 +314,17 @@ export async function createComplaint(input, user = null, file = null, files = {
 
 export async function processDraftMediaUpload(file, mediaType) {
   if (!file) throw new ApiError(400, 'No file was uploaded.', 'MISSING_FILE');
-  const validTypes = ['productImage', 'billImage', 'productVideo'];
+  const validTypes = ['productImage', 'productImage2', 'productImage3', 'billImage', 'productVideo'];
   if (!validTypes.includes(mediaType)) {
     throw new ApiError(400, 'Invalid media type.', 'INVALID_MEDIA_TYPE');
   }
 
-  if (mediaType === 'productImage' || mediaType === 'billImage') {
+  if (['productImage', 'productImage2', 'productImage3', 'billImage'].includes(mediaType)) {
     if (file.size > IMAGE_MAX_BYTES) {
       throw new ApiError(400, 'Image file exceeds maximum 10 MB limit.', 'FILE_TOO_LARGE');
     }
     await assertRealMediaFile(file, 'image');
-    const saved = await saveComplaintMedia(file, mediaType);
+    const saved = await saveComplaintMedia(file, mediaType.startsWith('productImage') ? 'productImage' : mediaType);
     return {
       url: saved.url,
       name: saved.name,
