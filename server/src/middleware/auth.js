@@ -4,6 +4,12 @@ import { ApiError } from '../utils/ApiError.js';
 export const sessionCookieName = 'badservice_session';
 
 export function readSessionToken(request) {
+  const authHeader = request.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const bearer = authHeader.slice(7).trim();
+    if (bearer) return bearer;
+  }
+
   const cookieHeader = request.headers.cookie || '';
   const prefix = `${sessionCookieName}=`;
   const cookie = cookieHeader
@@ -17,11 +23,6 @@ export function readSessionToken(request) {
     } catch {
       // ignore
     }
-  }
-
-  const authHeader = request.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim();
   }
 
   return null;

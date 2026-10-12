@@ -13,19 +13,19 @@ const sessionCookieName = 'badservice_session';
 export async function postRegister(request, response) {
   const session = await registerAccount(request.body);
   response.setHeader('Set-Cookie', createSessionCookie(session.token));
-  response.status(201).json({ success: true, data: session.account });
+  response.status(201).json({ success: true, data: { ...session.account, token: session.token } });
 }
 
 export async function postLogin(request, response) {
   const session = await loginAccount(request.body);
   response.setHeader('Set-Cookie', createSessionCookie(session.token));
-  response.json({ success: true, data: session.account });
+  response.json({ success: true, data: { ...session.account, token: session.token } });
 }
 
 export async function postAdminLogin(request, response) {
   const session = await loginAdminAccount(request.body);
   response.setHeader('Set-Cookie', createSessionCookie(session.token));
-  response.json({ success: true, data: session.account });
+  response.json({ success: true, data: { ...session.account, token: session.token } });
 }
 
 export async function getCurrentAccount(request, response) {
