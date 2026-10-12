@@ -135,11 +135,11 @@ export async function createComplaint(input, user = null, file = null, files = {
     ? readOptionalText(input.serviceType, 'service type', 100)
     : null;
 
-  if (!(await isValidCategory(category))) {
+  const categoryRecord = await categoryRepository.findByName(category);
+  if (!categoryRecord) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
   }
-
-  const categoryRecord = await categoryRepository.findByName(category);
+  const resolvedCategory = categoryRecord.name;
   const companyRecord = await resolveCompany(companyName, categoryRecord?.id);
 
   // 4. Evidence Media Validation (1 to 3 product photos required, 1 bill proof, 1 video)
@@ -271,7 +271,7 @@ export async function createComplaint(input, user = null, file = null, files = {
     title,
     description,
     company: companyRecord.name,
-    category,
+    category: resolvedCategory,
     subcategory: subcategory || null,
     model: model || null,
     seller: seller || null,

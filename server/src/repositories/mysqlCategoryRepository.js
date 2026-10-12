@@ -60,17 +60,93 @@ export async function findBySlug(slug) {
   return rows[0] || null;
 }
 
+const CATEGORY_ALIASES = {
+  'mobiles & smartphones': 'mobiles',
+  'mobile & smartphones': 'mobiles',
+  'mobiles': 'mobiles',
+  'mobile': 'mobiles',
+  'smartphones': 'mobiles',
+  'smartphone': 'mobiles',
+  'phone': 'mobiles',
+  'phones': 'mobiles',
+  'computers & laptops': 'computers',
+  'computer & laptops': 'computers',
+  'computers': 'computers',
+  'computer': 'computers',
+  'laptops': 'laptops',
+  'laptop': 'laptops',
+  'tv & electronics': 'tv-electronics',
+  'electronics': 'tv-electronics',
+  'home & kitchen appliances': 'tv-electronics',
+  'appliance repair & service': 'tv-electronics',
+  'audio & accessories': 'tv-electronics',
+  'other products': 'tv-electronics',
+  'fashion & apparel': 'fashion',
+  'fashion': 'fashion',
+  'apparel': 'fashion',
+  'vehicles & automotive': 'vehicles-automotive',
+  'vehicle service & repair': 'vehicles-automotive',
+  'cars': 'cars',
+  'car': 'cars',
+  'two wheeler': 'two-wheeler',
+  'hospital & healthcare': 'hospital-healthcare',
+  'hospitals': 'hospitals',
+  'hospital': 'hospitals',
+  'hotel, resort & stay': 'hotel-travel',
+  'hotel & stays': 'hotel-travel',
+  'hotel & travel': 'hotel-travel',
+  'hotels': 'hotels',
+  'hotel': 'hotels',
+  'flights & trains': 'flights-trains',
+  'flights': 'flights',
+  'flight': 'flights',
+  'restaurants & food': 'restaurants-food',
+  'banking & finance': 'banking',
+  'banking': 'banking',
+  'telecom & internet': 'telecom',
+  'telecom': 'telecom',
+  'education & coaching': 'service-centers',
+  'courier & delivery': 'service-centers',
+  'other professional services': 'service-centers',
+};
+
 export async function findByName(name) {
-  const trimmed = name.trim();
+  if (!name || typeof name !== 'string') return null;
+  const trimmed = name.trim().toLowerCase();
+  const aliasId = CATEGORY_ALIASES[trimmed] || trimmed;
+
   const [rows] = await pool.execute(
     `SELECT id, name, slug, parent_id AS parentId, status
      FROM categories
-     WHERE LOWER(name) = LOWER(?) OR LOWER(slug) = LOWER(?) OR LOWER(id) = LOWER(?)
+     WHERE LOWER(name) = ? OR LOWER(slug) = ? OR LOWER(id) = ?
+     LIMIT 1`,
+    [aliasId, aliasId, aliasId]
+  );
+
+  if (rows[0]) return rows[0];
+
+  // Secondary match: check if original trimmed string matches
+  const [origRows] = await pool.execute(
+    `SELECT id, name, slug, parent_id AS parentId, status
+     FROM categories
+     WHERE LOWER(name) = ? OR LOWER(slug) = ? OR LOWER(id) = ?
      LIMIT 1`,
     [trimmed, trimmed, trimmed]
   );
 
-  return rows[0] || null;
+  if (origRows[0]) return origRows[0];
+
+  // Fallback: LIKE substring match
+  const [likeRows] = await pool.execute(
+    `SELECT id, name, slug, parent_id AS parentId, status
+     FROM categories
+     WHERE LOWER(name) LIKE ? OR ? LIKE CONCAT('%', LOWER(name), '%')
+     ORDER BY parent_id IS NULL DESC
+     LIMIT 1`,
+    [`%${trimmed}%`, trimmed]
+  );
+
+  return likeRows[0] || null;
 }
 
 export async function findChildrenOf(parentId) {
