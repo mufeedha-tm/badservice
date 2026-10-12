@@ -61,7 +61,7 @@ export async function saveProof(file, category = 'legacy') {
   const relativePath = category === 'legacy'
     ? `/uploads/proofs/${file.filename}`
     : `/uploads/complaints/${
-        category === 'productImage' ? 'product-images' : category === 'billImage' ? 'bills' : 'product-videos'
+        category.startsWith('productImage') ? 'product-images' : category === 'billImage' ? 'bills' : 'product-videos'
       }/${file.filename}`;
 
   return {
@@ -143,7 +143,7 @@ export function getPublicUrl(storedPath) {
 function getSafeFileName(file, category) {
   const ext = path.extname(file.filename || file.originalname || '').toLowerCase();
   if (category === 'billImage') return `purchase-proof${ext}`;
-  if (category === 'productImage') return `product-photo${ext}`;
+  if (category.startsWith('productImage')) return `product-photo${ext}`;
   if (category === 'productVideo') return `product-video${ext}`;
   return `evidence${ext}`;
 }
@@ -157,7 +157,8 @@ async function uploadToCloudinary(file, category) {
 
   const resourceType = category === 'productVideo' ? 'video' : 'image';
   const timestamp = Math.round(Date.now() / 1000);
-  const folder = `badservice/${category}`;
+  const folder = category.startsWith('productImage') ? 'badservice/productImage' : `badservice/${category}`;
+
 
   const { createHash } = await import('node:crypto');
   const uploadParameters = { folder, timestamp };
