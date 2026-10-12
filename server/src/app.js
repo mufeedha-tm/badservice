@@ -94,6 +94,18 @@ app.use('/uploads', express.static(path.resolve(__dirname, '../uploads'), {
 // Health check at root /health for Render/monitoring
 app.use(healthRouter);
 
+// Performance: Lightweight caching headers for public read APIs to accelerate frontend loading
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET') {
+    if (req.path.startsWith('/categories') || req.path.startsWith('/navigation') || req.path.startsWith('/companies')) {
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
+    } else if (req.path.startsWith('/complaints/rankings')) {
+      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    }
+  }
+  next();
+});
+
 app.use('/api', apiRouter);
 app.use(notFound);
 app.use(errorHandler);
