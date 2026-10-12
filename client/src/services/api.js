@@ -12,6 +12,9 @@ export function getAssetUrl(path) {
   if (!path) return '';
 
   if (/^https?:\/\//i.test(path)) {
+    if (path.includes('res.cloudinary.com') && path.includes('/image/upload/') && !path.includes('/f_auto')) {
+      return path.replace('/image/upload/', '/image/upload/f_auto,q_auto/');
+    }
     return path;
   }
 
