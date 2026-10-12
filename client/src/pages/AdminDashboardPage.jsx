@@ -98,8 +98,10 @@ export default function AdminDashboardPage() {
     try {
       const data = await getAdminStats();
       setStats(data);
-    } catch {
-      // ignore
+    } catch (err) {
+      if (err?.response?.status === 403 || err?.response?.status === 401) {
+        showMessage('Administrator authorization required. Please sign out and sign in with an admin account.', 'error');
+      }
     }
   }
 
