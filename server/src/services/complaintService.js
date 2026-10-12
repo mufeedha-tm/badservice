@@ -211,6 +211,20 @@ export async function createComplaint(input, user = null, file = null, files = {
     parsedInputImages = input.productImages;
   }
 
+  const combinedImages = [];
+  if (Array.isArray(parsedInputImages) && parsedInputImages.length > 0) {
+    for (const img of parsedInputImages) {
+      if (img && typeof img === 'object' && img.url) {
+        if (!combinedImages.some((x) => x.url === img.url)) combinedImages.push(img);
+      }
+    }
+  }
+  for (const img of allProductImages) {
+    if (img && img.url && !combinedImages.some((x) => x.url === img.url)) {
+      combinedImages.push(img);
+    }
+  }
+
   let billImageInfo = null;
   if (input.billImageUrl) {
     billImageInfo = {
@@ -264,8 +278,8 @@ export async function createComplaint(input, user = null, file = null, files = {
     location: location || null,
     type: complaintType,
     serviceType: serviceType || null,
-    productImageUrl: productImageInfo?.url || null,
-    productImageName: productImageInfo?.name || null,
+    productImageUrl: productImageInfo?.url || combinedImages[0]?.url || null,
+    productImageName: productImageInfo?.name || combinedImages[0]?.name || null,
     billImageUrl: billImageInfo?.url || null,
     billImageName: billImageInfo?.name || null,
     billImagePublicId: billImageInfo?.publicId || null,
@@ -281,7 +295,7 @@ export async function createComplaint(input, user = null, file = null, files = {
     complainantCity,
     complainantAddress,
     complainantPincode,
-    productImages: (parsedInputImages && parsedInputImages.length > 0) ? parsedInputImages : (allProductImages.length > 0 ? allProductImages : null),
+    productImages: combinedImages.length > 0 ? combinedImages : null,
     emailVerified: verificationMethod === 'email',
     phoneVerified: verificationMethod === 'phone',
     otpVerifiedAt: new Date().toISOString(),
