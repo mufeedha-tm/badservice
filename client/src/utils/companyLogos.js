@@ -69,7 +69,33 @@ export function getCompanyCategoryIcon(companyName = '', categoryName = '') {
     };
   }
 
-  // 5. Cars & Automobiles (Audi, Maruti Suzuki, Hyundai, Tata Motors, Honda, Toyota, Mahindra)
+  // Phones & Mobiles (Samsung, Apple, OnePlus, Vivo, Oppo, Realme, Xiaomi, Motorola)
+  if (name.includes('samsung') || name.includes('apple') || name.includes('oneplus') || name.includes('vivo') || name.includes('oppo') || name.includes('realme') || name.includes('xiaomi') || name.includes('motorola') || cat.includes('mobile') || cat.includes('phone') || cat.includes('smartphone')) {
+    return {
+      type: 'phone',
+      emoji: '📱',
+      svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="14" fill="%23eff6ff"/><rect x="20" y="10" width="24" height="44" rx="6" fill="%23fff" stroke="%232563eb" stroke-width="3"/><circle cx="32" cy="15" r="1.5" fill="%232563eb"/><line x1="28" y1="48" x2="36" y2="48" stroke="%232563eb" stroke-width="2.5" stroke-linecap="round"/><rect x="23" y="19" width="18" height="26" rx="2" fill="%23dbeafe"/></svg>`,
+      label: 'Mobiles & Smartphones',
+      bg: '#eff6ff',
+      border: '#bfdbfe',
+      color: '#2563eb',
+    };
+  }
+
+  // Hotel, Resort, Rooms & Stay (OYO, Hotel, Stay) - Service
+  if (name.includes('oyo') || name.includes('hotel') || name.includes('resort') || name.includes('stay') || name.includes('room') || cat.includes('hotel') || cat.includes('travel')) {
+    return {
+      type: 'hotel',
+      emoji: '🏨',
+      svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="14" fill="%23fef2f2"/><path d="M14 40h36v5H14z" fill="%23e11d48"/><path d="M18 30h14v10H18z" fill="%23f43f5e" rx="2"/><circle cx="25" cy="24" r="4" fill="%23e11d48"/><path d="M34 23h12v17H34z" fill="%23be123c" rx="3"/><path d="M16 45v7M48 45v7" stroke="%23be123c" stroke-width="3" stroke-linecap="round"/><path d="M25 10h14l4 6H21z" fill="%23e11d48"/><text x="32" y="15" font-size="6" font-weight="900" fill="%23fff" text-anchor="middle" font-family="sans-serif">HOTEL</text></svg>`,
+      label: 'Hotel & Stays',
+      bg: '#fff1f2',
+      border: '#fecdd3',
+      color: '#e11d48',
+    };
+  }
+
+  // Cars & Automobiles (Audi, Maruti Suzuki, Hyundai, Tata Motors, Honda, Toyota, Mahindra)
   if (name.includes('audi') || name.includes('maruti') || name.includes('suzuki') || name.includes('hyundai') || name.includes('tata') || name.includes('toyota') || name.includes('honda') || name.includes('mahindra') || cat.includes('vehicle') || cat.includes('automotive') || cat.includes('car')) {
     return {
       type: 'car',
@@ -79,32 +105,6 @@ export function getCompanyCategoryIcon(companyName = '', categoryName = '') {
       bg: '#fff7ed',
       border: '#fed7aa',
       color: '#ea580c',
-    };
-  }
-
-  // 6. Hotel, Resort & Stay (OYO, Hotel, Resort)
-  if (name.includes('oyo') || name.includes('hotel') || name.includes('resort') || name.includes('stay') || name.includes('room') || cat.includes('hotel') || cat.includes('travel')) {
-    return {
-      type: 'hotel',
-      emoji: '🏨',
-      svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="14" fill="%23fdf4ff"/><rect x="18" y="14" width="28" height="38" rx="2" fill="%23fff" stroke="%23c026d3" stroke-width="3"/><path d="M24 22h4v4h-4zm12 0h4v4h-4zm-12 8h4v4h-4zm12 0h4v4h-4zm-12 8h4v4h-4zm12 0h4v4h-4z" fill="%23c026d3"/><rect x="28" y="44" width="8" height="8" fill="%23c026d3"/></svg>`,
-      label: 'Hotels & Rooms',
-      bg: '#fdf4ff',
-      border: '#f5d0fe',
-      color: '#c026d3',
-    };
-  }
-
-  // 7. Phones & Mobiles (Apple, Samsung, OnePlus, Vivo, Oppo, Realme, Xiaomi, Motorola)
-  if (name.includes('apple') || name.includes('samsung') || name.includes('oneplus') || name.includes('vivo') || name.includes('oppo') || name.includes('realme') || name.includes('xiaomi') || name.includes('motorola') || cat.includes('mobile') || cat.includes('phone') || cat.includes('smartphone')) {
-    return {
-      type: 'phone',
-      emoji: '📱',
-      svg: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64"><rect width="64" height="64" rx="14" fill="%23ecfdf5"/><rect x="20" y="12" width="24" height="40" rx="5" fill="%23fff" stroke="%23059669" stroke-width="3"/><circle cx="32" cy="46" r="2" fill="%23059669"/><rect x="28" y="16" width="8" height="2" rx="1" fill="%23059669"/></svg>`,
-      label: 'Phones & Mobiles',
-      bg: '#f0fdf4',
-      border: '#bbf7d0',
-      color: '#059669',
     };
   }
 
