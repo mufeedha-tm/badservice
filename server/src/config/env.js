@@ -30,6 +30,7 @@ export const env = {
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
   adminPassword: process.env.ADMIN_PASSWORD || 'admin',
   adminPasswordHash: process.env.ADMIN_PASSWORD_HASH || '',
+  adminEmail: process.env.ADMIN_EMAIL || 'badservice97@mail.com',
 
   // Session & JWT
   sessionSecret: process.env.SESSION_SECRET || 'badservice-super-secret-session-key',

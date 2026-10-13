@@ -102,7 +102,7 @@ export async function loginAdminAccount(input) {
   const usernameMatches =
     usernameLower === configuredUsername ||
     usernameLower === 'admin' ||
-    usernameLower === 'badservice97@gmail.com';
+    usernameLower === env.adminEmail.toLowerCase();
 
   let passwordMatches = false;
   if (env.adminPassword && password === env.adminPassword) {
@@ -117,7 +117,7 @@ export async function loginAdminAccount(input) {
     throw new ApiError(401, 'Admin username or password is incorrect.', 'INVALID_ADMIN_CREDENTIALS');
   }
 
-  let adminUser = await authRepository.findUserByEmail('badservice97@gmail.com');
+  let adminUser = await authRepository.findUserByEmail(env.adminEmail);
   if (!adminUser) {
     adminUser = await authRepository.findActiveAdminUser();
   }
@@ -126,7 +126,7 @@ export async function loginAdminAccount(input) {
     const newAdmin = {
       id: randomUUID(),
       name: 'BadService Admin',
-      email: 'badservice97@gmail.com',
+      email: env.adminEmail,
       phone: null,
       passwordSalt: '0000000000000000',
       passwordHash: 'admin',
@@ -137,7 +137,7 @@ export async function loginAdminAccount(input) {
     try {
       adminUser = await authRepository.insertUser(newAdmin);
     } catch {
-      adminUser = (await authRepository.findUserByEmail('badservice97@gmail.com')) || (await authRepository.findActiveAdminUser());
+      adminUser = (await authRepository.findUserByEmail(env.adminEmail)) || (await authRepository.findActiveAdminUser());
     }
     if (!adminUser) {
       adminUser = newAdmin;
