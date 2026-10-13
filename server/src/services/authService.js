@@ -105,11 +105,7 @@ export async function loginAdminAccount(input) {
     usernameLower === env.adminEmail.toLowerCase();
 
   let passwordMatches = false;
-  if (env.adminPassword && password === env.adminPassword) {
-    passwordMatches = true;
-  } else if (password === 'admin' || password === 'password') {
-    passwordMatches = true;
-  } else if (env.adminPasswordHash && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(env.adminPasswordHash)) {
+  if (env.adminPasswordHash && /^\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(env.adminPasswordHash)) {
     passwordMatches = await bcrypt.compare(password, env.adminPasswordHash).catch(() => false);
   }
 
