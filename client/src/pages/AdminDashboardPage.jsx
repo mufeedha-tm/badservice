@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { useAccount } from '../context/AccountContext.jsx';
@@ -8,6 +8,7 @@ import {
   deleteAdminComplaint,
   restoreAdminComplaint,
   getAdminCategories,
+  getAdminComplaintBill,
   getAdminCompanies,
   getAdminComplaints,
   getAdminCompanyRequests,
@@ -15,7 +16,6 @@ import {
   getAdminUsers,
   getErrorMessage,
   logoutAccount,
-  getAssetUrl,
   rejectCompanyRequest,
   rejectAdminDeleteRequest,
   updateAdminCompanyStatus,
@@ -55,8 +55,12 @@ export default function AdminDashboardPage() {
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [editingComplaint, setEditingComplaint] = useState(null);
   const [previewBillUrl, setPreviewBillUrl] = useState(null);
+  const [billPreviewOpen, setBillPreviewOpen] = useState(false);
+  const [previewBillId, setPreviewBillId] = useState(null);
   const [billImageLoading, setBillImageLoading] = useState(true);
   const [billImageError, setBillImageError] = useState(false);
+  const billPreviewObjectUrlRef = useRef(null);
+  const billRequestRef = useRef(0);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -88,6 +92,53 @@ export default function AdminDashboardPage() {
       if (activeTab === 'categories') loadCategories();
     }
   }, [account, activeTab, requestFilter]);
+
+  useEffect(() => () => {
+    if (billPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(billPreviewObjectUrlRef.current);
+    }
+  }, []);
+
+  function clearBillPreviewUrl() {
+    if (billPreviewObjectUrlRef.current) {
+      URL.revokeObjectURL(billPreviewObjectUrlRef.current);
+      billPreviewObjectUrlRef.current = null;
+    }
+    setPreviewBillUrl(null);
+  }
+
+  function closeBillPreview() {
+    billRequestRef.current += 1;
+    clearBillPreviewUrl();
+    setBillPreviewOpen(false);
+    setPreviewBillId(null);
+    setBillImageError(false);
+  }
+
+  async function openBillPreview(id) {
+    const requestId = ++billRequestRef.current;
+    clearBillPreviewUrl();
+    setPreviewBillId(id);
+    setBillPreviewOpen(true);
+    setBillImageLoading(true);
+    setBillImageError(false);
+
+    try {
+      const billBlob = await getAdminComplaintBill(id);
+      const objectUrl = URL.createObjectURL(billBlob);
+      if (requestId !== billRequestRef.current) {
+        URL.revokeObjectURL(objectUrl);
+        return;
+      }
+      billPreviewObjectUrlRef.current = objectUrl;
+      setPreviewBillUrl(objectUrl);
+    } catch {
+      if (requestId === billRequestRef.current) {
+        setBillImageLoading(false);
+        setBillImageError(true);
+      }
+    }
+  }
 
   function showMessage(text, type = 'success') {
     setActionMessage({ text, type });
@@ -888,11 +939,7 @@ export default function AdminDashboardPage() {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  setBillImageLoading(true);
-                                  setBillImageError(false);
-                                  setPreviewBillUrl(getAssetUrl(c.billImageUrl));
-                                }}
+                                onClick={() => openBillPreview(c.id)}
                                 style={{
                                   background: '#e0f2fe',
                                   border: '1px solid #7dd3fc',
@@ -907,9 +954,6 @@ export default function AdminDashboardPage() {
                               >
                                 🔒 View Bill
                               </button>
-                              <a href={getAssetUrl(c.billImageUrl)} target="_blank" rel="noopener noreferrer" style={{ color: '#64748b', fontSize: '0.75rem' }} title="Open in new tab">
-                                ↗
-                              </a>
                             </div>
                           ) : (
                             <span style={{ color: '#aaa' }}>None</span>
@@ -1925,9 +1969,9 @@ export default function AdminDashboardPage() {
         )}
 
         {/* Quick Instant Bill Viewer Modal */}
-        {previewBillUrl && (
+        {billPreviewOpen && (
           <div
-            onClick={() => setPreviewBillUrl(null)}
+            onClick={closeBillPreview}
             style={{
               position: 'fixed',
               inset: 0,
@@ -1969,25 +2013,27 @@ export default function AdminDashboardPage() {
                   <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Bill / Purchase Proof (Admin Confidential)</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <a
-                    href={previewBillUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      padding: '4px 10px',
-                      background: '#0284c7',
-                      color: '#fff',
-                      borderRadius: '4px',
-                      fontSize: '0.8rem',
-                      textDecoration: 'none',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Open Full Size ↗
-                  </a>
+                  {previewBillUrl && (
+                    <a
+                      href={previewBillUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        padding: '4px 10px',
+                        background: '#0284c7',
+                        color: '#fff',
+                        borderRadius: '4px',
+                        fontSize: '0.8rem',
+                        textDecoration: 'none',
+                        fontWeight: 600,
+                      }}
+                    >
+                      Open Full Size ↗
+                    </a>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setPreviewBillUrl(null)}
+                    onClick={closeBillPreview}
                     style={{
                       background: '#e2e8f0',
                       border: 'none',
@@ -2030,12 +2076,11 @@ export default function AdminDashboardPage() {
                       Unable to render inline image preview
                     </strong>
                     <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '16px', lineHeight: 1.5 }}>
-                      The file may be a PDF or saved in a secure format. You can open or download it directly below.
+                      The bill could not be loaded. Please try again.
                     </p>
-                    <a
-                      href={previewBillUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <button
+                      type="button"
+                      onClick={() => previewBillId && openBillPreview(previewBillId)}
                       style={{
                         display: 'inline-flex',
                         alignItems: 'center',
@@ -2048,12 +2093,14 @@ export default function AdminDashboardPage() {
                         fontWeight: 600,
                         textDecoration: 'none',
                         boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                        border: 'none',
+                        cursor: 'pointer',
                       }}
                     >
-                      <span>📥</span> Open / Download Bill Proof ↗
-                    </a>
+                      Retry Bill Preview
+                    </button>
                   </div>
-                ) : (
+                ) : previewBillUrl ? (
                   <img
                     src={previewBillUrl}
                     alt="Bill preview"
@@ -2074,7 +2121,7 @@ export default function AdminDashboardPage() {
                       background: '#fff',
                     }}
                   />
-                )}
+                ) : null}
               </div>
             </div>
           </div>

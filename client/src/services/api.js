@@ -286,6 +286,15 @@ export async function getAdminComplaints(params = {}) {
   return response.data.data;
 }
 
+// Bill files are admin-only. Fetch them through this client so the
+// administrator's authorization header is included before displaying them.
+export async function getAdminComplaintBill(id) {
+  const response = await api.get(`/admin/complaints/${encodeURIComponent(id)}/bill`, {
+    responseType: 'blob',
+  });
+  return response.data;
+}
+
 export async function updateAdminComplaintStatus(id, status, reason = '') {
   const response = await api.patch(`/admin/complaints/${encodeURIComponent(id)}/status`, { status, reason });
   return response.data.data;
