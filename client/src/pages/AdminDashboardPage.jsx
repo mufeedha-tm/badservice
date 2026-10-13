@@ -15,6 +15,7 @@ import {
   getAdminStats,
   getAdminUsers,
   getErrorMessage,
+  getAssetUrl,
   logoutAccount,
   rejectCompanyRequest,
   rejectAdminDeleteRequest,
@@ -25,6 +26,20 @@ import {
   loginAdminAccount,
   editAdminComplaint,
 } from '../services/api.js';
+
+function getComplaintPhotoUrls(complaint) {
+  const uploadedPhotos = Array.isArray(complaint?.productImages)
+    ? complaint.productImages
+      .map((photo) => (typeof photo === 'string' ? photo : photo?.url))
+      .filter(Boolean)
+    : [];
+
+  const photoUrls = uploadedPhotos.length > 0
+    ? uploadedPhotos
+    : complaint?.productImageUrl ? [complaint.productImageUrl] : [];
+
+  return [...new Set(photoUrls)];
+}
 
 export default function AdminDashboardPage() {
   const { account, status: accountStatus, setAccount } = useAccount();
@@ -1347,23 +1362,13 @@ export default function AdminDashboardPage() {
                           Visible only in admin dashboard. Never displayed on public website.
                         </p>
                         {selectedComplaint.billImageUrl ? (
-                          <div>
-                            <img
-                              src={getAssetUrl(selectedComplaint.billImageUrl)}
-                              alt="Bill Evidence"
-                              loading="eager"
-                              decoding="async"
-                              style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', background: '#f5f5f5', borderRadius: '4px', border: '1px solid #eee' }}
-                            />
-                            <a
-                              href={getAssetUrl(selectedComplaint.billImageUrl)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#0066cc', fontWeight: 600 }}
-                            >
-                              Open Full Size ↗
-                            </a>
-                          </div>
+                          <button
+                            type="button"
+                            onClick={() => openBillPreview(selectedComplaint.id)}
+                            style={{ padding: '0.45rem 0.7rem', background: '#e0f2fe', border: '1px solid #7dd3fc', borderRadius: '4px', color: '#0369a1', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer' }}
+                          >
+                            View Bill Securely
+                          </button>
                         ) : (
                           <p style={{ fontSize: '0.82rem', color: '#999', margin: 0 }}>No bill image attached.</p>
                         )}
@@ -1379,21 +1384,26 @@ export default function AdminDashboardPage() {
                             Public Carousel
                           </span>
                         </div>
-                        {selectedComplaint.productImageUrl ? (
-                          <div>
-                            <img
-                              src={getAssetUrl(selectedComplaint.productImageUrl)}
-                              alt="Product Evidence"
-                              style={{ width: '100%', maxHeight: '180px', objectFit: 'contain', background: '#fff', borderRadius: '4px', border: '1px solid #eee' }}
-                            />
-                            <a
-                              href={getAssetUrl(selectedComplaint.productImageUrl)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.8rem', color: '#0066cc', fontWeight: 600 }}
-                            >
-                              Open Full Size ↗
-                            </a>
+                        {getComplaintPhotoUrls(selectedComplaint).length > 0 ? (
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '0.65rem' }}>
+                            {getComplaintPhotoUrls(selectedComplaint).map((photoUrl, index) => (
+                              <div key={photoUrl}>
+                                <img
+                                  src={getAssetUrl(photoUrl)}
+                                  alt={`${selectedComplaint.type === 'Service' ? 'Service' : 'Product'} evidence ${index + 1}`}
+                                  loading="lazy"
+                                  style={{ width: '100%', height: '120px', objectFit: 'contain', background: '#fff', borderRadius: '4px', border: '1px solid #eee' }}
+                                />
+                                <a
+                                  href={getAssetUrl(photoUrl)}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.76rem', color: '#0066cc', fontWeight: 600 }}
+                                >
+                                  Photo {index + 1} — Open Full Size ↗
+                                </a>
+                              </div>
+                            ))}
                           </div>
                         ) : (
                           <p style={{ fontSize: '0.82rem', color: '#999', margin: 0 }}>No photo attached.</p>
