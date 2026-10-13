@@ -6040,3 +6040,107 @@ html, body {
     width: 220px;
   }
 }
+
+/* Keep the two home complaint rows visible and easy to scan on first load. */
+.home-modern {
+  margin-top: -16px;
+  gap: 14px;
+}
+
+.amazon-multi-banner {
+  padding: 14px 20px;
+  margin-bottom: 14px;
+}
+
+.amazon-multi-banner__header {
+  margin-bottom: 8px;
+  gap: 6px;
+}
+
+.amazon-multi-banner__live-badge {
+  margin-bottom: 1px;
+}
+
+.amazon-multi-banner__title {
+  margin-bottom: 2px;
+  line-height: 1.1;
+}
+
+.amazon-multi-banner__subtitle {
+  line-height: 1.35;
+}
+
+.amazon-two-row-grid {
+  gap: 12px;
+}
+
+.hero-carousel-row-section {
+  gap: 6px;
+}
+
+.hero-carousel-row-header {
+  gap: 6px;
+  padding: 2px 4px 6px;
+}
+
+.hero-carousel-row-title-wrap {
+  gap: 8px;
+}
+
+.hero-marquee-viewport {
+  padding: 3px 0 6px;
+}
+
+.hero-marquee-track {
+  gap: 12px;
+}
+
+.amazon-multi-card {
+  flex-basis: 270px;
+  width: 270px;
+  text-transform: uppercase;
+}
+
+.amazon-multi-card__top {
+  padding: 5px 10px;
+}
+
+.amazon-multi-card__titles {
+  padding: 7px 10px 5px;
+}
+
+.amazon-multi-card__media-wrap {
+  height: 132px;
+}
+
+.amazon-multi-card__info {
+  padding: 7px 10px 4px;
+}
+
+.amazon-multi-card__defect {
+  margin-bottom: 2px;
+}
+
+.amazon-multi-card__summary {
+  -webkit-line-clamp: 1;
+}
+
+.amazon-multi-card__footer {
+  padding: 6px 10px 8px;
+  gap: 5px;
+}
+
+@media (max-width: 640px) {
+  .home-modern {
+    margin-top: -10px;
+  }
+
+  .amazon-multi-banner {
+    padding: 12px;
+  }
+
+  .amazon-multi-card {
+    flex: 0 0 220px;
+    width: 220px;
+  }
+}
