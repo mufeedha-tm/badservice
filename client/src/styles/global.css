@@ -6253,5 +6253,8 @@ html, body {
 /* Restore the original, neutral card treatment on the home carousel. */
 .page-frame:has(.home-modern) {
   padding-right: 15px;
-  background: #0b1b2d;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(56, 189, 248, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.14), transparent 25%),
+    linear-gradient(135deg, #071526 0%, #102d4b 52%, #111f34 100%);
 }
