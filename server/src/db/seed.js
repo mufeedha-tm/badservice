@@ -1,8 +1,5 @@
-import { randomBytes, randomUUID, scrypt as scryptCallback } from 'node:crypto';
-import { promisify } from 'node:util';
+import { randomUUID } from 'node:crypto';
 import pool from '../config/database.js';
-
-const scrypt = promisify(scryptCallback);
 
 export async function runSeed() {
   console.log('--- Starting Database Seeding ---');
@@ -85,111 +82,7 @@ export async function runSeed() {
   }
   await pool.query(`UPDATE users SET role = 'USER' WHERE LOWER(email) = 'mufeedha059@gmail.com'`);
 
- 
- 
-
-  // 5. Seed legacy complaints if missing
-  const sampleComplaints = [
-    {
-      id: 'hp-laptop',
-      title: 'HP Laptop - Heating issue, service denied - HP Support',
-      companyId: 'hp',
-      categoryId: 'computers',
-      subcategory: 'Laptops',
-      location: null,
-      description: 'Heating issue with HP laptop, service center denied repair under warranty.',
-      badgeLabel: 'BEST SELLER',
-      badgeTone: 'best-seller',
-      similarComplaintCount: 45,
-    },
-    {
-      id: 'apollo-hospital',
-      title: 'Apollo Hospital - Overbilling, no bill details',
-      companyId: 'apollo-hospital',
-      categoryId: 'hospital-healthcare',
-      subcategory: 'Healthcare',
-      location: 'Kochi',
-      description: 'Charged excess fees without providing an itemized bill at discharge.',
-      badgeLabel: 'HOSPITAL',
-      badgeTone: 'hospital',
-      similarComplaintCount: 0,
-    },
-    {
-      id: 'maruti-swift',
-      title: 'Maruti Swift - Service center damaged car',
-      companyId: 'maruti-suzuki',
-      categoryId: 'vehicles-automotive',
-      subcategory: 'Cars',
-      location: 'Bangalore',
-      description: 'Brought car in for regular service, returned with deep scratch on left door.',
-      badgeLabel: 'VEHICLE',
-      badgeTone: 'vehicle',
-      similarComplaintCount: 12,
-    },
-    {
-      id: 'oyo-rooms',
-      title: 'OYO Rooms - Hotel denied check-in, no refund',
-      companyId: 'oyo',
-      categoryId: 'hotel-travel',
-      subcategory: 'Hotels',
-      location: 'Mumbai',
-      description: 'Paid advance online, hotel claimed no rooms available and refused refund.',
-      badgeLabel: 'HOTEL',
-      badgeTone: 'hotel',
-      similarComplaintCount: 30,
-    },
-    {
-      id: 'indigo-flight',
-      title: 'IndiGo Flight - Cancelled, refund pending 30 days',
-      companyId: 'indigo',
-      categoryId: 'flights-trains',
-      subcategory: 'Flights',
-      location: 'Delhi',
-      description: 'Flight cancelled by airline, refund has not been processed after 30 days.',
-      badgeLabel: 'AIRLINE',
-      badgeTone: 'airline',
-      similarComplaintCount: 18,
-    },
-    {
-      id: 'royal-enfield',
-      title: 'Royal Enfield - Bike engine issue in 10 days',
-      companyId: 'royal-enfield',
-      categoryId: 'vehicles-automotive',
-      subcategory: 'Two Wheeler',
-      location: 'Chennai',
-      description: 'Brand new motorcycle engine stalling and oil leak after 10 days of delivery.',
-      badgeLabel: 'BIKE',
-      badgeTone: 'bike',
-      similarComplaintCount: 8,
-    },
-  ];
-
-  for (const c of sampleComplaints) {
-    await pool.query(
-      `INSERT INTO complaints
-        (id, title, description, company_id, category_id, subcategory, location, status, created_at, similar_complaint_count, badge_label, badge_tone, action_label)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', NOW(), ?, ?, ?, 'View Details')
-       ON DUPLICATE KEY UPDATE
-        title = VALUES(title),
-        subcategory = VALUES(subcategory),
-        category_id = VALUES(category_id),
-        company_id = VALUES(company_id)`,
-      [
-        c.id,
-        c.title,
-        c.description,
-        c.companyId,
-        c.categoryId,
-        c.subcategory,
-        c.location,
-        c.similarComplaintCount,
-        c.badgeLabel,
-        c.badgeTone,
-      ]
-    );
-  }
-
-  console.log('--- Database Seeding Completed Successfully ---');
+  console.log('--- Database reference data seeding completed successfully ---');
 }
 
 if (process.argv[1]?.replace(/\\/g, '/').endsWith('src/db/seed.js')) {
