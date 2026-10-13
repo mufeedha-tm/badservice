@@ -99,7 +99,7 @@ app.use('/api', (req, res, next) => {
   if (req.method === 'GET') {
     if (req.path.startsWith('/categories') || req.path.startsWith('/navigation') || req.path.startsWith('/companies')) {
       res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=120');
-    } else if (req.path.startsWith('/complaints/rankings')) {
+    } else if (req.path === '/complaints' || req.path.startsWith('/complaints/rankings')) {
       res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
     }
   }

@@ -7,7 +7,19 @@ import { useNavigation } from '../context/NavigationContext.jsx';
 import { getCategories, searchComplaints } from '../services/api.js';
 import { getCategoryFilterForSlug } from '../utils/categoryForSlug.js';
 import { getNavigationTitle } from '../utils/navigationTitle.js';
-import { getShowcaseImage } from '../utils/showcaseImages.js';
+
+function getCategoryHeaderIcon(title = '', category = '') {
+  const value = `${title} ${category}`.toLowerCase();
+
+  if (value.includes('two wheeler') || value.includes('motorbike') || value.includes('bike')) return '🏍️';
+  if (value.includes('hospital') || value.includes('health') || value.includes('medical')) return '🏥';
+  if (value.includes('hotel') || value.includes('resort') || value.includes('stay')) return '🏨';
+  if (value.includes('flight') || value.includes('train') || value.includes('airline')) return '✈️';
+  if (value.includes('food') || value.includes('restaurant') || value.includes('delivery')) return '🍔';
+  if (value.includes('vehicle') || value.includes('automotive') || value.includes('car')) return '🚗';
+
+  return '📋';
+}
 
 export default function CategoryPage() {
   const { slug } = useParams();
@@ -111,6 +123,7 @@ export default function CategoryPage() {
   }, [navigation, navigationStatus, slug]);
 
   const displayTitle = result.title || getNavigationTitle(slug, navigation) || slug;
+  const headerIcon = getCategoryHeaderIcon(displayTitle, result.categories[0]);
 
   return (
     <MainLayout>
@@ -128,7 +141,9 @@ export default function CategoryPage() {
           <>
             <section className="category-page-modern__hero">
               <div><span className="home-section__eyebrow">Category complaint record</span><h2>{displayTitle}</h2><p>Explore complaint patterns, recent reports and the evidence attached to customer complaints in this category.</p></div>
-              <img src={getShowcaseImage(result.categories[0])} alt="" />
+              <div className="category-page-modern__icon" role="img" aria-label={`${displayTitle} category`}>
+                {headerIcon}
+              </div>
             </section>
             <ComplaintToolbar
               search={{ category: result.categories.join(', ') }}

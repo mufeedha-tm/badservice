@@ -54,6 +54,7 @@ export default function AdminDashboardPage() {
   const [stats, setStats] = useState(null);
   const [requests, setRequests] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [complaintPagination, setComplaintPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [companies, setCompanies] = useState([]);
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -76,6 +77,8 @@ export default function AdminDashboardPage() {
   const [billImageError, setBillImageError] = useState(false);
   const billPreviewObjectUrlRef = useRef(null);
   const billRequestRef = useRef(0);
+  const billAbortControllerRef = useRef(null);
+  const complaintsRequestRef = useRef(0);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -95,20 +98,23 @@ export default function AdminDashboardPage() {
   const [addingCompany, setAddingCompany] = useState(false);
 
   useEffect(() => {
-    if (account && account.role === 'ADMIN') {
-      loadStats();
-      if (activeTab === 'requests') loadRequests(requestFilter);
-      if (activeTab === 'complaints') loadComplaints();
-      if (activeTab === 'companies') {
-        loadCompanies();
-        loadCategories(false);
-      }
-      if (activeTab === 'users') loadUsers();
-      if (activeTab === 'categories') loadCategories();
+    if (account?.role === 'ADMIN') loadStats();
+  }, [account]);
+
+  useEffect(() => {
+    if (account?.role !== 'ADMIN') return;
+    if (activeTab === 'requests') loadRequests(requestFilter);
+    if (activeTab === 'complaints') loadComplaints();
+    if (activeTab === 'companies') {
+      loadCompanies();
+      loadCategories(false);
     }
-  }, [account, activeTab, requestFilter]);
+    if (activeTab === 'users') loadUsers();
+    if (activeTab === 'categories') loadCategories();
+  }, [account, activeTab]);
 
   useEffect(() => () => {
+    billAbortControllerRef.current?.abort();
     if (billPreviewObjectUrlRef.current) {
       URL.revokeObjectURL(billPreviewObjectUrlRef.current);
     }
@@ -124,6 +130,8 @@ export default function AdminDashboardPage() {
 
   function closeBillPreview() {
     billRequestRef.current += 1;
+    billAbortControllerRef.current?.abort();
+    billAbortControllerRef.current = null;
     clearBillPreviewUrl();
     setBillPreviewOpen(false);
     setPreviewBillId(null);
@@ -132,6 +140,9 @@ export default function AdminDashboardPage() {
 
   async function openBillPreview(id) {
     const requestId = ++billRequestRef.current;
+    billAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    billAbortControllerRef.current = abortController;
     clearBillPreviewUrl();
     setPreviewBillId(id);
     setBillPreviewOpen(true);
@@ -139,7 +150,7 @@ export default function AdminDashboardPage() {
     setBillImageError(false);
 
     try {
-      const billBlob = await getAdminComplaintBill(id);
+      const billBlob = await getAdminComplaintBill(id, { signal: abortController.signal });
       const objectUrl = URL.createObjectURL(billBlob);
       if (requestId !== billRequestRef.current) {
         URL.revokeObjectURL(objectUrl);
@@ -147,8 +158,8 @@ export default function AdminDashboardPage() {
       }
       billPreviewObjectUrlRef.current = objectUrl;
       setPreviewBillUrl(objectUrl);
-    } catch {
-      if (requestId === billRequestRef.current) {
+    } catch (error) {
+      if (requestId === billRequestRef.current && error?.code !== 'ERR_CANCELED') {
         setBillImageLoading(false);
         setBillImageError(true);
       }
@@ -183,7 +194,12 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function loadComplaints(onlyDelete = deleteRequestOnly, showOnlyDeleted = viewDeleted) {
+  async function loadComplaints({
+    page = 1,
+    onlyDelete = deleteRequestOnly,
+    showOnlyDeleted = viewDeleted,
+  } = {}) {
+    const requestId = ++complaintsRequestRef.current;
     setLoading(true);
     try {
       const data = await getAdminComplaints({
@@ -191,12 +207,23 @@ export default function AdminDashboardPage() {
         q: complaintSearch,
         deleteRequested: onlyDelete ? 'true' : '',
         onlyDeleted: showOnlyDeleted ? 'true' : '',
+        page,
+        limit: complaintPagination.limit,
       });
-      setComplaints(data);
+      if (requestId !== complaintsRequestRef.current) return;
+      setComplaints(data?.items || []);
+      setComplaintPagination(data?.pagination || {
+        page: 1,
+        limit: complaintPagination.limit,
+        total: 0,
+        totalPages: 1,
+      });
     } catch (err) {
-      showMessage(err.response?.data?.error?.message || 'Error loading complaints', 'error');
+      if (requestId === complaintsRequestRef.current) {
+        showMessage(err.response?.data?.error?.message || 'Error loading complaints', 'error');
+      }
     } finally {
-      setLoading(false);
+      if (requestId === complaintsRequestRef.current) setLoading(false);
     }
   }
 
@@ -262,25 +289,31 @@ export default function AdminDashboardPage() {
 
   async function handleComplaintStatusChange(id, newStatus) {
     let reason = '';
-    if (newStatus === 'REJECTED') {
+    const statusUpdateDefaults = {
+      REJECTED: '',
+      COMPANY_RESPONDED: 'The company or service provider has responded. Follow-up communication is now in progress.',
+      RESOLVED: 'The issue has been marked resolved after the reported outcome was confirmed.',
+    };
+    if (Object.hasOwn(statusUpdateDefaults, newStatus)) {
       const promptRes = window.prompt(
-        'Please enter the mandatory reason for REJECTING this complaint:\n(The complainant will see this reason when tracking their complaint)'
+        `Enter the update the complainant should see for ${newStatus.replace(/_/g, ' ')}:\n(This is saved in their Track Status history.)`,
+        statusUpdateDefaults[newStatus]
       );
       if (promptRes === null) return;
       if (!promptRes.trim()) {
-        alert('A rejection reason is strictly mandatory so the complainant knows why their complaint was rejected.');
+        alert('A clear update is required so the complainant can understand this status change.');
         return;
       }
       reason = promptRes.trim();
     }
     try {
-      await updateAdminComplaintStatus(id, newStatus, reason);
+      const updated = await updateAdminComplaintStatus(id, newStatus, reason);
       showMessage(`Complaint status updated to ${newStatus}`);
       setComplaints((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, status: newStatus, deleteAdminNote: reason || c.deleteAdminNote } : c))
+        prev.map((c) => (c.id === id ? { ...c, ...updated } : c))
       );
       if (selectedComplaint?.id === id) {
-        setSelectedComplaint((prev) => ({ ...prev, status: newStatus, deleteAdminNote: reason || prev.deleteAdminNote }));
+        setSelectedComplaint((prev) => ({ ...prev, ...updated }));
       }
       loadStats();
     } catch (err) {
@@ -678,7 +711,10 @@ export default function AdminDashboardPage() {
                 {['', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
                   <button
                     key={st}
-                    onClick={() => setRequestFilter(st)}
+                    onClick={() => {
+                      setRequestFilter(st);
+                      loadRequests(st);
+                    }}
                     style={{
                       padding: '0.3rem 0.6rem',
                       fontSize: '0.8rem',
@@ -787,7 +823,7 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setDeleteRequestOnly(false);
                     setViewDeleted(false);
-                    loadComplaints(false, false);
+                    loadComplaints({ page: 1, onlyDelete: false, showOnlyDeleted: false });
                   }}
                   style={{
                     padding: '0.35rem 0.75rem',
@@ -807,7 +843,7 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setViewDeleted(false);
                     setDeleteRequestOnly(true);
-                    loadComplaints(true, false);
+                    loadComplaints({ page: 1, onlyDelete: true, showOnlyDeleted: false });
                   }}
                   style={{
                     padding: '0.35rem 0.75rem',
@@ -827,7 +863,7 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setDeleteRequestOnly(false);
                     setViewDeleted(true);
-                    loadComplaints(false, true);
+                    loadComplaints({ page: 1, onlyDelete: false, showOnlyDeleted: true });
                   }}
                   style={{
                     padding: '0.35rem 0.75rem',
@@ -849,7 +885,7 @@ export default function AdminDashboardPage() {
                   placeholder="Search title, company, person..."
                   value={complaintSearch}
                   onChange={(e) => setComplaintSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && loadComplaints()}
+                  onKeyDown={(e) => e.key === 'Enter' && loadComplaints({ page: 1 })}
                   style={{ padding: '0.3rem 0.5rem', fontSize: '0.85rem' }}
                 />
                 <select
@@ -866,7 +902,7 @@ export default function AdminDashboardPage() {
                   <option value="REJECTED">REJECTED</option>
                 </select>
                 <button
-                  onClick={() => loadComplaints()}
+                  onClick={() => loadComplaints({ page: 1 })}
                   style={{ padding: '0.3rem 0.8rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem' }}
                 >
                   Filter
@@ -882,8 +918,9 @@ export default function AdminDashboardPage() {
             )}
 
             {!loading && complaints.length > 0 && (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
+              <>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
                   <thead>
                     <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
@@ -1076,8 +1113,35 @@ export default function AdminDashboardPage() {
                       </tr>
                     ))}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                  <small style={{ color: '#64748b' }}>
+                    Showing {((complaintPagination.page - 1) * complaintPagination.limit) + 1}–{Math.min(complaintPagination.page * complaintPagination.limit, complaintPagination.total)} of {complaintPagination.total}
+                  </small>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      disabled={complaintPagination.page <= 1}
+                      onClick={() => loadComplaints({ page: complaintPagination.page - 1 })}
+                      style={{ padding: '0.35rem 0.7rem', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff', cursor: complaintPagination.page <= 1 ? 'not-allowed' : 'pointer', opacity: complaintPagination.page <= 1 ? 0.55 : 1 }}
+                    >
+                      Previous
+                    </button>
+                    <span style={{ alignSelf: 'center', fontSize: '0.85rem', color: '#475569' }}>
+                      Page {complaintPagination.page} of {complaintPagination.totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={complaintPagination.page >= complaintPagination.totalPages}
+                      onClick={() => loadComplaints({ page: complaintPagination.page + 1 })}
+                      style={{ padding: '0.35rem 0.7rem', border: '1px solid #cbd5e1', borderRadius: '4px', background: '#fff', cursor: complaintPagination.page >= complaintPagination.totalPages ? 'not-allowed' : 'pointer', opacity: complaintPagination.page >= complaintPagination.totalPages ? 0.55 : 1 }}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
 
             {/* FULL DETAILS COMPLAINT REVIEW MODAL */}
@@ -1224,7 +1288,7 @@ export default function AdminDashboardPage() {
                           ✓ Approve & Publish to Website
                         </button>
                       )}
-                      {['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(selectedComplaint.status) && (
+                      {['APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED'].includes(selectedComplaint.status) && (
                         <Link
                           to={`/complaints/${encodeURIComponent(selectedComplaint.id)}`}
                           target="_blank"

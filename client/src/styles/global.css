@@ -3059,7 +3059,7 @@ body { background: var(--bs-bg); color: var(--bs-ink); }
 .category-page-modern__hero { display:grid; grid-template-columns:minmax(0,1fr) 300px; gap:20px; align-items:center; margin:0 0 18px; padding:22px; border:1px solid var(--bs-line); border-radius:20px; background:#fff; box-shadow:var(--bs-shadow); }
 .category-page-modern__hero h2 { margin:6px 0 8px; font-size:clamp(1.6rem,3vw,2.3rem); letter-spacing:-.04em; }
 .category-page-modern__hero p { max-width:700px; margin:0; color:var(--bs-muted); line-height:1.6; }
-.category-page-modern__hero img { width:100%; height:180px; object-fit:cover; border-radius:14px; }
+.category-page-modern__icon { width:100%; min-height:180px; display:flex; align-items:center; justify-content:center; border:1px solid #dbe5f0; border-radius:14px; background:linear-gradient(135deg,#f8fbff,#edf5ff); font-size:5rem; line-height:1; }
 .category-page-modern__evidence { display:grid; grid-template-columns:300px minmax(0,1fr); gap:22px; align-items:center; }
 .category-page-modern__evidence > div:first-child { padding:0 5px; }
 .category-page-modern__evidence h2 { margin:6px 0 7px; font-size:1.45rem; }
@@ -6041,93 +6041,77 @@ html, body {
   }
 }
 
-/* Keep the two home complaint rows visible and easy to scan on first load. */
+/* Home complaint dashboard: clear two-row hierarchy without changing cards. */
 .home-modern {
   margin-top: -16px;
-  gap: 14px;
+  gap: 20px;
 }
 
 .amazon-multi-banner {
-  padding: 14px 20px;
-  margin-bottom: 14px;
+  padding: 18px 20px 20px;
+  margin-bottom: 18px;
+  border-radius: 0 0 22px 22px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(56, 189, 248, 0.18), transparent 28%),
+    radial-gradient(circle at 92% 12%, rgba(251, 146, 60, 0.14), transparent 25%),
+    linear-gradient(135deg, #071526 0%, #102d4b 52%, #111f34 100%);
+  box-shadow: 0 16px 36px rgba(8, 26, 45, 0.24);
 }
 
 .amazon-multi-banner__header {
-  margin-bottom: 8px;
-  gap: 6px;
+  position: relative;
+  margin-bottom: 14px;
+  gap: 10px;
+  padding: 0 4px 12px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.18);
 }
 
 .amazon-multi-banner__live-badge {
-  margin-bottom: 1px;
+  margin-bottom: 3px;
 }
 
 .amazon-multi-banner__title {
-  margin-bottom: 2px;
-  line-height: 1.1;
+  margin-bottom: 4px;
+  font-size: clamp(1.35rem, 2.2vw, 1.75rem);
+  line-height: 1.08;
 }
 
 .amazon-multi-banner__subtitle {
-  line-height: 1.35;
+  max-width: 860px;
+  line-height: 1.45;
 }
 
 .amazon-two-row-grid {
-  gap: 12px;
+  gap: 16px;
 }
 
 .hero-carousel-row-section {
-  gap: 6px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(203, 213, 225, 0.16);
+  border-radius: 14px;
+  background: rgba(4, 18, 34, 0.25);
 }
 
 .hero-carousel-row-header {
-  gap: 6px;
-  padding: 2px 4px 6px;
+  gap: 10px;
+  padding: 2px 4px 8px;
 }
 
 .hero-carousel-row-title-wrap {
-  gap: 8px;
+  gap: 10px;
 }
 
 .hero-marquee-viewport {
-  padding: 3px 0 6px;
+  padding: 4px 0 8px;
 }
 
 .hero-marquee-track {
-  gap: 12px;
+  gap: 16px;
 }
 
 .amazon-multi-card {
-  flex-basis: 270px;
-  width: 270px;
   text-transform: uppercase;
-}
-
-.amazon-multi-card__top {
-  padding: 5px 10px;
-}
-
-.amazon-multi-card__titles {
-  padding: 7px 10px 5px;
-}
-
-.amazon-multi-card__media-wrap {
-  height: 132px;
-}
-
-.amazon-multi-card__info {
-  padding: 7px 10px 4px;
-}
-
-.amazon-multi-card__defect {
-  margin-bottom: 2px;
-}
-
-.amazon-multi-card__summary {
-  -webkit-line-clamp: 1;
-}
-
-.amazon-multi-card__footer {
-  padding: 6px 10px 8px;
-  gap: 5px;
 }
 
 @media (max-width: 640px) {
@@ -6137,10 +6121,131 @@ html, body {
 
   .amazon-multi-banner {
     padding: 12px;
+    border-radius: 0 0 16px 16px;
+  }
+
+  .hero-carousel-row-section {
+    padding: 8px;
+  }
+}
+
+/* Mobile-first card sizing: preserve every action while reducing vertical scroll. */
+@media (max-width: 640px) {
+  .page-frame {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .home-modern {
+    gap: 14px;
+  }
+
+  .amazon-multi-banner__header {
+    margin-bottom: 10px;
+    padding-bottom: 9px;
+  }
+
+  .amazon-multi-banner__title {
+    font-size: 1.22rem;
+  }
+
+  .amazon-multi-banner__subtitle {
+    font-size: 0.78rem;
+  }
+
+  .hero-carousel-row-section {
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .hero-carousel-row-header {
+    align-items: flex-start;
+    padding-bottom: 6px;
+  }
+
+  .hero-carousel-row-title {
+    font-size: 0.9rem;
+  }
+
+  .hero-carousel-row-title-wrap > span {
+    font-size: 0.68rem !important;
+  }
+
+  .amazon-multi-banner__explore-btn {
+    padding: 6px 10px;
+    font-size: 0.68rem;
+  }
+
+  .hero-marquee-viewport {
+    padding: 2px 0 6px;
+  }
+
+  .hero-marquee-track {
+    gap: 10px;
   }
 
   .amazon-multi-card {
-    flex: 0 0 220px;
-    width: 220px;
+    flex: 0 0 min(82vw, 300px);
+    width: min(82vw, 300px);
+  }
+
+  .amazon-multi-card__top {
+    padding: 5px 8px;
+  }
+
+  .amazon-multi-card__rank-tag {
+    font-size: 0.64rem;
+  }
+
+  .amazon-multi-card__titles {
+    padding: 6px 8px 4px;
+  }
+
+  .amazon-multi-card__media-wrap {
+    height: 112px;
+  }
+
+  .amazon-multi-card__info {
+    min-height: 0;
+    padding: 6px 8px 4px;
+  }
+
+  .amazon-multi-card__summary {
+    -webkit-line-clamp: 1;
+  }
+
+  .amazon-multi-card__footer {
+    padding: 5px 8px 7px;
+    gap: 4px;
+  }
+
+  .complaint-card {
+    min-height: 0;
+    padding: 0.75rem;
+  }
+
+  .complaint-card__thumb,
+  .complaint-card__evidence-link .media-carousel,
+  .complaint-card__evidence-link .media-carousel__viewport,
+  .complaint-card__evidence-link .media-carousel__slide,
+  .complaint-card__evidence-link .media-carousel__media,
+  .complaint-card__evidence-link .media-carousel__placeholder {
+    height: 150px;
+    min-height: 150px;
+  }
+
+  .mini-complaint-card__media {
+    padding: 0.6rem 0.6rem 0;
+  }
+
+  .mini-complaint-card__body {
+    padding: 0.75rem;
+  }
+
+  .product-rank-card .media-carousel__media,
+  .product-ranking-grid--equal .media-carousel__media,
+  .product-ranking-grid--equal .media-carousel__placeholder {
+    height: 185px;
+    min-height: 185px;
   }
 }

@@ -5,9 +5,10 @@ import { trackComplaint, requestDeleteComplaint, cancelDeleteComplaint, getError
 
 const STATUS_STEPS = [
   { key: 'SUBMITTED', label: '1. Complaint Submitted', desc: 'Complaint registered and queued for verification' },
-  { key: 'APPROVED', label: '2. Admin Approved', desc: 'Verified and approved by admin team; published to public directory' },
-  { key: 'COMPANY_RESPONDED', label: '3. Brand Responded', desc: 'Brand / service provider contacted and communication ongoing' },
-  { key: 'RESOLVED', label: '4. Issue Resolved', desc: 'Complaint successfully resolved with customer confirmation' },
+  { key: 'UNDER_REVIEW', label: '2. Under Review', desc: 'Admin review is active; the complaint remains available to track' },
+  { key: 'APPROVED', label: '3. Admin Approved', desc: 'Verified and published to the public directory' },
+  { key: 'COMPANY_RESPONDED', label: '4. Brand Responded', desc: 'Brand / service provider has responded and communication is ongoing' },
+  { key: 'RESOLVED', label: '5. Issue Resolved', desc: 'Reported outcome confirmed and complaint marked resolved' },
 ];
 
 function getStepIndex(status) {
@@ -15,18 +16,22 @@ function getStepIndex(status) {
     case 'PENDING':
       return 0;
     case 'UNDER_REVIEW':
-      return 0;
-    case 'APPROVED':
       return 1;
-    case 'COMPANY_RESPONDED':
+    case 'APPROVED':
       return 2;
-    case 'RESOLVED':
+    case 'COMPANY_RESPONDED':
       return 3;
+    case 'RESOLVED':
+      return 4;
     case 'REJECTED':
       return -1;
     default:
       return 0;
   }
+}
+
+function formatStatus(status = '') {
+  return status.replace(/_/g, ' ');
 }
 
 export default function TrackComplaintPage() {
@@ -352,6 +357,38 @@ export default function TrackComplaintPage() {
                       <p style={{ margin: 0, fontSize: '0.9rem' }}>{c.statusNote}</p>
                     </div>
                   )}
+
+                  {/* Status history is retained so users can understand every past update. */}
+                  <div style={{ border: '1px solid #dbe5f0', background: '#fbfdff', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#1e3a5f', marginBottom: '0.75rem' }}>
+                      📜 Complaint Update History
+                    </strong>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+                      <div style={{ borderLeft: '3px solid #64748b', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
+                        <strong>Complaint submitted</strong>
+                        <div style={{ color: '#64748b', marginTop: '2px' }}>
+                          {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'Submission date unavailable'}
+                        </div>
+                      </div>
+                      {(c.statusHistory || []).map((update, index) => (
+                        <div key={`${update.changedAt || 'update'}-${index}`} style={{ borderLeft: '3px solid #0284c7', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
+                          <strong>{formatStatus(update.from)} → {formatStatus(update.to)}</strong>
+                          <div style={{ color: '#334155', marginTop: '2px', lineHeight: 1.45 }}>{update.note}</div>
+                          <div style={{ color: '#64748b', marginTop: '3px', fontSize: '0.78rem' }}>
+                            {update.changedAt ? new Date(update.changedAt).toLocaleString() : 'Update date unavailable'}
+                          </div>
+                        </div>
+                      ))}
+                      {(!c.statusHistory || c.statusHistory.length === 0) && c.statusChangedAt && (
+                        <div style={{ borderLeft: '3px solid #0284c7', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
+                          <strong>Current status: {formatStatus(c.status)}</strong>
+                          <div style={{ color: '#64748b', marginTop: '3px', fontSize: '0.78rem' }}>
+                            Updated {new Date(c.statusChangedAt).toLocaleString()}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
 
                   {/* Deletion Request Status or Action */}
                   {c.deleteRequested ? (

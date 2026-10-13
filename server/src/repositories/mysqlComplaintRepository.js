@@ -83,6 +83,8 @@ function mapComplaint(row) {
     deletedBy: row.deletedBy ?? null,
     deleteAdminNote: row.deleteAdminNote ?? null,
     statusNote: row.statusNote ?? '',
+    statusChangedAt: row.statusChangedAt ? new Date(row.statusChangedAt).toISOString() : null,
+    statusHistory: row.statusHistory ? parseJsonSafe(row.statusHistory) : [],
   };
 }
 
@@ -167,6 +169,8 @@ const baseQuery = `
     c.deleted_by AS deletedBy,
     c.delete_admin_note AS deleteAdminNote,
     c.status_note AS statusNote,
+    c.status_changed_at AS statusChangedAt,
+    c.status_history AS statusHistory,
     c.company_id AS companyId,
     c.category_id AS categoryId,
     co.name AS companyName,
@@ -223,13 +227,16 @@ export async function findAll() {
   return rows.map(mapComplaint);
 }
 
-export async function findPublicAll() {
-  const [rows] = await pool.execute(`
+export async function findPublicAll({ limit } = {}) {
+  const safeLimit = Number.isFinite(limit) ? Math.min(Math.max(limit, 1), 100) : null;
+  const query = `
     ${baseQuery}
-    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     ORDER BY c.created_at DESC
-  `);
+    ${safeLimit ? 'LIMIT ?' : ''}
+  `;
+  const [rows] = await pool.execute(query, safeLimit ? [safeLimit] : []);
   return rows.map(mapComplaint);
 }
 
@@ -247,7 +254,7 @@ export async function findPublicById(id) {
   const [rows] = await pool.execute(`
     ${baseQuery}
     WHERE c.id = ?
-      AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     LIMIT 1
   `, [id]);
@@ -294,6 +301,7 @@ export async function search({
   deleteRequested = false,
   onlyDeleted = false,
   includeDeleted = false,
+  withPagination = false,
 } = {}) {
   const normalizedQuery = q.trim().toLocaleLowerCase();
   const normalizedCategory = category.trim().toLocaleLowerCase();
@@ -314,7 +322,7 @@ export async function search({
   }
 
   if (publishedOnly) {
-    conditions.push("c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')");
+    conditions.push("c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')");
   }
 
   if (normalizedQuery) {
@@ -373,13 +381,48 @@ export async function search({
     ? 'c.similar_complaint_count DESC, c.created_at DESC'
     : 'c.created_at DESC';
 
-  const [rows] = await pool.execute(`
-    ${baseQuery}
-    ${whereClause}
-    ORDER BY ${orderBy}
-  `, parameters);
+  if (!withPagination) {
+    const [rows] = await pool.execute(`
+      ${baseQuery}
+      ${whereClause}
+      ORDER BY ${orderBy}
+    `, parameters);
+    return rows.map(mapComplaint);
+  }
 
-  return rows.map(mapComplaint);
+  // Admin lists grow continuously. Keep each response bounded so one table never
+  // transfers the whole database or blocks the dashboard from becoming usable.
+  const safeLimit = Math.min(Math.max(Number.parseInt(limit, 10) || 25, 1), 100);
+  const safePage = Math.max(Number.parseInt(page, 10) || 1, 1);
+  const offset = (safePage - 1) * safeLimit;
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    FROM complaints c
+    LEFT JOIN companies co ON co.id = c.company_id
+    LEFT JOIN categories ca ON ca.id = c.category_id
+    ${whereClause}
+  `;
+
+  const [[rows], [[count]]] = await Promise.all([
+    pool.execute(`
+      ${baseQuery}
+      ${whereClause}
+      ORDER BY ${orderBy}
+      LIMIT ? OFFSET ?
+    `, [...parameters, safeLimit, offset]),
+    pool.execute(countQuery, parameters),
+  ]);
+  const total = Number(count?.total) || 0;
+
+  return {
+    items: rows.map(mapComplaint),
+    pagination: {
+      page: safePage,
+      limit: safeLimit,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    },
+  };
 }
 
 let rankingsCache = null;
@@ -409,7 +452,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
-    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     GROUP BY co.id, co.name, co.slug, ca.name, ca.slug
     ORDER BY complaintCount DESC, latestAt DESC
@@ -427,7 +470,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN companies co ON co.id = c.company_id
     LEFT JOIN categories ca ON ca.id = c.category_id
-    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     GROUP BY COALESCE(NULLIF(c.product_model, ''), co.name), co.name, co.id, ca.name
     ORDER BY complaintCount DESC, latestAt DESC
@@ -443,7 +486,7 @@ export async function findRankings() {
     FROM complaints c
     INNER JOIN categories ca ON ca.id = c.category_id
     LEFT JOIN categories parent ON parent.id = ca.parent_id
-    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     GROUP BY COALESCE(parent.id, ca.id), COALESCE(parent.name, ca.name), COALESCE(parent.slug, ca.slug)
     ORDER BY complaintCount DESC, name ASC
@@ -451,7 +494,7 @@ export async function findRankings() {
 
   const recentComplaintsQuery = pool.execute(`
     ${baseQuery}
-    WHERE c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+    WHERE c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
       AND c.is_deleted = 0
     ORDER BY c.created_at DESC
     LIMIT 50
@@ -516,7 +559,7 @@ async function findLatestForProduct(companyId, productName) {
     ${baseQuery}
     WHERE c.company_id = ?
       AND COALESCE(NULLIF(c.product_model, ''), co.name) = ?
-      AND c.status IN ('APPROVED', 'COMPANY_RESPONDED', 'RESOLVED')
+      AND c.status IN ('APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED')
     ORDER BY c.created_at DESC
     LIMIT 1
   `, [companyId, productName]);
@@ -776,24 +819,49 @@ export async function updateStatus(id, status, reason = '') {
     throw new ApiError(400, `Invalid status. Must be one of: ${allowedStatuses.join(', ')}`, 'INVALID_STATUS');
   }
 
-  const requiresApproval = ['COMPANY_RESPONDED', 'RESOLVED'].includes(status);
-  let sql = 'UPDATE complaints SET status = ?';
-  const params = [status];
-
-  if (status === 'REJECTED' && reason) {
-    sql += ', delete_admin_note = ?';
-    params.push(reason);
+  const existing = await findById(id);
+  if (!existing) {
+    throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
 
-  sql += ` WHERE id = ?${requiresApproval ? " AND status IN ('APPROVED', 'COMPANY_RESPONDED')" : ''}`;
+  const requiresPublishedWorkflow = ['COMPANY_RESPONDED', 'RESOLVED'].includes(status);
+  if (requiresPublishedWorkflow && !['APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED'].includes(existing.status)) {
+    throw new ApiError(409, 'Approve or move this complaint to Under Review before recording a company response or resolution.', 'COMPLAINT_REQUIRES_APPROVAL');
+  }
+
+  if (existing.status === status) return existing;
+
+  const defaultNotes = {
+    PENDING: 'Your complaint has been returned to the verification queue.',
+    APPROVED: 'Your complaint has been verified and published to the public complaint directory.',
+    UNDER_REVIEW: 'Your complaint is under active review. The public record remains available while the review is in progress.',
+    COMPANY_RESPONDED: 'The company or service provider has responded. Follow-up communication is now in progress.',
+    RESOLVED: 'The issue has been marked resolved after the reported outcome was confirmed.',
+    REJECTED: 'The complaint could not be approved. Please review the administrator note.',
+  };
+  const statusNote = reason.trim() || defaultNotes[status];
+  const statusHistory = Array.isArray(existing.statusHistory) ? existing.statusHistory : [];
+  statusHistory.unshift({
+    from: existing.status,
+    to: status,
+    note: statusNote,
+    changedAt: new Date().toISOString(),
+  });
+
+  let sql = 'UPDATE complaints SET status = ?, status_note = ?, status_changed_at = UTC_TIMESTAMP(), status_history = ?';
+  const params = [status, statusNote, JSON.stringify(statusHistory)];
+
+  if (status === 'REJECTED') {
+    sql += ', delete_admin_note = ?';
+    params.push(statusNote);
+  }
+
+  sql += ' WHERE id = ?';
   params.push(id);
 
   const [result] = await pool.execute(sql, params);
 
   if (result.affectedRows === 0) {
-    if (requiresApproval && await findById(id)) {
-      throw new ApiError(409, 'Approve this complaint before moving it to a response or resolution status.', 'COMPLAINT_REQUIRES_APPROVAL');
-    }
     throw new ApiError(404, 'Complaint not found.', 'COMPLAINT_NOT_FOUND');
   }
 
@@ -820,14 +888,19 @@ export async function restore(id) {
 }
 
 export async function getStats() {
-  const [[complaintsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 0`);
-  const [[pendingComplaints]] = await pool.execute(`SELECT COUNT(*) AS pending FROM complaints WHERE status = 'PENDING' AND is_deleted = 0`);
-  const [[resolvedComplaints]] = await pool.execute(`SELECT COUNT(*) AS resolved FROM complaints WHERE status = 'RESOLVED' AND is_deleted = 0`);
-  const [[companiesCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM companies WHERE status = 'ACTIVE'`);
-  const [[usersCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM users`);
-  const [[pendingRequestsCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM company_requests WHERE status = 'PENDING'`);
-  const [[pendingDeleteCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE delete_requested = 1 AND is_deleted = 0`);
-  const [[deletedCount]] = await pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 1`);
+  const [
+    [[complaintsCount]], [[pendingComplaints]], [[resolvedComplaints]], [[companiesCount]],
+    [[usersCount]], [[pendingRequestsCount]], [[pendingDeleteCount]], [[deletedCount]],
+  ] = await Promise.all([
+    pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 0`),
+    pool.execute(`SELECT COUNT(*) AS pending FROM complaints WHERE status = 'PENDING' AND is_deleted = 0`),
+    pool.execute(`SELECT COUNT(*) AS resolved FROM complaints WHERE status = 'RESOLVED' AND is_deleted = 0`),
+    pool.execute(`SELECT COUNT(*) AS total FROM companies WHERE status = 'ACTIVE'`),
+    pool.execute(`SELECT COUNT(*) AS total FROM users`),
+    pool.execute(`SELECT COUNT(*) AS total FROM company_requests WHERE status = 'PENDING'`),
+    pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE delete_requested = 1 AND is_deleted = 0`),
+    pool.execute(`SELECT COUNT(*) AS total FROM complaints WHERE is_deleted = 1`),
+  ]);
 
   return {
     totalComplaints: complaintsCount.total,

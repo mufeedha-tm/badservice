@@ -12,8 +12,12 @@ import {
 import * as complaintRepository from '../repositories/mysqlComplaintRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 
-export async function getComplaints(_request, response) {
-  const complaints = await listComplaints();
+export async function getComplaints(request, response) {
+  const requestedLimit = Number.parseInt(request.query.limit, 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(requestedLimit, 1), 100)
+    : undefined;
+  const complaints = await listComplaints({ limit });
   response.json({ success: true, data: complaints });
 }
 
@@ -91,7 +95,8 @@ export async function trackComplaintStatus(request, response) {
       isDeleted: c.isDeleted,
       deleteAdminNote: c.deleteAdminNote || null,
       createdAt: c.createdAt,
-      updatedAt: c.updatedAt,
+      statusChangedAt: c.statusChangedAt || null,
+      statusHistory: Array.isArray(c.statusHistory) ? c.statusHistory : [],
       productImageUrl: c.productImageUrl,
     })),
   });

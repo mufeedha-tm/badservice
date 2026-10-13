@@ -221,6 +221,7 @@ export async function runMigrations() {
   await addColumnIfNotExists('complaints', 'deleted_by', 'CHAR(36) NULL');
   await addColumnIfNotExists('complaints', 'delete_admin_note', 'VARCHAR(500) NULL');
   await addColumnIfNotExists('complaints', 'status_note', 'VARCHAR(500) NULL');
+  await addColumnIfNotExists('complaints', 'status_history', 'TEXT NULL');
   await addColumnIfNotExists('complaints', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
   await addColumnIfNotExists('complaints', 'update_requested', 'TINYINT(1) NOT NULL DEFAULT 0');
   await addColumnIfNotExists('complaints', 'update_note', 'VARCHAR(500) NULL');
@@ -377,6 +378,10 @@ export async function runMigrations() {
   await addIndexIfNotExists('complaints', 'idx_complaints_status', '(status)');
 
   await addIndexIfNotExists('complaints', 'idx_complaints_created', '(created_at)');
+
+  await addIndexIfNotExists('complaints', 'idx_complaints_admin_status', '(is_deleted, status, created_at)');
+
+  await addIndexIfNotExists('complaints', 'idx_complaints_admin_delete_request', '(is_deleted, delete_requested, created_at)');
 
   await addIndexIfNotExists('company_requests', 'idx_company_requests_status', '(status)');
 

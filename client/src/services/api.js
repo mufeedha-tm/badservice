@@ -3,6 +3,9 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   withCredentials: true,
+  // A failed connection should fail visibly instead of leaving a page indefinitely busy.
+  // Longer-running uploads override this per request below.
+  timeout: 30000,
   headers: {
     Accept: 'application/json',
   },
@@ -73,8 +76,10 @@ export async function getHealth() {
   return response.data;
 }
 
-export async function getComplaints() {
-  const response = await api.get('/complaints');
+export async function getComplaints({ limit } = {}) {
+  const response = await api.get('/complaints', {
+    params: limit ? { limit } : undefined,
+  });
   return response.data.data;
 }
 
@@ -195,6 +200,7 @@ export async function searchComplaints({
 export async function createComplaint(complaint) {
   const isFormData = typeof FormData !== 'undefined' && complaint instanceof FormData;
   const response = await api.post('/complaints', complaint, {
+    timeout: 120000,
     headers: isFormData
       ? {
           'Content-Type': 'multipart/form-data',
@@ -288,9 +294,10 @@ export async function getAdminComplaints(params = {}) {
 
 // Bill files are admin-only. Fetch them through this client so the
 // administrator's authorization header is included before displaying them.
-export async function getAdminComplaintBill(id) {
+export async function getAdminComplaintBill(id, { signal } = {}) {
   const response = await api.get(`/admin/complaints/${encodeURIComponent(id)}/bill`, {
     responseType: 'blob',
+    signal,
   });
   return response.data;
 }
@@ -310,6 +317,7 @@ export async function uploadDraftMedia(file, mediaType, onProgress = null) {
   formData.append('media', file);
   formData.append('mediaType', mediaType);
   const response = await api.post('/complaints/upload-media', formData, {
+    timeout: 120000,
     headers: { 'Content-Type': 'multipart/form-data' },
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {

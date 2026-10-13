@@ -21,8 +21,8 @@ import {
 const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 const VIDEO_MAX_DURATION_SECONDS = 30;
 
-export function listComplaints() {
-  return complaintRepository.findPublicAll().then((complaints) => complaints.map(toPublicComplaint));
+export function listComplaints({ limit } = {}) {
+  return complaintRepository.findPublicAll({ limit }).then((complaints) => complaints.map(toPublicComplaint));
 }
 
 export async function listRankings() {
@@ -40,7 +40,7 @@ export async function getComplaint(id, user = null) {
   const complaint = await complaintRepository.findById(id);
   if (!complaint) throw new ApiError(404, 'Complaint not found', 'COMPLAINT_NOT_FOUND');
 
-  const isPubliclyVisible = ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
+  const isPubliclyVisible = ['APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
   const isOwner = user && complaint.userId === user.id;
   const isAdmin = user && user.role === 'ADMIN';
 
@@ -80,6 +80,8 @@ export function toPublicComplaint(complaint) {
     emailVerified: _emailVerified,
     otpVerifiedAt: _otpVerifiedAt,
     userId: _userId,
+    statusHistory: _statusHistory,
+    statusChangedAt: _statusChangedAt,
     ...publicComplaint
   } = complaint;
   return publicComplaint;

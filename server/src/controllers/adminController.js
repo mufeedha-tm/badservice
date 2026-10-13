@@ -40,8 +40,8 @@ export async function postRejectCompanyRequest(request, response) {
 }
 
 export async function getAdminComplaints(request, response) {
-  const { q, category, subcategory, company, status, sort, deleteRequested, onlyDeleted, includeDeleted } = request.query;
-  const complaints = await complaintRepository.search({
+  const { q, category, subcategory, company, status, sort, deleteRequested, onlyDeleted, includeDeleted, page, limit } = request.query;
+  const result = await complaintRepository.search({
     q: q || '',
     category: category || '',
     subcategory: subcategory || '',
@@ -51,8 +51,17 @@ export async function getAdminComplaints(request, response) {
     deleteRequested: deleteRequested === 'true' || deleteRequested === '1',
     onlyDeleted: onlyDeleted === 'true' || onlyDeleted === '1',
     includeDeleted: includeDeleted === 'true' || includeDeleted === '1',
+    page,
+    limit,
+    withPagination: true,
   });
-  response.json({ success: true, data: complaints.map(toAdminComplaint) });
+  response.json({
+    success: true,
+    data: {
+      items: result.items.map(toAdminComplaint),
+      pagination: result.pagination,
+    },
+  });
 }
 
 export async function patchComplaintStatus(request, response) {

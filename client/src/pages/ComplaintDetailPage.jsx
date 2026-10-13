@@ -219,7 +219,7 @@ export default function ComplaintDetailPage() {
   const complaint = result.complaint;
 
   // Timeline step active calculation
-  const isApproved = complaint && ['APPROVED', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
+  const isApproved = complaint && ['APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
   const isCompanyResponded = complaint && ['COMPANY_RESPONDED', 'RESOLVED'].includes(complaint.status);
   const isResolved = complaint && complaint.status === 'RESOLVED';
   const isOwner = Boolean(

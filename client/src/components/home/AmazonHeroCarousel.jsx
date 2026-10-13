@@ -15,7 +15,9 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
   // Fetch real approved live complaints for Row 1
   useEffect(() => {
     let isCurrent = true;
-    getComplaints()
+    // The marquee only displays sixteen records; do not download the full public
+    // archive just to render its first row.
+    getComplaints({ limit: 16 })
       .then((data) => {
         if (!isCurrent) return;
         if (Array.isArray(data) && data.length > 0) {
@@ -162,10 +164,12 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
   const speedSeconds = 32;
 
   function renderHeroCard(item, keyPrefix = '') {
+    const preload = keyPrefix === 'orig1-0' || keyPrefix === 'orig1-1';
     return (
       <HeroCard
         key={`${keyPrefix}-${item.id}`}
         item={item}
+        preload={preload}
         onVideoClick={(videoItem) => setActiveVideoModal(videoItem)}
         onCommentsClick={(commentsItem) => setActiveCommentsItem(commentsItem)}
       />
@@ -339,7 +343,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
   );
 }
 
-function HeroCard({ item, onVideoClick, onCommentsClick }) {
+function HeroCard({ item, preload = false, onVideoClick, onCommentsClick }) {
   const images = Array.isArray(item.images) && item.images.length > 0
     ? item.images
     : [item.imageUrl];
@@ -433,7 +437,8 @@ function HeroCard({ item, onVideoClick, onCommentsClick }) {
           src={images[currentImgIndex] || item.imageUrl}
           alt={`${item.company} ${item.productName} evidence`}
           className="amazon-multi-card__img"
-          loading="lazy"
+          loading={preload ? 'eager' : 'lazy'}
+          fetchPriority={preload ? 'high' : 'auto'}
           onError={(e) => {
             e.currentTarget.src = getShowcaseImage(item.category);
           }}
