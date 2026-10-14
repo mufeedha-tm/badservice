@@ -141,19 +141,15 @@ export async function getComplaint(id) {
   return response.data.data;
 }
 
-/**
- * Send a 6-digit OTP to an email address or phone number.
- */
-export async function sendOtp({ email, phone }) {
-  const response = await api.post('/otp/send', phone ? { phone } : { email });
+/** Send a 6-digit OTP to a phone number. */
+export async function sendOtp({ phone }) {
+  const response = await api.post('/otp/send', { phone });
   return response.data.data;
 }
 
-/**
- * Verify a 6-digit OTP using its email address or phone number.
- */
-export async function verifyOtp({ email, phone, otp }) {
-  const response = await api.post('/otp/verify', phone ? { phone, otp } : { email, otp });
+/** Verify a 6-digit OTP using a phone number. */
+export async function verifyOtp({ phone, otp }) {
+  const response = await api.post('/otp/verify', { phone, otp });
   return response.data.data;
 }
 
@@ -289,6 +285,15 @@ export async function rejectCompanyRequest(id) {
 
 export async function getAdminComplaints(params = {}) {
   const response = await api.get('/admin/complaints', { params });
+  return response.data.data;
+}
+
+export async function createAdminComplaint(complaint) {
+  const isFormData = typeof FormData !== 'undefined' && complaint instanceof FormData;
+  const response = await api.post('/admin/complaints', complaint, {
+    timeout: 120000,
+    headers: isFormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+  });
   return response.data.data;
 }
 

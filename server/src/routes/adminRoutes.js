@@ -13,6 +13,7 @@ import {
   patchAdminUserRole,
   patchAdminUserStatus,
   patchComplaintStatus,
+  postAdminComplaint,
   postAdminCompany,
   postApproveCompanyRequest,
   postRejectCompanyRequest,
@@ -20,6 +21,7 @@ import {
   postRestoreComplaint,
 } from '../controllers/adminController.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
+import { uploadComplaintMedia } from '../middleware/upload.js';
 
 const adminRouter = Router();
 
@@ -36,6 +38,15 @@ adminRouter.post('/admin/company-requests/:id/reject', postRejectCompanyRequest)
 
 // Complaints
 adminRouter.get('/admin/complaints', getAdminComplaints);
+adminRouter.post(
+  '/admin/complaints',
+  uploadComplaintMedia.fields([
+    { name: 'productImage', maxCount: 1 },
+    { name: 'billImage', maxCount: 1 },
+    { name: 'productVideo', maxCount: 1 },
+  ]),
+  postAdminComplaint
+);
 adminRouter.get('/admin/complaints/:id/bill', getAdminComplaintBill);
 adminRouter.patch('/admin/complaints/:id', patchAdminEditComplaint);
 adminRouter.patch('/admin/complaints/:id/status', patchComplaintStatus);

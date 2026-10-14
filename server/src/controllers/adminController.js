@@ -15,6 +15,7 @@ import * as complaintRepository from '../repositories/mysqlComplaintRepository.j
 import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 import { getAdminBillImageSource } from '../services/storageService.js';
 import { ApiError } from '../utils/ApiError.js';
+import { createAdminComplaint } from '../services/complaintService.js';
 
 const BILL_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -62,6 +63,11 @@ export async function getAdminComplaints(request, response) {
       pagination: result.pagination,
     },
   });
+}
+
+export async function postAdminComplaint(request, response) {
+  const complaint = await createAdminComplaint(request.body || {}, request.files || {});
+  response.status(201).json({ success: true, data: toAdminComplaint(complaint) });
 }
 
 export async function patchComplaintStatus(request, response) {

@@ -19,13 +19,6 @@ export const env = {
   otpCooldownSeconds: Number(process.env.OTP_RESEND_COOLDOWN_SECONDS) || 60,
   otpMaxAttempts: Number(process.env.OTP_MAX_ATTEMPTS) || 5,
 
-  // Gmail API (Official OAuth2)
-  gmailClientId: process.env.GMAIL_CLIENT_ID || '',
-  gmailClientSecret: process.env.GMAIL_CLIENT_SECRET || '',
-  gmailRedirectUri: process.env.GMAIL_REDIRECT_URI || '',
-  gmailRefreshToken: process.env.GMAIL_REFRESH_TOKEN || '',
-  gmailSenderEmail: process.env.GMAIL_SENDER_EMAIL || '',
-
   // Single Admin Account Configuration
   adminUsername: process.env.ADMIN_USERNAME || 'admin',
   adminPassword: process.env.ADMIN_PASSWORD || '',

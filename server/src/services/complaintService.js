@@ -4,11 +4,7 @@ import * as companyRepository from '../repositories/mysqlCompanyRepository.js';
 import * as categoryRepository from '../repositories/mysqlCategoryRepository.js';
 import { ApiError } from '../utils/ApiError.js';
 import { isValidCategory } from './categoryService.js';
-import {
-  assertPhoneVerificationToken,
-  assertVerificationToken,
-  consumeChallenge,
-} from './otpService.js';
+import { assertPhoneVerificationToken, consumeChallenge } from './otpService.js';
 import { saveComplaintMedia } from './storageService.js';
 import { assertRealMediaFile } from '../middleware/upload.js';
 import { readVideoDurationSeconds, VideoMetadataError } from '../utils/videoDuration.js';
@@ -92,22 +88,20 @@ export async function createComplaint(input, user = null, file = null, files = {
     throw new ApiError(400, 'A complaint object is required.', 'INVALID_COMPLAINT');
   }
 
-  // 1. Verification Token Check (Priority check for security)
+  // 1. Phone verification is used for public complaint submission.
+  // Email OTP/Gmail delivery is intentionally not part of this workflow.
   const verificationToken = input.verificationToken;
-  const verificationMethod = input.verificationMethod === 'phone' ? 'phone' : 'email';
   if (!verificationToken || typeof verificationToken !== 'string') {
     throw new ApiError(
       401,
-      `${verificationMethod === 'phone' ? 'Phone' : 'Email'} verification is required before submitting a complaint.`,
+      'Phone verification is required before submitting a complaint.',
       'OTP_REQUIRED'
     );
   }
 
   const complainantEmail = normalizeOptionalEmail(input.email);
   const complainantPhone = readRequiredPhone(input.phone);
-  const verified = verificationMethod === 'phone'
-    ? await assertPhoneVerificationToken(complainantPhone, verificationToken)
-    : await assertVerificationToken(complainantEmail || input.email, verificationToken);
+  const verified = await assertPhoneVerificationToken(complainantPhone, verificationToken);
 
   // 2. Personal & Contact Details Validation
   const complainantName = readRequiredText(input.fullName || input.name, 'full name', 80);
@@ -298,8 +292,8 @@ export async function createComplaint(input, user = null, file = null, files = {
     complainantAddress,
     complainantPincode,
     productImages: combinedImages.length > 0 ? combinedImages : null,
-    emailVerified: verificationMethod === 'email',
-    phoneVerified: verificationMethod === 'phone',
+    emailVerified: false,
+    phoneVerified: true,
     otpVerifiedAt: new Date().toISOString(),
 
     status: 'PENDING',
@@ -311,6 +305,93 @@ export async function createComplaint(input, user = null, file = null, files = {
 
   // Consume verification challenge (single-use)
   await consumeChallenge(verified.challengeId);
+  return toPublicComplaint(created);
+}
+
+// This path is intentionally separate from createComplaint. Public submissions
+// continue to require OTP verification and evidence; an authenticated
+// administrator may record a complaint received through another channel.
+export async function createAdminComplaint(input = {}, files = {}) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    throw new ApiError(400, 'A complaint object is required.', 'INVALID_COMPLAINT');
+  }
+
+  const productImage = pickUploadedFile(files, 'productImage');
+  const billImage = pickUploadedFile(files, 'billImage');
+  const productVideo = pickUploadedFile(files, 'productVideo');
+
+  if (!productImage) {
+    throw new ApiError(400, 'A product or service photo is required for an admin complaint.', 'MISSING_PRODUCT_IMAGE');
+  }
+  if (!billImage) {
+    throw new ApiError(400, 'A bill or receipt image is required for an admin complaint.', 'MISSING_BILL_IMAGE');
+  }
+  if (!productVideo) {
+    throw new ApiError(400, 'An evidence video is required for an admin complaint.', 'MISSING_PRODUCT_VIDEO');
+  }
+
+  const categoryName = readOptionalText(input.category, 'category', 100);
+  const availableCategories = await categoryRepository.findAll();
+  const categoryRecord = categoryName
+    ? await categoryRepository.findByName(categoryName)
+    : availableCategories[0];
+
+  if (categoryName && !categoryRecord) {
+    throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
+  }
+  if (!categoryRecord) {
+    throw new ApiError(409, 'Create an active category before recording a complaint.', 'CATEGORY_REQUIRED');
+  }
+
+  const companyName = readOptionalText(input.company, 'company / brand', 120) || 'Unspecified company';
+  const companyRecord = await resolveCompany(companyName, categoryRecord.id);
+  const complaintType = normalizeComplaintType(input.type);
+  const now = new Date().toISOString();
+  const [productImageInfo, billImageInfo, productVideoInfo] = await Promise.all([
+    processDraftMediaUpload(productImage, 'productImage'),
+    processDraftMediaUpload(billImage, 'billImage'),
+    processDraftMediaUpload(productVideo, 'productVideo'),
+  ]);
+
+  const created = await complaintRepository.create({
+    id: randomUUID(),
+    title: readOptionalText(input.title, 'complaint title', 160) || 'Admin-recorded complaint',
+    description: readOptionalText(input.description, 'complaint details', 5000) || null,
+    company: companyRecord.name,
+    category: categoryRecord.name,
+    subcategory: readOptionalText(input.subcategory, 'subcategory', 100) || null,
+    model: readOptionalText(input.model, 'product / service details', 150) || null,
+    seller: readOptionalText(input.seller, 'seller / service provider', 150) || null,
+    location: readOptionalText(input.location, 'location', 120) || null,
+    type: complaintType,
+    serviceType: complaintType === 'Service'
+      ? readOptionalText(input.serviceType, 'service type', 100) || null
+      : null,
+    productImageUrl: productImageInfo.url,
+    productImageName: productImageInfo.name,
+    billImageUrl: billImageInfo.url,
+    billImageName: billImageInfo.name,
+    billImagePublicId: billImageInfo.publicId || null,
+    billImageVersion: billImageInfo.version || null,
+    productVideoUrl: productVideoInfo.url,
+    productVideoName: productVideoInfo.name,
+    productImages: [{ url: productImageInfo.url, name: productImageInfo.name }],
+    userId: null,
+    complainantName: readOptionalText(input.complainantName, 'complainant name', 80) || null,
+    complainantPhone: readOptionalText(input.complainantPhone, 'complainant phone', 20) || null,
+    complainantEmail: normalizeOptionalEmail(input.complainantEmail),
+    complainantCity: readOptionalText(input.complainantCity, 'complainant city', 120) || null,
+    complainantAddress: readOptionalText(input.complainantAddress, 'complainant address', 500) || null,
+    complainantPincode: readOptionalText(input.complainantPincode, 'complainant pincode', 20) || null,
+    phoneVerified: false,
+    emailVerified: false,
+    otpVerifiedAt: null,
+    status: 'PENDING',
+    createdAt: now,
+    metadata: [companyRecord.name, categoryRecord.name].filter(Boolean),
+    actionLabel: 'View Details',
+  });
+
   return toPublicComplaint(created);
 }
 
