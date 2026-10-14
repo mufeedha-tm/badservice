@@ -42,6 +42,8 @@ adminRouter.post(
   '/admin/complaints',
   uploadComplaintMedia.fields([
     { name: 'productImage', maxCount: 1 },
+    { name: 'productImage2', maxCount: 1 },
+    { name: 'productImage3', maxCount: 1 },
     { name: 'billImage', maxCount: 1 },
     { name: 'productVideo', maxCount: 1 },
   ]),

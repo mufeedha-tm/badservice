@@ -317,16 +317,23 @@ export async function createAdminComplaint(input = {}, files = {}) {
   }
 
   const productImage = pickUploadedFile(files, 'productImage');
+  const productImage2 = pickUploadedFile(files, 'productImage2');
+  const productImage3 = pickUploadedFile(files, 'productImage3');
   const billImage = pickUploadedFile(files, 'billImage');
   const productVideo = pickUploadedFile(files, 'productVideo');
+  const savedProductImage = readDraftMedia(input, 'productImage', 'product-photo');
+  const savedProductImage2 = readDraftMedia(input, 'productImage2', 'product-photo-2');
+  const savedProductImage3 = readDraftMedia(input, 'productImage3', 'product-photo-3');
+  const savedBillImage = readDraftMedia(input, 'billImage', 'purchase-proof');
+  const savedProductVideo = readDraftMedia(input, 'productVideo', 'evidence-video');
 
-  if (!productImage) {
+  if (!productImage && !savedProductImage) {
     throw new ApiError(400, 'A product or service photo is required for an admin complaint.', 'MISSING_PRODUCT_IMAGE');
   }
-  if (!billImage) {
+  if (!billImage && !savedBillImage) {
     throw new ApiError(400, 'A bill or receipt image is required for an admin complaint.', 'MISSING_BILL_IMAGE');
   }
-  if (!productVideo) {
+  if (!productVideo && !savedProductVideo) {
     throw new ApiError(400, 'An evidence video is required for an admin complaint.', 'MISSING_PRODUCT_VIDEO');
   }
 
@@ -346,10 +353,12 @@ export async function createAdminComplaint(input = {}, files = {}) {
   const complainantAddress = readOptionalText(input.complainantAddress, 'complainant address', 500) || null;
   const complainantPincode = readOptionalPincode(input.complainantPincode);
   const now = new Date().toISOString();
-  const [productImageInfo, billImageInfo, productVideoInfo] = await Promise.all([
-    processDraftMediaUpload(productImage, 'productImage'),
-    processDraftMediaUpload(billImage, 'billImage'),
-    processDraftMediaUpload(productVideo, 'productVideo'),
+  const [productImageInfo, billImageInfo, productVideoInfo, productImage2Info, productImage3Info] = await Promise.all([
+    productImage ? processDraftMediaUpload(productImage, 'productImage') : savedProductImage,
+    billImage ? processDraftMediaUpload(billImage, 'billImage') : savedBillImage,
+    productVideo ? processDraftMediaUpload(productVideo, 'productVideo') : savedProductVideo,
+    productImage2 ? processDraftMediaUpload(productImage2, 'productImage2') : savedProductImage2,
+    productImage3 ? processDraftMediaUpload(productImage3, 'productImage3') : savedProductImage3,
   ]);
 
   const created = await complaintRepository.create({
@@ -374,7 +383,9 @@ export async function createAdminComplaint(input = {}, files = {}) {
     billImageVersion: billImageInfo.version || null,
     productVideoUrl: productVideoInfo.url,
     productVideoName: productVideoInfo.name,
-    productImages: [{ url: productImageInfo.url, name: productImageInfo.name }],
+    productImages: [productImageInfo, productImage2Info, productImage3Info]
+      .filter(Boolean)
+      .map((image) => ({ url: image.url, name: image.name })),
     userId: null,
     complainantName,
     complainantPhone,
@@ -538,6 +549,17 @@ function pickUploadedFile(files, key) {
   const fileList = files[key];
   if (!fileList || fileList.length === 0) return null;
   return fileList[0];
+}
+
+function readDraftMedia(input, mediaType, fallbackName) {
+  const value = input?.[`${mediaType}Url`];
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new ApiError(400, `Invalid saved ${mediaType} upload.`, 'INVALID_MEDIA');
+  }
+
+  const name = readOptionalText(input?.[`${mediaType}Name`], `${mediaType} name`, 255) || fallbackName;
+  return { url: value.trim(), name, mediaType };
 }
 
 function normalizeEmail(value) {

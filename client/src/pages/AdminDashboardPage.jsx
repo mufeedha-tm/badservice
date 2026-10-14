@@ -26,6 +26,7 @@ import {
   updateAdminUserStatus,
   loginAdminAccount,
   editAdminComplaint,
+  uploadDraftMedia,
 } from '../services/api.js';
 import { IMAGE_ACCEPT, VIDEO_ACCEPT } from '../utils/complaintMedia.js';
 
@@ -107,10 +108,20 @@ export default function AdminDashboardPage() {
   const [adminComplaintForm, setAdminComplaintForm] = useState(emptyAdminComplaintForm);
   const [adminComplaintMedia, setAdminComplaintMedia] = useState({
     productImage: null,
+    productImage2: null,
+    productImage3: null,
     billImage: null,
     productVideo: null,
   });
   const [adminComplaintMediaKey, setAdminComplaintMediaKey] = useState(0);
+  const [adminUploadedMedia, setAdminUploadedMedia] = useState({});
+  const [adminUploadProgress, setAdminUploadProgress] = useState({
+    productImage: 0, productImage2: 0, productImage3: 0, billImage: 0, productVideo: 0,
+  });
+  const [adminUploadStatus, setAdminUploadStatus] = useState({
+    productImage: 'idle', productImage2: 'idle', productImage3: 'idle', billImage: 'idle', productVideo: 'idle',
+  });
+  const adminMediaRequestRef = useRef({});
   const [creatingAdminComplaint, setCreatingAdminComplaint] = useState(false);
 
   useEffect(() => {
@@ -124,6 +135,7 @@ export default function AdminDashboardPage() {
       loadComplaints();
       loadCategories(false);
     }
+    if (activeTab === 'create-complaint') loadCategories(false);
     if (activeTab === 'companies') {
       loadCompanies();
       loadCategories(false);
@@ -463,22 +475,77 @@ export default function AdminDashboardPage() {
     }
   }
 
+  function handleAdminComplaintMediaSelect(kind, file) {
+    const requestId = (adminMediaRequestRef.current[kind] || 0) + 1;
+    adminMediaRequestRef.current[kind] = requestId;
+    setAdminComplaintMedia((media) => ({ ...media, [kind]: file || null }));
+    setAdminUploadedMedia((media) => {
+      const next = { ...media };
+      delete next[kind];
+      return next;
+    });
+
+    if (!file) {
+      setAdminUploadStatus((status) => ({ ...status, [kind]: 'idle' }));
+      setAdminUploadProgress((progress) => ({ ...progress, [kind]: 0 }));
+      return;
+    }
+
+    setAdminUploadStatus((status) => ({ ...status, [kind]: 'uploading' }));
+    setAdminUploadProgress((progress) => ({ ...progress, [kind]: 10 }));
+    uploadDraftMedia(file, kind, (percent) => {
+      if (adminMediaRequestRef.current[kind] !== requestId) return;
+      setAdminUploadProgress((progress) => ({ ...progress, [kind]: Math.min(95, Math.max(10, Math.round(percent))) }));
+    })
+      .then((savedMedia) => {
+        if (adminMediaRequestRef.current[kind] !== requestId) return;
+        setAdminUploadedMedia((media) => ({ ...media, [kind]: savedMedia }));
+        setAdminUploadStatus((status) => ({ ...status, [kind]: 'done' }));
+        setAdminUploadProgress((progress) => ({ ...progress, [kind]: 100 }));
+      })
+      .catch(() => {
+        if (adminMediaRequestRef.current[kind] !== requestId) return;
+        setAdminUploadStatus((status) => ({ ...status, [kind]: 'error' }));
+      });
+  }
+
+  function handleAdminComplaintFieldChange(field, value, uppercase = true) {
+    setAdminComplaintForm((form) => ({
+      ...form,
+      [field]: uppercase ? value.toUpperCase() : value,
+    }));
+  }
+
   async function handleCreateAdminComplaint(event) {
     event.preventDefault();
     if (creatingAdminComplaint) return;
+
+    if (Object.values(adminUploadStatus).some((status) => status === 'uploading')) {
+      showMessage('Please wait for all selected evidence files to finish uploading.', 'error');
+      return;
+    }
 
     setCreatingAdminComplaint(true);
     try {
       const payload = new FormData();
       Object.entries(adminComplaintForm).forEach(([key, value]) => payload.append(key, value));
       Object.entries(adminComplaintMedia).forEach(([key, file]) => {
-        if (file) payload.append(key, file);
+        const savedMedia = adminUploadedMedia[key];
+        if (savedMedia?.url) {
+          payload.append(`${key}Url`, savedMedia.url);
+          payload.append(`${key}Name`, savedMedia.name || key);
+        } else if (file) {
+          payload.append(key, file);
+        }
       });
 
       const created = await createAdminComplaint(payload);
       showMessage(`Complaint ${created.id.slice(0, 8)} was recorded and placed in the review queue.`);
       setAdminComplaintForm(emptyAdminComplaintForm);
-      setAdminComplaintMedia({ productImage: null, billImage: null, productVideo: null });
+      setAdminComplaintMedia({ productImage: null, productImage2: null, productImage3: null, billImage: null, productVideo: null });
+      setAdminUploadedMedia({});
+      setAdminUploadProgress({ productImage: 0, productImage2: 0, productImage3: 0, billImage: 0, productVideo: 0 });
+      setAdminUploadStatus({ productImage: 'idle', productImage2: 'idle', productImage3: 'idle', billImage: 'idle', productVideo: 'idle' });
       setAdminComplaintMediaKey((key) => key + 1);
       await Promise.all([loadComplaints({ page: 1 }), loadStats()]);
     } catch (err) {
@@ -486,6 +553,28 @@ export default function AdminDashboardPage() {
     } finally {
       setCreatingAdminComplaint(false);
     }
+  }
+
+  function renderAdminUploadState(kind) {
+    const status = adminUploadStatus[kind];
+    if (status === 'uploading') {
+      const progress = adminUploadProgress[kind] || 0;
+      return (
+        <div style={{ marginTop: '0.3rem' }} aria-live="polite">
+          <small style={{ display: 'block', color: '#0369a1', fontWeight: 600 }}>Uploading… {progress}%</small>
+          <div style={{ height: '5px', marginTop: '0.2rem', overflow: 'hidden', borderRadius: '999px', background: '#dbeafe' }}>
+            <div style={{ width: `${progress}%`, height: '100%', background: '#0284c7', transition: 'width 180ms ease' }} />
+          </div>
+        </div>
+      );
+    }
+    if (status === 'done') {
+      return <small style={{ display: 'block', marginTop: '0.3rem', color: '#15803d', fontWeight: 600 }}>Saved automatically ✓</small>;
+    }
+    if (status === 'error') {
+      return <small style={{ display: 'block', marginTop: '0.3rem', color: '#b45309' }}>Auto-save failed; this file will upload when you create the complaint.</small>;
+    }
+    return null;
   }
 
   async function handleToggleCompanyStatus(id, currentStatus) {
@@ -693,7 +782,10 @@ export default function AdminDashboardPage() {
             Overview
           </button>
           <button style={tabStyle('complaints')} onClick={() => setActiveTab('complaints')}>
-            Complaints ({stats?.totalComplaints || 0})
+            Complaint Management ({stats?.totalComplaints || 0})
+          </button>
+          <button style={tabStyle('create-complaint')} onClick={() => setActiveTab('create-complaint')}>
+            Create Complaint
           </button>
           <button style={tabStyle('companies')} onClick={() => setActiveTab('companies')}>
             Companies ({stats?.totalCompanies || 0})
@@ -856,9 +948,10 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* TAB: COMPLAINTS */}
-        {activeTab === 'complaints' && (
+        {/* COMPLAINT MANAGEMENT AND CREATE COMPLAINT PAGES */}
+        {(activeTab === 'complaints' || activeTab === 'create-complaint') && (
           <div>
+            {activeTab === 'create-complaint' && (
             <form
               onSubmit={handleCreateAdminComplaint}
               style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}
@@ -870,13 +963,6 @@ export default function AdminDashboardPage() {
                     Admin-only entry. Every field except email is required; no OTP is required. New records start as PENDING for review.
                   </p>
                 </div>
-                <button
-                  type="submit"
-                  disabled={creatingAdminComplaint}
-                  style={{ padding: '0.45rem 0.8rem', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: creatingAdminComplaint ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: creatingAdminComplaint ? 0.7 : 1 }}
-                >
-                  {creatingAdminComplaint ? 'Saving...' : 'Create complaint'}
-                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.65rem' }}>
@@ -895,11 +981,11 @@ export default function AdminDashboardPage() {
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Complaint title *
-                  <input required value={adminComplaintForm.title} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, title: event.target.value }))} placeholder="Enter complaint title" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.title} onChange={(event) => handleAdminComplaintFieldChange('title', event.target.value)} placeholder="Enter complaint title" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   {adminComplaintForm.type === 'Service' ? 'Service provider' : 'Company / brand'} *
-                  <input required value={adminComplaintForm.company} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, company: event.target.value }))} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.company} onChange={(event) => handleAdminComplaintFieldChange('company', event.target.value)} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Category *
@@ -910,19 +996,19 @@ export default function AdminDashboardPage() {
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   {adminComplaintForm.type === 'Service' ? 'Service details' : 'Product / model'} *
-                  <input required value={adminComplaintForm.model} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, model: event.target.value }))} placeholder="Enter details" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.model} onChange={(event) => handleAdminComplaintFieldChange('model', event.target.value)} placeholder="Enter details" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   {adminComplaintForm.type === 'Service' ? 'Service provider' : 'Seller / shop'} *
-                  <input required value={adminComplaintForm.seller} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, seller: event.target.value }))} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.seller} onChange={(event) => handleAdminComplaintFieldChange('seller', event.target.value)} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Location *
-                  <input required value={adminComplaintForm.location} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, location: event.target.value }))} placeholder="Enter location" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.location} onChange={(event) => handleAdminComplaintFieldChange('location', event.target.value)} placeholder="Enter location" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Complainant name *
-                  <input required value={adminComplaintForm.complainantName} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantName: event.target.value }))} placeholder="Enter full name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.complainantName} onChange={(event) => handleAdminComplaintFieldChange('complainantName', event.target.value)} placeholder="Enter full name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Phone *
@@ -935,12 +1021,12 @@ export default function AdminDashboardPage() {
                 {adminComplaintForm.type === 'Service' && (
                   <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Service type *
-                    <input required value={adminComplaintForm.serviceType} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, serviceType: event.target.value }))} placeholder="For example: Hotel or Bank" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                    <input required value={adminComplaintForm.serviceType} onChange={(event) => handleAdminComplaintFieldChange('serviceType', event.target.value)} placeholder="For example: Hotel or Bank" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                   </label>
                 )}
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   City *
-                  <input required value={adminComplaintForm.complainantCity} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantCity: event.target.value }))} placeholder="Enter city" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  <input required value={adminComplaintForm.complainantCity} onChange={(event) => handleAdminComplaintFieldChange('complainantCity', event.target.value)} placeholder="Enter city" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Pincode (optional)
@@ -949,18 +1035,18 @@ export default function AdminDashboardPage() {
               </div>
               <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
                 Complainant address (optional)
-                <textarea value={adminComplaintForm.complainantAddress} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantAddress: event.target.value }))} placeholder="Enter full address" rows="2" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
+                <textarea value={adminComplaintForm.complainantAddress} onChange={(event) => handleAdminComplaintFieldChange('complainantAddress', event.target.value)} placeholder="Enter full address" rows="2" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
               </label>
               <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
                 Complaint details *
-                <textarea required value={adminComplaintForm.description} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, description: event.target.value }))} placeholder="Enter complete complaint details" rows="3" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
+                <textarea required value={adminComplaintForm.description} onChange={(event) => handleAdminComplaintFieldChange('description', event.target.value)} placeholder="Enter complete complaint details" rows="3" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
               </label>
               <fieldset style={{ margin: '0.9rem 0 0', padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '6px' }}>
                 <legend style={{ padding: '0 0.3rem', color: '#0369a1', fontSize: '0.86rem', fontWeight: 700 }}>
                   Required evidence uploads
                 </legend>
                 <p style={{ margin: '0 0 0.7rem', color: '#64748b', fontSize: '0.8rem' }}>
-                  These three files are mandatory for admin-recorded complaints.
+                  Upload one required product/service photo, with up to two optional extra photos. Bill/receipt and evidence video are required.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem' }}>
                   <label style={{ fontSize: '0.82rem', color: '#334155' }}>
@@ -970,9 +1056,32 @@ export default function AdminDashboardPage() {
                       type="file"
                       accept={IMAGE_ACCEPT}
                       required
-                      onChange={(event) => setAdminComplaintMedia((media) => ({ ...media, productImage: event.target.files?.[0] || null }))}
+                      onChange={(event) => handleAdminComplaintMediaSelect('productImage', event.target.files?.[0] || null)}
                       style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
                     />
+                    {renderAdminUploadState('productImage')}
+                  </label>
+                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                    Additional photo 2 (optional)
+                    <input
+                      key={`admin-product-image-2-${adminComplaintMediaKey}`}
+                      type="file"
+                      accept={IMAGE_ACCEPT}
+                      onChange={(event) => handleAdminComplaintMediaSelect('productImage2', event.target.files?.[0] || null)}
+                      style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
+                    />
+                    {renderAdminUploadState('productImage2')}
+                  </label>
+                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                    Additional photo 3 (optional)
+                    <input
+                      key={`admin-product-image-3-${adminComplaintMediaKey}`}
+                      type="file"
+                      accept={IMAGE_ACCEPT}
+                      onChange={(event) => handleAdminComplaintMediaSelect('productImage3', event.target.files?.[0] || null)}
+                      style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
+                    />
+                    {renderAdminUploadState('productImage3')}
                   </label>
                   <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Bill / receipt image *
@@ -981,9 +1090,10 @@ export default function AdminDashboardPage() {
                       type="file"
                       accept={IMAGE_ACCEPT}
                       required
-                      onChange={(event) => setAdminComplaintMedia((media) => ({ ...media, billImage: event.target.files?.[0] || null }))}
+                      onChange={(event) => handleAdminComplaintMediaSelect('billImage', event.target.files?.[0] || null)}
                       style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
                     />
+                    {renderAdminUploadState('billImage')}
                   </label>
                   <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Evidence video *
@@ -992,13 +1102,26 @@ export default function AdminDashboardPage() {
                       type="file"
                       accept={VIDEO_ACCEPT}
                       required
-                      onChange={(event) => setAdminComplaintMedia((media) => ({ ...media, productVideo: event.target.files?.[0] || null }))}
+                      onChange={(event) => handleAdminComplaintMediaSelect('productVideo', event.target.files?.[0] || null)}
                       style={{ display: 'block', width: '100%', marginTop: '0.25rem' }}
                     />
+                    {renderAdminUploadState('productVideo')}
                   </label>
                 </div>
               </fieldset>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.9rem' }}>
+                <button
+                  type="submit"
+                  disabled={creatingAdminComplaint}
+                  style={{ padding: '0.45rem 0.8rem', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: creatingAdminComplaint ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: creatingAdminComplaint ? 0.7 : 1 }}
+                >
+                  {creatingAdminComplaint ? 'Saving...' : 'Create complaint'}
+                </button>
+              </div>
             </form>
+            )}
+            {activeTab === 'complaints' && (
+            <>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <h2 style={{ margin: 0 }}>Complaints Management</h2>
@@ -1993,6 +2116,8 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
             )}
+          </>
+          )}
           </div>
         )}
 
