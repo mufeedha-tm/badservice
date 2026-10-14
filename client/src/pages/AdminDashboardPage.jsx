@@ -99,7 +99,7 @@ export default function AdminDashboardPage() {
   const [newCompany, setNewCompany] = useState({ name: '', categoryId: '', status: 'ACTIVE' });
   const [addingCompany, setAddingCompany] = useState(false);
   const emptyAdminComplaintForm = {
-    type: 'Product', title: '', description: '', company: '', category: '', subcategory: '',
+    type: '', title: '', description: '', company: '', category: '', subcategory: '',
     model: '', seller: '', location: '', serviceType: '', complainantName: '',
     complainantPhone: '', complainantEmail: '', complainantCity: '', complainantAddress: '',
     complainantPincode: '',
@@ -867,7 +867,7 @@ export default function AdminDashboardPage() {
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1rem' }}>Record a complaint for a user</h3>
                   <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
-                    Admin-only entry. Every field is optional; no OTP or evidence is required. New records start as PENDING for review.
+                    Admin-only entry. Every field except email is required; no OTP is required. New records start as PENDING for review.
                   </p>
                 </div>
                 <button
@@ -881,59 +881,79 @@ export default function AdminDashboardPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.65rem' }}>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Type
+                  Type *
                   <select
                     value={adminComplaintForm.type}
                     onChange={(event) => setAdminComplaintForm((form) => ({ ...form, type: event.target.value }))}
+                    required
                     style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem' }}
                   >
+                    <option value="">Select type</option>
                     <option value="Product">Product</option>
                     <option value="Service">Service</option>
                   </select>
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Complaint title
-                  <input value={adminComplaintForm.title} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, title: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  Complaint title *
+                  <input required value={adminComplaintForm.title} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, title: event.target.value }))} placeholder="Enter complaint title" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Company / brand
-                  <input value={adminComplaintForm.company} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, company: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  {adminComplaintForm.type === 'Service' ? 'Service provider' : 'Company / brand'} *
+                  <input required value={adminComplaintForm.company} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, company: event.target.value }))} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Category
-                  <select value={adminComplaintForm.category} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, category: event.target.value }))} style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem' }}>
-                    <option value="">Automatic default</option>
+                  Category *
+                  <select required value={adminComplaintForm.category} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, category: event.target.value }))} style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem' }}>
+                    <option value="">Select category</option>
                     {categories.map((category) => <option key={category.id} value={category.name}>{category.name}</option>)}
                   </select>
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Product / service details
-                  <input value={adminComplaintForm.model} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, model: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  {adminComplaintForm.type === 'Service' ? 'Service details' : 'Product / model'} *
+                  <input required value={adminComplaintForm.model} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, model: event.target.value }))} placeholder="Enter details" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Seller / provider
-                  <input value={adminComplaintForm.seller} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, seller: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  {adminComplaintForm.type === 'Service' ? 'Service provider' : 'Seller / shop'} *
+                  <input required value={adminComplaintForm.seller} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, seller: event.target.value }))} placeholder="Enter name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Location
-                  <input value={adminComplaintForm.location} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, location: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  Location *
+                  <input required value={adminComplaintForm.location} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, location: event.target.value }))} placeholder="Enter location" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Complainant name
-                  <input value={adminComplaintForm.complainantName} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantName: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  Complainant name *
+                  <input required value={adminComplaintForm.complainantName} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantName: event.target.value }))} placeholder="Enter full name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
-                  Phone
-                  <input value={adminComplaintForm.complainantPhone} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantPhone: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  Phone *
+                  <input required type="tel" value={adminComplaintForm.complainantPhone} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantPhone: event.target.value }))} placeholder="10-digit mobile number" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Email
                   <input type="email" value={adminComplaintForm.complainantEmail} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantEmail: event.target.value }))} placeholder="Optional" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
+                {adminComplaintForm.type === 'Service' && (
+                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                    Service type *
+                    <input required value={adminComplaintForm.serviceType} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, serviceType: event.target.value }))} placeholder="For example: Hotel or Bank" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                  </label>
+                )}
+                <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  City *
+                  <input required value={adminComplaintForm.complainantCity} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantCity: event.target.value }))} placeholder="Enter city" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                </label>
+                <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  Pincode (optional)
+                  <input inputMode="numeric" maxLength="6" value={adminComplaintForm.complainantPincode} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantPincode: event.target.value }))} placeholder="6-digit pincode" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
+                </label>
               </div>
               <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
-                Complaint details
-                <textarea value={adminComplaintForm.description} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, description: event.target.value }))} placeholder="Optional" rows="3" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
+                Complainant address (optional)
+                <textarea value={adminComplaintForm.complainantAddress} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantAddress: event.target.value }))} placeholder="Enter full address" rows="2" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
+              </label>
+              <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
+                Complaint details *
+                <textarea required value={adminComplaintForm.description} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, description: event.target.value }))} placeholder="Enter complete complaint details" rows="3" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
               </label>
               <fieldset style={{ margin: '0.9rem 0 0', padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '6px' }}>
                 <legend style={{ padding: '0 0.3rem', color: '#0369a1', fontSize: '0.86rem', fontWeight: 700 }}>

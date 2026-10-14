@@ -330,22 +330,21 @@ export async function createAdminComplaint(input = {}, files = {}) {
     throw new ApiError(400, 'An evidence video is required for an admin complaint.', 'MISSING_PRODUCT_VIDEO');
   }
 
-  const categoryName = readOptionalText(input.category, 'category', 100);
-  const availableCategories = await categoryRepository.findAll();
-  const categoryRecord = categoryName
-    ? await categoryRepository.findByName(categoryName)
-    : availableCategories[0];
+  const categoryName = readRequiredText(input.category, 'category', 100);
+  const categoryRecord = await categoryRepository.findByName(categoryName);
 
-  if (categoryName && !categoryRecord) {
+  if (!categoryRecord) {
     throw new ApiError(400, 'Select a valid complaint category.', 'INVALID_CATEGORY');
   }
-  if (!categoryRecord) {
-    throw new ApiError(409, 'Create an active category before recording a complaint.', 'CATEGORY_REQUIRED');
-  }
 
-  const companyName = readOptionalText(input.company, 'company / brand', 120) || 'Unspecified company';
+  const complaintType = readAdminComplaintType(input.type);
+  const companyName = readRequiredText(input.company, complaintType === 'Service' ? 'service provider' : 'company / brand', 120);
   const companyRecord = await resolveCompany(companyName, categoryRecord.id);
-  const complaintType = normalizeComplaintType(input.type);
+  const complainantName = readRequiredText(input.complainantName, 'complainant name', 80);
+  const complainantPhone = readRequiredPhone(input.complainantPhone);
+  const complainantCity = readRequiredText(input.complainantCity, 'complainant city', 120);
+  const complainantAddress = readOptionalText(input.complainantAddress, 'complainant address', 500) || null;
+  const complainantPincode = readOptionalPincode(input.complainantPincode);
   const now = new Date().toISOString();
   const [productImageInfo, billImageInfo, productVideoInfo] = await Promise.all([
     processDraftMediaUpload(productImage, 'productImage'),
@@ -355,17 +354,17 @@ export async function createAdminComplaint(input = {}, files = {}) {
 
   const created = await complaintRepository.create({
     id: randomUUID(),
-    title: readOptionalText(input.title, 'complaint title', 160) || 'Admin-recorded complaint',
-    description: readOptionalText(input.description, 'complaint details', 5000) || null,
+    title: readRequiredText(input.title, 'complaint title', 160),
+    description: readRequiredText(input.description, 'complaint details', 5000),
     company: companyRecord.name,
     category: categoryRecord.name,
     subcategory: readOptionalText(input.subcategory, 'subcategory', 100) || null,
-    model: readOptionalText(input.model, 'product / service details', 150) || null,
-    seller: readOptionalText(input.seller, 'seller / service provider', 150) || null,
-    location: readOptionalText(input.location, 'location', 120) || null,
+    model: readRequiredText(input.model, complaintType === 'Service' ? 'service details' : 'product / model', 150),
+    seller: readRequiredText(input.seller, complaintType === 'Service' ? 'service provider' : 'seller / shop', 150),
+    location: readRequiredText(input.location, 'location', 120),
     type: complaintType,
     serviceType: complaintType === 'Service'
-      ? readOptionalText(input.serviceType, 'service type', 100) || null
+      ? readRequiredText(input.serviceType, 'service type', 100)
       : null,
     productImageUrl: productImageInfo.url,
     productImageName: productImageInfo.name,
@@ -377,12 +376,12 @@ export async function createAdminComplaint(input = {}, files = {}) {
     productVideoName: productVideoInfo.name,
     productImages: [{ url: productImageInfo.url, name: productImageInfo.name }],
     userId: null,
-    complainantName: readOptionalText(input.complainantName, 'complainant name', 80) || null,
-    complainantPhone: readOptionalText(input.complainantPhone, 'complainant phone', 20) || null,
+    complainantName,
+    complainantPhone,
     complainantEmail: normalizeOptionalEmail(input.complainantEmail),
-    complainantCity: readOptionalText(input.complainantCity, 'complainant city', 120) || null,
-    complainantAddress: readOptionalText(input.complainantAddress, 'complainant address', 500) || null,
-    complainantPincode: readOptionalText(input.complainantPincode, 'complainant pincode', 20) || null,
+    complainantCity,
+    complainantAddress,
+    complainantPincode,
     phoneVerified: false,
     emailVerified: false,
     otpVerifiedAt: null,
@@ -529,6 +528,11 @@ function normalizeComplaintType(value) {
   return type === 'Service' ? 'Service' : 'Product';
 }
 
+function readAdminComplaintType(value) {
+  if (value === 'Product' || value === 'Service') return value;
+  throw new ApiError(400, 'Select a complaint type.', 'INVALID_COMPLAINT_TYPE');
+}
+
 function pickUploadedFile(files, key) {
   if (!files || typeof files !== 'object') return null;
   const fileList = files[key];
@@ -559,6 +563,11 @@ function readRequiredPincode(value) {
     throw new ApiError(400, 'Please enter a valid 6-digit PIN code.', 'INVALID_PINCODE');
   }
   return cleaned;
+}
+
+function readOptionalPincode(value) {
+  if (value === undefined || value === null || !String(value).trim()) return null;
+  return readRequiredPincode(value);
 }
 
 function readRequiredPhone(value) {
