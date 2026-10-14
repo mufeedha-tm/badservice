@@ -30,6 +30,10 @@ export async function runMigrations() {
 
       status ENUM('ACTIVE', 'DISABLED') NOT NULL DEFAULT 'ACTIVE',
 
+      is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+
+      deleted_at DATETIME NULL,
+
       created_at DATETIME NOT NULL,
 
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
@@ -42,9 +46,15 @@ export async function runMigrations() {
 
   await addColumnIfNotExists('users', 'status', "ENUM('ACTIVE', 'DISABLED') NOT NULL DEFAULT 'ACTIVE'");
 
+  await addColumnIfNotExists('users', 'is_deleted', 'TINYINT(1) NOT NULL DEFAULT 0');
+
+  await addColumnIfNotExists('users', 'deleted_at', 'DATETIME NULL');
+
   await addColumnIfNotExists('users', 'phone', 'VARCHAR(20) NULL');
 
   await addColumnIfNotExists('users', 'updated_at', 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP');
+
+  await addIndexIfNotExists('users', 'idx_users_active', '(is_deleted, role, status)');
 
   // 2. categories table
 

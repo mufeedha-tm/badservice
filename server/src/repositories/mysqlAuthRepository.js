@@ -13,7 +13,7 @@ export async function findUserByEmail(email) {
       password_hash AS passwordHash,
       created_at AS createdAt
      FROM users
-     WHERE LOWER(email) = LOWER(?)
+     WHERE LOWER(email) = LOWER(?) AND is_deleted = 0
      LIMIT 1`,
     [email.trim()]
   );
@@ -35,7 +35,7 @@ export async function findUserByPhone(phone) {
       password_hash AS passwordHash,
       created_at AS createdAt
      FROM users
-     WHERE phone = ?
+     WHERE phone = ? AND is_deleted = 0
      LIMIT 1`,
     [phone.trim()]
   );
@@ -56,7 +56,7 @@ export async function findUserById(id) {
       password_hash AS passwordHash,
       created_at AS createdAt
      FROM users
-     WHERE id = ?
+     WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
     [id]
   );
@@ -77,7 +77,7 @@ export async function findActiveAdminUser() {
       password_hash AS passwordHash,
       created_at AS createdAt
     FROM users
-    WHERE role = 'ADMIN' AND status = 'ACTIVE'
+    WHERE role = 'ADMIN' AND status = 'ACTIVE' AND is_deleted = 0
     ORDER BY created_at ASC, id ASC
     LIMIT 1
   `);
@@ -130,6 +130,7 @@ export async function findAllUsers() {
       status,
       created_at AS createdAt
     FROM users
+    WHERE is_deleted = 0
     ORDER BY created_at DESC
   `);
   return rows;
