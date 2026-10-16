@@ -80,6 +80,42 @@ function collectCloudinaryAssets(complaints) {
   return [...assets.values()];
 }
 
+function addLocalUploadFile(files, value) {
+  if (!value || typeof value !== 'string') return;
+
+  try {
+    const pathname = new URL(value, 'http://localhost').pathname;
+    if (!pathname.startsWith('/uploads/')) return;
+
+    const filePath = path.resolve(__dirname, '../..', `.${decodeURIComponent(pathname)}`);
+    const uploadsRoot = path.resolve(__dirname, '../../uploads');
+    if (filePath.startsWith(`${uploadsRoot}${path.sep}`)) files.add(filePath);
+  } catch {
+    // Ignore malformed optional media metadata; the complaint row still clears.
+  }
+}
+
+function collectLocalUploadFiles(complaints) {
+  const files = new Set();
+
+  for (const complaint of complaints) {
+    addLocalUploadFile(files, complaint.product_image_url);
+    addLocalUploadFile(files, complaint.bill_image_url);
+    addLocalUploadFile(files, complaint.product_video_url);
+
+    try {
+      const productImages = JSON.parse(complaint.product_images || '[]');
+      for (const image of productImages) {
+        addLocalUploadFile(files, typeof image === 'string' ? image : image?.url);
+      }
+    } catch {
+      // Ignore malformed optional image metadata; the complaint row still clears.
+    }
+  }
+
+  return [...files];
+}
+
 async function removeCloudinaryAssets(assets) {
   if (assets.length === 0) return { removed: 0, skipped: 0 };
 
@@ -104,27 +140,37 @@ async function removeCloudinaryAssets(assets) {
   return { removed: assets.length, skipped: 0 };
 }
 
-export async function clearComplaints() {
+export async function clearComplaints({ complaintIds = null } = {}) {
+  if (complaintIds !== null && (!Array.isArray(complaintIds) || complaintIds.length === 0)) {
+    throw new Error('complaintIds must be a non-empty array when supplied.');
+  }
+
   const connection = await pool.getConnection();
   let complaintCount = 0;
   let commentCount = 0;
   let cloudinaryAssets = [];
+  let localUploadFiles = [];
+  const placeholders = complaintIds?.map(() => '?').join(', ') || '';
+  const whereClause = complaintIds ? ` WHERE id IN (${placeholders})` : '';
 
   try {
     await connection.beginTransaction();
-    const [[complaints]] = await connection.query('SELECT COUNT(*) AS total FROM complaints');
-    const [[comments]] = await connection.query('SELECT COUNT(*) AS total FROM comments');
+    const [[complaints]] = await connection.query(`SELECT COUNT(*) AS total FROM complaints${whereClause}`, complaintIds || []);
+    const [comments] = complaintIds
+      ? await connection.query(`SELECT COUNT(*) AS total FROM comments WHERE complaint_id IN (${placeholders})`, complaintIds)
+      : await connection.query('SELECT COUNT(*) AS total FROM comments');
     const [complaintMedia] = await connection.query(`
       SELECT product_image_url, product_images, bill_image_url, bill_image_public_id, product_video_url
-      FROM complaints
-    `);
+      FROM complaints${whereClause}
+    `, complaintIds || []);
     complaintCount = Number(complaints.total);
-    commentCount = Number(comments.total);
+    commentCount = Number(comments[0].total);
     cloudinaryAssets = collectCloudinaryAssets(complaintMedia);
+    localUploadFiles = collectLocalUploadFiles(complaintMedia);
 
     // The comments foreign key is ON DELETE CASCADE, so this clears every
     // complaint and its discussion without affecting users or reference data.
-    await connection.query('DELETE FROM complaints');
+    await connection.query(`DELETE FROM complaints${whereClause}`, complaintIds || []);
     await connection.commit();
   } catch (error) {
     await connection.rollback();
@@ -133,8 +179,9 @@ export async function clearComplaints() {
     connection.release();
   }
 
-  const removedFiles = await Promise.all(uploadDirectories.map(emptyDirectory));
-  const localFileCount = removedFiles.reduce((total, count) => total + count, 0);
+  const localFileCount = complaintIds
+    ? (await Promise.all(localUploadFiles.map((filePath) => fs.rm(filePath, { force: true })))).length
+    : (await Promise.all(uploadDirectories.map(emptyDirectory))).reduce((total, count) => total + count, 0);
   const cloudinaryResult = await removeCloudinaryAssets(cloudinaryAssets);
   console.log(`Cleared ${complaintCount} complaints, ${commentCount} comments, and ${localFileCount} local complaint-media files.`);
   if (cloudinaryResult.removed > 0) {
