@@ -1,7 +1,11 @@
-import { Suspense, lazy } from 'react';
-import { Route, Routes } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { Route, Routes, useLocation } from 'react-router-dom';
 import ScrollToTop from './components/common/ScrollToTop.jsx';
 import HomePage from './pages/HomePage.jsx';
+import Footer from './components/layout/Footer.jsx';
+import Header from './components/layout/Header.jsx';
+import MegaMenu from './components/layout/MegaMenu.jsx';
+import SecondaryNavigation from './components/layout/SecondaryNavigation.jsx';
 
 const CategoryPage = lazy(() => import('./pages/CategoryPage.jsx'));
 const ComplaintDetailPage = lazy(() => import('./pages/ComplaintDetailPage.jsx'));
@@ -19,25 +23,63 @@ const TrackComplaintPage = lazy(() => import('./pages/TrackComplaintPage.jsx'));
 
 function PageFallback() {
   return (
-    <div style={{ minHeight: '50vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div
-        style={{
-          width: '32px',
-          height: '32px',
-          border: '3px solid #cbd5e1',
-          borderTopColor: '#0284c7',
-          borderRadius: '50%',
-          animation: 'spin 0.6s linear infinite',
-        }}
-      />
+    <div className="page-frame page-route-loading" aria-label="Loading page" aria-busy="true">
+      <div className="route-loading-skeleton" aria-hidden="true">
+        <span />
+        <span />
+        <span />
+      </div>
     </div>
   );
 }
 
 export default function App() {
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuPanelRef = useRef(null);
+  const menuButtonRef = useRef(null);
+  const menuId = 'all-services-menu';
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    function handlePointerDown(event) {
+      const clickedMenu = menuPanelRef.current?.contains(event.target);
+      const clickedToggle = menuButtonRef.current?.contains(event.target);
+      if (!clickedMenu && !clickedToggle) setMenuOpen(false);
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+        menuButtonRef.current?.focus();
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [menuOpen]);
+
   return (
-    <>
+    <div className={isAdminRoute ? 'admin-site-layout' : 'site-layout'}>
       <ScrollToTop />
+      {!isAdminRoute && (
+        <div className="site-navigation">
+          <Header
+            menuOpen={menuOpen}
+            menuId={menuId}
+            onMenuToggle={() => setMenuOpen((isOpen) => !isOpen)}
+            menuButtonRef={menuButtonRef}
+          />
+          <SecondaryNavigation />
+          <MegaMenu id={menuId} open={menuOpen} panelRef={menuPanelRef} />
+        </div>
+      )}
       <Suspense fallback={<PageFallback />}>
         <Routes>
           <Route path="/" element={<HomePage />} />
@@ -60,6 +102,7 @@ export default function App() {
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
-    </>
+      {!isAdminRoute && <Footer />}
+    </div>
   );
 }

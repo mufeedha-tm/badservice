@@ -10,6 +10,8 @@ export default function ComplaintsSearchPage() {
     company: params.get('company') || '',
     sort: params.get('sort') || '',
     status: params.get('status') || '',
+    date: params.get('date') || '',
+    period: params.get('period') || '',
   };
 
   const hasFilters = Object.values(search).some(Boolean);

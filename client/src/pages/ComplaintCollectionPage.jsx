@@ -152,6 +152,7 @@ export default function ComplaintCollectionPage({ title, search }) {
           search={{ period: isToday ? 'today' : selectedDate, sort: 'latest' }}
           resultCount={complaints.length}
           title={`Complaints on ${formatDisplayDate(selectedDate)}`}
+          showFilters={false}
         />
 
         {errorMsg && (

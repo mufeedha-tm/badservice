@@ -16,18 +16,16 @@ export default function SearchBar({ onSearch }) {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const containerRef = useRef(null);
+  const companiesRequestRef = useRef(null);
 
   useEffect(() => {
     let isCurrent = true;
 
-    Promise.all([getCategories(), getCompanies()])
-      .then(([availableCategories, availableCompanies]) => {
+    getCategories()
+      .then((availableCategories) => {
         if (!isCurrent) return;
         if (Array.isArray(availableCategories)) {
           setCategories(availableCategories);
-        }
-        if (Array.isArray(availableCompanies)) {
-          setCompanies(availableCompanies);
         }
       })
       .catch(() => {
@@ -39,10 +37,30 @@ export default function SearchBar({ onSearch }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!showSuggestions || query.trim().length < 2) return undefined;
+
+    let isCurrent = true;
+    if (!companiesRequestRef.current) {
+      const request = getCompanies();
+      companiesRequestRef.current = request;
+      request.catch(() => {
+        if (companiesRequestRef.current === request) companiesRequestRef.current = null;
+      });
+    }
+    companiesRequestRef.current
+      .then((availableCompanies) => {
+        if (isCurrent && Array.isArray(availableCompanies)) setCompanies(availableCompanies);
+      })
+      .catch(() => {});
+
+    return () => { isCurrent = false; };
+  }, [query, showSuggestions]);
+
   // Fetch real suggestions debounced
   useEffect(() => {
     const trimmed = query.trim().toLowerCase();
-    if (!trimmed || trimmed.length < 2) {
+    if (!showSuggestions || !trimmed || trimmed.length < 2) {
       setSuggestions([]);
       return;
     }
@@ -103,7 +121,7 @@ export default function SearchBar({ onSearch }) {
       isCurrent = false;
       clearTimeout(timer);
     };
-  }, [query, companies, categories]);
+  }, [query, showSuggestions, companies, categories]);
 
   // Click outside listener to close dropdown
   useEffect(() => {

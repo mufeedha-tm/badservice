@@ -1,114 +1,107 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
 import { trackComplaint, requestDeleteComplaint, cancelDeleteComplaint, getErrorMessage } from '../services/api.js';
 
 const STATUS_STEPS = [
-  { key: 'SUBMITTED', label: '1. Complaint Submitted', desc: 'Complaint registered and queued for verification' },
-  { key: 'UNDER_REVIEW', label: '2. Under Review', desc: 'Admin review is active; the complaint remains available to track' },
-  { key: 'APPROVED', label: '3. Admin Approved', desc: 'Verified and published to the public directory' },
-  { key: 'COMPANY_RESPONDED', label: '4. Brand Responded', desc: 'Brand / service provider has responded and communication is ongoing' },
-  { key: 'RESOLVED', label: '5. Issue Resolved', desc: 'Reported outcome confirmed and complaint marked resolved' },
+  { key: 'PENDING', label: 'Submitted', desc: 'Your complaint has been received.' },
+  { key: 'UNDER_REVIEW', label: 'Under review', desc: 'The submission is being checked.' },
+  { key: 'APPROVED', label: 'Verified', desc: 'The complaint has been approved.' },
+  { key: 'COMPANY_RESPONDED', label: 'Company update', desc: 'A response has been recorded.' },
+  { key: 'RESOLVED', label: 'Resolved', desc: 'The complaint is marked resolved.' },
 ];
 
 function getStepIndex(status) {
-  switch (status) {
-    case 'PENDING':
-      return 0;
-    case 'UNDER_REVIEW':
-      return 1;
-    case 'APPROVED':
-      return 2;
-    case 'COMPANY_RESPONDED':
-      return 3;
-    case 'RESOLVED':
-      return 4;
-    case 'REJECTED':
-      return -1;
-    default:
-      return 0;
-  }
+  if (status === 'PENDING') return 0;
+  if (status === 'UNDER_REVIEW') return 1;
+  if (status === 'APPROVED') return 2;
+  if (status === 'COMPANY_RESPONDED') return 3;
+  if (status === 'RESOLVED') return 4;
+  return -1;
 }
 
 function formatStatus(status = '') {
-  return status.replace(/_/g, ' ');
+  return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function formatDate(value, includeTime = false) {
+  if (!value) return 'Not available';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not available';
+  return date.toLocaleString(undefined, includeTime
+    ? { dateStyle: 'medium', timeStyle: 'short' }
+    : { dateStyle: 'medium' });
 }
 
 export default function TrackComplaintPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || searchParams.get('id') || '';
-
+  const lastAutoQuery = useRef('');
   const [query, setQuery] = useState(initialQuery);
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
-
-  // Deletion request modal state
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [modalFeedback, setModalFeedback] = useState({ text: '', type: '' });
 
   useEffect(() => {
-    if (initialQuery.trim()) {
-      handleSearch(initialQuery.trim());
+    const value = initialQuery.trim();
+    if (value && value !== lastAutoQuery.current) {
+      lastAutoQuery.current = value;
+      handleSearch(value);
     }
   }, [initialQuery]);
 
   async function handleSearch(searchQuery = query) {
     const q = searchQuery.trim();
     if (!q) {
-      setError('Please enter a Complaint ID or registered Mobile Number.');
+      setError('Enter your complaint reference ID or registered mobile number.');
+      setSearched(false);
       return;
     }
 
     setLoading(true);
     setError('');
     setSearched(true);
-
+    lastAutoQuery.current = q;
     try {
       setSearchParams({ q });
       const data = await trackComplaint(q);
       setComplaints(Array.isArray(data) ? data : data ? [data] : []);
     } catch (err) {
-      setError(getErrorMessage(err) || 'Unable to find complaints matching this query.');
+      setError(getErrorMessage(err) || 'We could not find a complaint for those details. Check your entry and try again.');
       setComplaints([]);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleOpenDeleteModal(complaintId) {
+  function handleOpenDeleteModal(complaintId) {
     setDeleteTargetId(complaintId);
     setDeleteReason('');
     setModalFeedback({ text: '', type: '' });
   }
 
-  async function handleSubmitDeleteRequest(e) {
-    e.preventDefault();
+  async function handleSubmitDeleteRequest(event) {
+    event.preventDefault();
     if (!deleteReason.trim()) {
       setModalFeedback({ text: 'Please specify a reason for requesting deletion.', type: 'error' });
       return;
     }
-
     setDeleteSubmitting(true);
     setModalFeedback({ text: '', type: '' });
     try {
       await requestDeleteComplaint(deleteTargetId, deleteReason.trim());
-      setComplaints((prev) =>
-        prev.map((c) =>
-          c.id === deleteTargetId
-            ? { ...c, deleteRequested: true, deleteReason: deleteReason.trim(), deleteRequestedAt: new Date().toISOString() }
-            : c
-        )
-      );
-      setModalFeedback({ text: 'Deletion request submitted successfully. Admin will review and process it.', type: 'success' });
-      setTimeout(() => {
-        setDeleteTargetId(null);
-      }, 1800);
+      setComplaints((previous) => previous.map((complaint) => complaint.id === deleteTargetId
+        ? { ...complaint, deleteRequested: true, deleteReason: deleteReason.trim() }
+        : complaint));
+      setModalFeedback({ text: 'Your deletion request was submitted for admin review.', type: 'success' });
+      setTimeout(() => setDeleteTargetId(null), 1800);
     } catch (err) {
-      setModalFeedback({ text: getErrorMessage(err) || 'Failed to submit deletion request.', type: 'error' });
+      setModalFeedback({ text: getErrorMessage(err) || 'Unable to submit the deletion request.', type: 'error' });
     } finally {
       setDeleteSubmitting(false);
     }
@@ -118,506 +111,209 @@ export default function TrackComplaintPage() {
     if (!window.confirm('Cancel your deletion request for this complaint?')) return;
     try {
       await cancelDeleteComplaint(complaintId);
-      setComplaints((prev) =>
-        prev.map((c) =>
-          c.id === complaintId
-            ? { ...c, deleteRequested: false, deleteReason: null, deleteRequestedAt: null }
-            : c
-        )
-      );
+      setComplaints((previous) => previous.map((complaint) => complaint.id === complaintId
+        ? { ...complaint, deleteRequested: false, deleteReason: null, deleteRequestedAt: null }
+        : complaint));
     } catch (err) {
-      alert(getErrorMessage(err) || 'Failed to cancel deletion request.');
+      window.alert(getErrorMessage(err) || 'Unable to cancel the deletion request.');
     }
   }
 
   return (
     <MainLayout>
-      <div style={{ maxWidth: '960px', margin: '0 auto', padding: '1.5rem 1rem' }}>
-        {/* Header Banner */}
-        <div style={{ background: 'linear-gradient(135deg, #131921 0%, #232f3e 100%)', color: '#fff', borderRadius: '10px', padding: '2rem 1.75rem', marginBottom: '2rem', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-          <span style={{ fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px', color: '#febd69', fontWeight: 700 }}>
-            BadService.in Consumer Portal
-          </span>
-          <h1 style={{ fontSize: '1.85rem', margin: '0.4rem 0 0.8rem 0', color: '#fff' }}>
-            Track Complaint Status & Updation
-          </h1>
-          <p style={{ margin: 0, fontSize: '0.98rem', color: '#e0e0e0', maxWidth: '720px', lineHeight: '1.5' }}>
-            Check the live progress of your submitted complaints, view admin verification notes, see company communication status, or submit a deletion request.
-          </p>
+      <div className="tracking-page">
+        <section className="tracking-page__hero" aria-labelledby="tracking-title">
+          <div className="tracking-page__hero-copy">
+            <span className="tracking-page__eyebrow"><span aria-hidden="true">●</span> BadService.in · Consumer support</span>
+            <h1 id="tracking-title">Track your complaint</h1>
+            <p>See the latest status, verification notes, and recorded company updates in one place.</p>
+          </div>
 
-          {/* Search Box */}
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearch();
-            }}
-            style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}
-          >
-            <input
-              type="text"
-              placeholder="Enter Complaint Reference ID or 10-digit Mobile Number"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              style={{
-                flex: '1 1 320px',
-                padding: '0.75rem 1rem',
-                fontSize: '1rem',
-                borderRadius: '6px',
-                border: '2px solid #febd69',
-                outline: 'none',
-                color: '#111',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={loading}
-              style={{
-                background: '#febd69',
-                color: '#111',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '0.75rem 1.75rem',
-                fontSize: '1rem',
-                fontWeight: 700,
-                cursor: loading ? 'not-allowed' : 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-              }}
-            >
-              {loading ? 'Searching...' : '🔍 Track Status'}
-            </button>
+          <form className="tracking-search" onSubmit={(event) => { event.preventDefault(); handleSearch(); }}>
+            <label htmlFor="tracking-query">Complaint reference ID or registered mobile number</label>
+            <div className="tracking-search__controls">
+              <span className="tracking-search__icon" aria-hidden="true">⌕</span>
+              <input
+                id="tracking-query"
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                placeholder="e.g. complaint ID or 10-digit mobile number"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                aria-describedby="tracking-search-help"
+              />
+              <button type="submit" disabled={loading}>
+                {loading ? <><span className="tracking-spinner" aria-hidden="true" /> Searching</> : 'Track status'}
+              </button>
+            </div>
+            <p id="tracking-search-help">Use the reference ID from your submission, or the mobile number you registered with.</p>
           </form>
-        </div>
+        </section>
 
-        {error && (
-          <div style={{ background: '#ffebee', color: '#c62828', padding: '1rem', borderRadius: '6px', marginBottom: '1.5rem', border: '1px solid #ffcdd2' }}>
-            {error}
+        {error && !loading && (
+          <div className="tracking-state tracking-state--error" role="alert">
+            <span className="tracking-state__icon" aria-hidden="true">!</span>
+            <div><strong>{error.includes('Enter your') ? 'Details needed' : 'We couldn’t find that complaint'}</strong><p>{error}</p></div>
+            {searched && <button type="button" onClick={() => handleSearch()}>Try again</button>}
           </div>
         )}
 
-        {/* Results Section */}
         {loading && (
-          <div style={{ textAlign: 'center', padding: '3rem 0', color: '#666' }}>
-            <div style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>⏳</div>
-            <p>Fetching real-time complaint updates and status...</p>
+          <div className="tracking-state tracking-state--loading" role="status" aria-live="polite">
+            <span className="tracking-spinner tracking-spinner--large" aria-hidden="true" />
+            <div><strong>Looking up your complaint</strong><p>Fetching the latest available status and updates…</p></div>
+            <div className="tracking-skeleton" aria-hidden="true"><i /><i /><i /></div>
           </div>
         )}
 
-        {!loading && searched && complaints.length === 0 && (
-          <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-            <div style={{ fontSize: '2.5rem', marginBottom: '0.5rem' }}>🔍</div>
-            <h3 style={{ margin: '0 0 0.5rem 0' }}>No complaints found</h3>
-            <p style={{ color: '#666', maxWidth: '500px', margin: '0 auto 1.5rem auto', fontSize: '0.95rem' }}>
-              We could not find any complaint matching "<strong>{query}</strong>". Please make sure you entered the correct Complaint ID or the phone number provided during submission.
-            </p>
-            <Link
-              to="/file-complaint"
-              style={{
-                display: 'inline-block',
-                background: '#ff9900',
-                color: '#111',
-                padding: '0.6rem 1.25rem',
-                borderRadius: '5px',
-                fontWeight: 700,
-                textDecoration: 'none',
-              }}
-            >
-              File a New Complaint
-            </Link>
+        {!loading && searched && !error && complaints.length === 0 && (
+          <div className="tracking-state tracking-state--empty" role="status">
+            <span className="tracking-state__icon" aria-hidden="true">?</span>
+            <h2>No complaint found</h2>
+            <p>Check the reference ID or use the mobile number provided when you submitted the complaint.</p>
+            <Link className="tracking-button tracking-button--secondary" to="/file-complaint">File a complaint</Link>
           </div>
         )}
 
         {!loading && complaints.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-            <p style={{ color: '#555', margin: '0 0 0.5rem 0', fontWeight: 600 }}>
-              Found {complaints.length} complaint{complaints.length > 1 ? 's' : ''} matching your search:
-            </p>
+          <section className="tracking-results" aria-label="Complaint tracking results">
+            <div className="tracking-results__heading">
+              <div><span className="tracking-page__eyebrow">Your records</span><h2>Tracking results</h2></div>
+              <span className="tracking-results__count">{complaints.length} {complaints.length === 1 ? 'complaint' : 'complaints'}</span>
+            </div>
 
-            {complaints.map((c) => {
-              const currentStep = getStepIndex(c.status);
+            {complaints.map((complaint) => {
+              const currentStep = getStepIndex(complaint.status);
+              const history = Array.isArray(complaint.statusHistory) ? complaint.statusHistory : [];
+              const companyUpdates = history.filter((update) => update.to === 'COMPANY_RESPONDED');
+              const statusClass = (complaint.status || 'pending').toLowerCase().replace(/_/g, '-');
               return (
-                <div
-                  key={c.id}
-                  style={{
-                    background: '#fff',
-                    border: '1px solid #ddd',
-                    borderRadius: '8px',
-                    padding: '1.5rem',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-                  }}
-                >
-                  {/* Top card header */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.75rem', borderBottom: '1px solid #eee', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, background: '#f0f2f5', padding: '3px 8px', borderRadius: '4px', color: '#444' }}>
-                          ID: {c.id}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 700, background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', color: c.type === 'Service' ? '#856404' : '#004085', padding: '3px 8px', borderRadius: '4px' }}>
-                          {c.type === 'Service' ? 'SERVICE' : 'PRODUCT'}
-                        </span>
-                        <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                          Submitted: {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
+                <article className="tracking-result-card" key={complaint.id}>
+                  <header className="tracking-result-card__header">
+                    <div className="tracking-result-card__title-group">
+                      <div className="tracking-result-card__badges">
+                        <span className="tracking-id">Reference <strong>{complaint.id}</strong></span>
+                        <span className={`tracking-type tracking-type--${complaint.type === 'Service' ? 'service' : 'product'}`}>
+                          {complaint.type === 'Service' ? 'Service' : 'Product'}
                         </span>
                       </div>
-                      <h2 style={{ fontSize: '1.25rem', margin: '0.5rem 0 0.25rem 0', color: '#111' }}>
-                        {c.title}
-                      </h2>
-                      <div style={{ fontSize: '0.9rem', color: '#444' }}>
-                        <strong>{c.company}</strong> {c.productName ? `— ${c.productName}` : ''} {c.serviceType ? `(${c.serviceType})` : ''}
-                      </div>
-                    </div>
-
-                    <div style={{ textAlign: 'right' }}>
-                      <span
-                        style={{
-                          display: 'inline-block',
-                          padding: '0.35rem 0.85rem',
-                          borderRadius: '20px',
-                          fontSize: '0.85rem',
-                          fontWeight: 700,
-                          background:
-                            c.status === 'APPROVED' ? '#d4edda' :
-                            c.status === 'RESOLVED' ? '#c3e6cb' :
-                            c.status === 'UNDER_REVIEW' ? '#d1ecf1' :
-                            c.status === 'COMPANY_RESPONDED' ? '#e2e3e5' :
-                            c.status === 'REJECTED' ? '#f8d7da' : '#fff3cd',
-                          color:
-                            c.status === 'APPROVED' || c.status === 'RESOLVED' ? '#155724' :
-                            c.status === 'UNDER_REVIEW' ? '#0c5460' :
-                            c.status === 'COMPANY_RESPONDED' ? '#383d41' :
-                            c.status === 'REJECTED' ? '#721c24' : '#856404',
-                        }}
-                      >
-                        ● {c.status}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Visual Progress Stepper */}
-                  <div style={{ marginBottom: '1.5rem', background: '#f9f9f9', padding: '1.25rem', borderRadius: '6px' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#333', marginBottom: '1rem' }}>
-                      Complaint Updation & Verification Timeline:
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
-                      {STATUS_STEPS.map((step, idx) => {
-                        const isDone = currentStep >= idx;
-                        const isCurrent = currentStep === idx;
-                        const isNext = currentStep + 1 === idx;
-                        return (
-                          <div
-                            key={step.key}
-                            style={{
-                              borderLeft: `4px solid ${isDone ? '#28a745' : isNext ? '#3b82f6' : '#ccc'}`,
-                              paddingLeft: '0.65rem',
-                              background: isCurrent ? '#e8f5e9' : isNext ? '#f0f9ff' : 'transparent',
-                              borderRadius: '0 4px 4px 0',
-                              paddingTop: '0.35rem',
-                              paddingBottom: '0.35rem',
-                            }}
-                          >
-                            <div style={{ fontSize: '0.85rem', fontWeight: isDone ? 700 : isNext ? 700 : 500, color: isDone ? '#155724' : isNext ? '#1d4ed8' : '#888', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <span>{isDone ? '✓ ' : isNext ? '👉 Next: ' : '○ '}</span>
-                              <span>{step.label}</span>
-                            </div>
-                            <div style={{ fontSize: '0.72rem', color: isDone ? '#555' : isNext ? '#1e40af' : '#aaa', marginTop: '2px' }}>
-                              {step.desc}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Rejection / Deletion Reason from Admin */}
-                  {(c.status === 'REJECTED' || c.isDeleted || c.deleteAdminNote) && (
-                    <div style={{ background: '#fdf2f2', border: '1.5px solid #f87171', color: '#991b1b', padding: '1rem 1.25rem', borderRadius: '8px', marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '1.2rem' }}>❌</span>
-                        <strong style={{ fontSize: '0.95rem', color: '#b91c1c' }}>
-                          Complaint {c.isDeleted ? 'Deleted / Archived' : 'Rejected'} by Administrator
-                        </strong>
-                      </div>
-                      <p style={{ margin: '0 0 6px 0', fontSize: '0.9rem', color: '#7f1d1d' }}>
-                        <strong>Reason from Administrator:</strong> {c.deleteAdminNote || c.statusNote || 'Submitted evidence or complaint details did not meet platform verification standards.'}
+                      <h3>{complaint.title}</h3>
+                      <p className="tracking-result-card__company">
+                        <strong>{complaint.company}</strong>
+                        {complaint.productName && complaint.productName !== complaint.company && <> · {complaint.productName}</>}
+                        {complaint.serviceType && <> · {complaint.serviceType}</>}
                       </p>
-                      <small style={{ color: '#991b1b', fontSize: '0.8rem', display: 'block' }}>
-                        Notice: To file again, please submit valid purchase invoice and clear proof of service/product issue.
-                      </small>
+                    </div>
+                    <span className={`tracking-status tracking-status--${statusClass}`}><i aria-hidden="true" />{formatStatus(complaint.status || 'PENDING')}</span>
+                  </header>
+
+                  <dl className="tracking-details">
+                    <div><dt>Submitted</dt><dd>{formatDate(complaint.createdAt)}</dd></div>
+                    {complaint.category && <div><dt>Category</dt><dd>{complaint.category}</dd></div>}
+                    <div><dt>Last updated</dt><dd>{formatDate(complaint.updatedAt || complaint.statusChangedAt || complaint.createdAt)}</dd></div>
+                  </dl>
+
+                  {complaint.status !== 'REJECTED' && !complaint.isDeleted && (
+                    <section className="tracking-progress" aria-label={`Complaint progress: ${formatStatus(complaint.status)}`}>
+                      <div className="tracking-section-heading"><div><span className="tracking-section-heading__icon" aria-hidden="true">01</span><div><h4>Status progress</h4><p>Progress reflects the latest status recorded for this complaint.</p></div></div></div>
+                      <ol className="tracking-timeline">
+                        {STATUS_STEPS.map((step, index) => {
+                          const complete = currentStep >= index;
+                          const active = currentStep === index;
+                          return (
+                            <li className={`tracking-timeline__step${complete ? ' is-complete' : ''}${active ? ' is-current' : ''}`} key={step.key}>
+                              <span className="tracking-timeline__marker" aria-hidden="true">{complete ? '✓' : index + 1}</span>
+                              <div><strong>{step.label}</strong><p>{step.desc}</p></div>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </section>
+                  )}
+
+                  {(complaint.statusNote || complaint.deleteAdminNote || complaint.status === 'REJECTED' || complaint.isDeleted) && (
+                    <section className="tracking-note tracking-note--admin">
+                      <div className="tracking-note__heading"><span aria-hidden="true">A</span><div><h4>Admin verification note</h4><p>Update from the BadService.in review team</p></div></div>
+                      <p>{complaint.deleteAdminNote || complaint.statusNote || 'This complaint was not approved for publication.'}</p>
+                      {(complaint.status === 'REJECTED' || complaint.isDeleted) && <span className="tracking-note__tag">{complaint.isDeleted ? 'Archived' : 'Not approved'}</span>}
+                    </section>
+                  )}
+
+                  {(complaint.status === 'COMPANY_RESPONDED' || complaint.status === 'RESOLVED' || companyUpdates.length > 0) && (
+                    <section className="tracking-note tracking-note--company">
+                      <div className="tracking-note__heading"><span aria-hidden="true">C</span><div><h4>Company response status</h4><p>Admin-recorded status update; no direct company message is included</p></div></div>
+                      {companyUpdates.length > 0 ? companyUpdates.map((update, index) => (
+                        <div className="tracking-note__response" key={`${update.changedAt || 'response'}-${index}`}>
+                          <p>{update.note || 'A company response was recorded.'}</p>
+                          <time>{formatDate(update.changedAt, true)}</time>
+                        </div>
+                      )) : <p className="tracking-note__unavailable">A response status is recorded, but no response message is included in the tracking record.</p>}
+                    </section>
+                  )}
+
+                  {history.length > 0 && (
+                    <details className="tracking-history">
+                      <summary><span><strong>Update history</strong><small>{history.length} {history.length === 1 ? 'update' : 'updates'} recorded</small></span><span aria-hidden="true">＋</span></summary>
+                      <ol>
+                        {history.map((update, index) => (
+                          <li key={`${update.changedAt || 'update'}-${index}`}>
+                            <span className="tracking-history__dot" aria-hidden="true" />
+                            <div><strong>{update.from ? `${formatStatus(update.from)} → ` : ''}{formatStatus(update.to)}</strong>
+                              {update.note && <p>{update.note}</p>}
+                              <time>{formatDate(update.changedAt, true)}</time>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  )}
+
+                  {complaint.deleteRequested && (
+                    <div className="tracking-delete-notice">
+                      <div><strong>Deletion request submitted</strong><p>{complaint.deleteReason || 'Your request is waiting for admin review.'}</p></div>
+                      <button type="button" onClick={() => handleCancelDelete(complaint.id)}>Cancel request</button>
                     </div>
                   )}
 
-                  {/* Status Note from Admin / Platform (e.g. deletion request rejection update) */}
-                  {c.statusNote && c.statusNote !== c.deleteAdminNote && (
-                    <div style={{ background: '#e8f4fd', border: '1px solid #b8daff', color: '#004085', padding: '0.85rem 1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
-                      <strong style={{ display: 'block', fontSize: '0.85rem', marginBottom: '0.25rem' }}>
-                        📌 Latest Update from Admin:
-                      </strong>
-                      <p style={{ margin: 0, fontSize: '0.9rem' }}>{c.statusNote}</p>
-                    </div>
-                  )}
-
-                  {/* Status history is retained so users can understand every past update. */}
-                  <div style={{ border: '1px solid #dbe5f0', background: '#fbfdff', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
-                    <strong style={{ display: 'block', fontSize: '0.9rem', color: '#1e3a5f', marginBottom: '0.75rem' }}>
-                      📜 Complaint Update History
-                    </strong>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-                      <div style={{ borderLeft: '3px solid #64748b', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
-                        <strong>Complaint submitted</strong>
-                        <div style={{ color: '#64748b', marginTop: '2px' }}>
-                          {c.createdAt ? new Date(c.createdAt).toLocaleString() : 'Submission date unavailable'}
-                        </div>
-                      </div>
-                      {(c.statusHistory || []).map((update, index) => (
-                        <div key={`${update.changedAt || 'update'}-${index}`} style={{ borderLeft: '3px solid #0284c7', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
-                          <strong>{formatStatus(update.from)} → {formatStatus(update.to)}</strong>
-                          <div style={{ color: '#334155', marginTop: '2px', lineHeight: 1.45 }}>{update.note}</div>
-                          <div style={{ color: '#64748b', marginTop: '3px', fontSize: '0.78rem' }}>
-                            {update.changedAt ? new Date(update.changedAt).toLocaleString() : 'Update date unavailable'}
-                          </div>
-                        </div>
-                      ))}
-                      {(!c.statusHistory || c.statusHistory.length === 0) && c.statusChangedAt && (
-                        <div style={{ borderLeft: '3px solid #0284c7', paddingLeft: '0.7rem', fontSize: '0.85rem' }}>
-                          <strong>Current status: {formatStatus(c.status)}</strong>
-                          <div style={{ color: '#64748b', marginTop: '3px', fontSize: '0.78rem' }}>
-                            Updated {new Date(c.statusChangedAt).toLocaleString()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Deletion Request Status or Action */}
-                  {c.deleteRequested ? (
-                    <div style={{ background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', padding: '1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '0.5rem' }}>
-                        <div>
-                          <strong style={{ fontSize: '0.9rem', color: '#721c24' }}>
-                            ⚠️ Deletion Request Submitted to Admin
-                          </strong>
-                          <p style={{ margin: '0.35rem 0 0 0', fontSize: '0.85rem' }}>
-                            <strong>Your reason:</strong> {c.deleteReason || 'Requested by complainant'}
-                          </p>
-                          <small style={{ color: '#666', display: 'block', marginTop: '4px' }}>
-                            Platform policy: Only platform administrators can permanently delete records from public view to ensure genuine complaints and transparency.
-                          </small>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCancelDelete(c.id)}
-                          style={{
-                            background: '#fff',
-                            border: '1px solid #856404',
-                            color: '#856404',
-                            padding: '0.35rem 0.75rem',
-                            borderRadius: '4px',
-                            cursor: 'pointer',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          Cancel Deletion Request
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {/* Action buttons */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', borderTop: '1px solid #eee', paddingTop: '1rem' }}>
-                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                      <Link
-                        to={`/complaints/${encodeURIComponent(c.id)}`}
-                        style={{
-                          background: '#232f3e',
-                          color: '#fff',
-                          textDecoration: 'none',
-                          padding: '0.45rem 1rem',
-                          borderRadius: '4px',
-                          fontSize: '0.85rem',
-                          fontWeight: 600,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.35rem',
-                        }}
-                      >
-                        View Full Details & Comments ↗
-                      </Link>
-
-                      {!c.deleteRequested && (
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDeleteModal(c.id)}
-                          style={{
-                            background: '#fff',
-                            border: '1px solid #dc3545',
-                            color: '#dc3545',
-                            padding: '0.45rem 0.85rem',
-                            borderRadius: '4px',
-                            fontSize: '0.82rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          🗑️ Request Deletion
-                        </button>
-                      )}
-                    </div>
-
-                    <small style={{ color: '#888' }}>
-                      Last updated: {c.updatedAt ? new Date(c.updatedAt).toLocaleDateString() : 'Recently'}
-                    </small>
-                  </div>
-                </div>
+                  <footer className="tracking-result-card__footer">
+                    <Link className="tracking-button tracking-button--primary" to={`/complaints/${encodeURIComponent(complaint.id)}`}>View complaint details <span aria-hidden="true">↗</span></Link>
+                    {!complaint.deleteRequested && !complaint.isDeleted && <button className="tracking-button tracking-button--quiet" type="button" onClick={() => handleOpenDeleteModal(complaint.id)}>Request deletion</button>}
+                  </footer>
+                </article>
               );
             })}
-          </div>
+          </section>
         )}
 
-        {/* Feature Information Card */}
         {!searched && (
-          <div style={{ background: '#fff', border: '1px solid #e0e0e0', borderRadius: '8px', padding: '1.75rem', marginTop: '1.5rem' }}>
-            <h2 style={{ fontSize: '1.2rem', margin: '0 0 1rem 0', color: '#111' }}>
-              How Complaint Tracking & Updation Works
-            </h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
-              <div style={{ border: '1px solid #eee', padding: '1rem', borderRadius: '6px', background: '#fafafa' }}>
-                <div style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>📱</div>
-                <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>Look up using Mobile Number</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#555', lineHeight: '1.5' }}>
-                  Forgot your reference ID? Enter the 10-digit phone number you provided during submission to view all your complaints.
-                </p>
-              </div>
-
-              <div style={{ border: '1px solid #eee', padding: '1rem', borderRadius: '6px', background: '#fafafa' }}>
-                <div style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>⚡</div>
-                <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>Live Verification Progress</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#555', lineHeight: '1.5' }}>
-                  Track review milestones from bill verification to brand communication and public publication.
-                </p>
-              </div>
-
-              <div style={{ border: '1px solid #eee', padding: '1rem', borderRadius: '6px', background: '#fafafa' }}>
-                <div style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>🛡️</div>
-                <h3 style={{ margin: '0 0 0.4rem 0', fontSize: '0.95rem' }}>Admin-Governed Deletions</h3>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#555', lineHeight: '1.5' }}>
-                  If your issue is resolved with the company, submit a deletion request. Platform admins review and process requests to protect truth and integrity.
-                </p>
-              </div>
+          <section className="tracking-guide" aria-labelledby="tracking-guide-title">
+            <div className="tracking-guide__heading"><span className="tracking-section-heading__icon" aria-hidden="true">?</span><div><h2 id="tracking-guide-title">A clearer view of every update</h2><p>Use your submission details to securely find your complaint progress.</p></div></div>
+            <div className="tracking-guide__items">
+              <div><span aria-hidden="true">01</span><h3>Look up your record</h3><p>Enter a complaint reference ID or the registered mobile number to find submitted complaints.</p></div>
+              <div><span aria-hidden="true">02</span><h3>Follow verified updates</h3><p>Review the latest status, admin notes, and any company response recorded in the complaint history.</p></div>
+              <div><span aria-hidden="true">03</span><h3>Need to report an issue?</h3><p>Submit a new complaint with clear details and supporting evidence.</p><Link to="/file-complaint">File a complaint <span aria-hidden="true">→</span></Link></div>
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Deletion Request Modal */}
         {deleteTargetId && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background: 'rgba(0,0,0,0.6)',
-              zIndex: 9999,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '1rem',
-            }}
-            onClick={() => setDeleteTargetId(null)}
-          >
-            <div
-              style={{
-                background: '#fff',
-                borderRadius: '8px',
-                width: '100%',
-                maxWidth: '520px',
-                padding: '1.75rem',
-                boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
-              }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3 style={{ margin: '0 0 0.5rem 0', color: '#111' }}>
-                Request Deletion of Complaint
-              </h3>
-              <p style={{ margin: '0 0 1rem 0', fontSize: '0.88rem', color: '#666', lineHeight: '1.5' }}>
-                To maintain consumer trust and dispute fairness, complaints can only be removed by platform administrators. Please tell us why you wish to delete this complaint:
-              </p>
-
-              {modalFeedback.text && (
-                <div
-                  style={{
-                    padding: '0.65rem 0.85rem',
-                    borderRadius: '4px',
-                    fontSize: '0.85rem',
-                    marginBottom: '1rem',
-                    background: modalFeedback.type === 'success' ? '#d4edda' : '#f8d7da',
-                    color: modalFeedback.type === 'success' ? '#155724' : '#721c24',
-                  }}
-                >
-                  {modalFeedback.text}
-                </div>
-              )}
-
+          <div className="tracking-modal-backdrop" role="presentation" onClick={() => !deleteSubmitting && setDeleteTargetId(null)}>
+            <section className="tracking-delete-modal" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title" onClick={(event) => event.stopPropagation()}>
+              <button className="tracking-delete-modal__close" type="button" aria-label="Close dialog" onClick={() => setDeleteTargetId(null)} disabled={deleteSubmitting}>×</button>
+              <span className="tracking-section-heading__icon tracking-section-heading__icon--orange" aria-hidden="true">!</span>
+              <h2 id="delete-modal-title">Request complaint removal</h2>
+              <p>Removal requests are reviewed by an administrator. Tell us why you would like this complaint removed.</p>
+              {modalFeedback.text && <div className={`tracking-modal-feedback tracking-modal-feedback--${modalFeedback.type}`} role={modalFeedback.type === 'error' ? 'alert' : 'status'}>{modalFeedback.text}</div>}
               <form onSubmit={handleSubmitDeleteRequest}>
-                <div style={{ marginBottom: '1rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.35rem' }}>
-                    Reason for Deletion Request:
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={deleteReason}
-                    onChange={(e) => setDeleteReason(e.target.value)}
-                    placeholder="e.g. The company contacted me and fully refunded / replaced my product. The issue is resolved."
-                    style={{
-                      width: '100%',
-                      padding: '0.6rem',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc',
-                      fontSize: '0.9rem',
-                      boxSizing: 'border-box',
-                    }}
-                    required
-                  />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetId(null)}
-                    disabled={deleteSubmitting}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      background: '#eee',
-                      border: '1px solid #ccc',
-                      borderRadius: '4px',
-                      cursor: 'pointer',
-                      fontSize: '0.85rem',
-                    }}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={deleteSubmitting}
-                    style={{
-                      padding: '0.5rem 1.25rem',
-                      background: '#dc3545',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: deleteSubmitting ? 'not-allowed' : 'pointer',
-                      fontSize: '0.85rem',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {deleteSubmitting ? 'Submitting...' : 'Submit Deletion Request'}
-                  </button>
+                <label htmlFor="delete-reason">Reason for request</label>
+                <textarea id="delete-reason" rows={4} value={deleteReason} onChange={(event) => setDeleteReason(event.target.value)} placeholder="For example, the issue has been resolved with the company." required />
+                <div className="tracking-delete-modal__actions">
+                  <button className="tracking-button tracking-button--quiet" type="button" onClick={() => setDeleteTargetId(null)} disabled={deleteSubmitting}>Cancel</button>
+                  <button className="tracking-button tracking-button--danger" type="submit" disabled={deleteSubmitting}>{deleteSubmitting ? 'Submitting…' : 'Submit request'}</button>
                 </div>
               </form>
-            </div>
+            </section>
           </div>
         )}
       </div>

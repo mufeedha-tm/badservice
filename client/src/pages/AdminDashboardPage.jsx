@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import MainLayout from '../components/layout/MainLayout.jsx';
+import Logo from '../components/layout/Logo.jsx';
 import { useAccount } from '../context/AccountContext.jsx';
 import {
-  approveCompanyRequest,
   createAdminCompany,
   createAdminComplaint,
   deleteAdminComplaint,
@@ -12,13 +12,11 @@ import {
   getAdminComplaintBill,
   getAdminCompanies,
   getAdminComplaints,
-  getAdminCompanyRequests,
   getAdminStats,
   getAdminUsers,
   getErrorMessage,
   getAssetUrl,
   logoutAccount,
-  rejectCompanyRequest,
   rejectAdminDeleteRequest,
   updateAdminCompanyStatus,
   updateAdminComplaintStatus,
@@ -44,6 +42,46 @@ function getComplaintPhotoUrls(complaint) {
   return [...new Set(photoUrls)];
 }
 
+function AdminComplaintFilePreview({ file }) {
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl('');
+      return undefined;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  if (!file || !previewUrl) return null;
+  if (file.type.startsWith('image/')) {
+    return <img className="admin-upload-preview__image" src={previewUrl} alt={`Preview of ${file.name}`} />;
+  }
+  if (file.type.startsWith('video/')) {
+    return <video className="admin-upload-preview__video" src={previewUrl} controls preload="metadata" aria-label={`Preview of ${file.name}`} />;
+  }
+  return null;
+}
+
+function AdminIcon({ name, size = 18 }) {
+  const paths = {
+    overview: <><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></>,
+    complaints: <><path d="M8 3h8l5 5v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3Z" /><path d="M8 12h8M8 16h8M15 3v5h5" /></>,
+    create: <><path d="M12 5v14M5 12h14" /></>,
+    companies: <><path d="M3 21h18M5 21V7l7-4 7 4v14M9 10h.01M15 10h.01M9 14h.01M15 14h.01M10 21v-4h4v4" /></>,
+    users: <><path d="M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="10" cy="7" r="4" /><path d="M20 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></>,
+    categories: <><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" /></>,
+    home: <><path d="m3 10 9-7 9 7" /><path d="M5 9v11h14V9M9 20v-6h6v6" /></>,
+    logout: <><path d="M10 17l5-5-5-5M15 12H3" /><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6" /></>,
+    arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
+    reports: <><path d="M4 19V5M4 19h17" /><path d="m7 15 4-4 3 2 6-7" /></>,
+    archive: <><path d="M3 4h18v4H3zM5 8v12h14V8M10 12h4" /></>,
+  };
+  return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{paths[name] || paths.overview}</svg>;
+}
+
 export default function AdminDashboardPage() {
   const { account, status: accountStatus, setAccount } = useAccount();
   const navigate = useNavigate();
@@ -55,18 +93,19 @@ export default function AdminDashboardPage() {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState(null);
-  const [requests, setRequests] = useState([]);
   const [complaints, setComplaints] = useState([]);
   const [complaintPagination, setComplaintPagination] = useState({ page: 1, limit: 25, total: 0, totalPages: 1 });
   const [companies, setCompanies] = useState([]);
   const [users, setUsers] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [recentComplaints, setRecentComplaints] = useState([]);
+  const [recentComplaintsLoading, setRecentComplaintsLoading] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [actionMessage, setActionMessage] = useState({ text: '', type: '' });
 
   // Filters & Review Modal
-  const [requestFilter, setRequestFilter] = useState('PENDING');
   const [complaintFilter, setComplaintFilter] = useState('');
   const [complaintSearch, setComplaintSearch] = useState('');
   const [deleteRequestOnly, setDeleteRequestOnly] = useState(false);
@@ -130,7 +169,15 @@ export default function AdminDashboardPage() {
 
   useEffect(() => {
     if (account?.role !== 'ADMIN') return;
-    if (activeTab === 'requests') loadRequests(requestFilter);
+    if (activeTab === 'overview') {
+      let current = true;
+      setRecentComplaintsLoading(true);
+      getAdminComplaints({ page: 1, limit: 5, sort: 'latest' })
+        .then((data) => current && setRecentComplaints(data?.items || []))
+        .catch(() => current && setRecentComplaints([]))
+        .finally(() => current && setRecentComplaintsLoading(false));
+      return () => { current = false; };
+    }
     if (activeTab === 'complaints') {
       loadComplaints();
       loadCategories(false);
@@ -213,18 +260,6 @@ export default function AdminDashboardPage() {
     }
   }
 
-  async function loadRequests(status = '') {
-    setLoading(true);
-    try {
-      const data = await getAdminCompanyRequests(status);
-      setRequests(data);
-    } catch (err) {
-      showMessage(err.response?.data?.error?.message || 'Error loading requests', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function loadComplaints({
     page = 1,
     onlyDelete = deleteRequestOnly,
@@ -295,29 +330,6 @@ export default function AdminDashboardPage() {
   }
 
   // Action Handlers
-  async function handleApproveRequest(id) {
-    try {
-      await approveCompanyRequest(id);
-      showMessage('Company request approved and company is now active!');
-      loadRequests(requestFilter);
-      loadStats();
-    } catch (err) {
-      showMessage(err.response?.data?.error?.message || 'Approval failed', 'error');
-    }
-  }
-
-  async function handleRejectRequest(id) {
-    if (!window.confirm('Are you sure you want to reject this company request?')) return;
-    try {
-      await rejectCompanyRequest(id);
-      showMessage('Company request rejected.', 'info');
-      loadRequests(requestFilter);
-      loadStats();
-    } catch (err) {
-      showMessage(err.response?.data?.error?.message || 'Rejection failed', 'error');
-    }
-  }
-
   async function handleComplaintStatusChange(id, newStatus) {
     let reason = '';
     const statusUpdateDefaults = {
@@ -557,24 +569,28 @@ export default function AdminDashboardPage() {
 
   function renderAdminUploadState(kind) {
     const status = adminUploadStatus[kind];
+    const file = adminComplaintMedia[kind];
+    const sizeLabel = file ? `${(file.size / (1024 * 1024)).toFixed(file.size >= 1024 * 1024 ? 1 : 2)} MB` : '';
+    const preview = file && <AdminComplaintFilePreview file={file} />;
+    const fileDetails = file && <span className="admin-upload-state__file"><strong>{file.name}</strong><small>{sizeLabel}</small></span>;
+
     if (status === 'uploading') {
       const progress = adminUploadProgress[kind] || 0;
       return (
-        <div style={{ marginTop: '0.3rem' }} aria-live="polite">
-          <small style={{ display: 'block', color: '#0369a1', fontWeight: 600 }}>Uploading… {progress}%</small>
-          <div style={{ height: '5px', marginTop: '0.2rem', overflow: 'hidden', borderRadius: '999px', background: '#dbeafe' }}>
-            <div style={{ width: `${progress}%`, height: '100%', background: '#0284c7', transition: 'width 180ms ease' }} />
-          </div>
+        <div className="admin-upload-state" aria-live="polite">
+          {preview}{fileDetails}
+          <small style={{ display: 'block', color: '#0369a1', fontWeight: 600 }}>Uploading... {progress}%</small>
+          <div className="admin-upload-state__track"><div style={{ width: `${progress}%` }} /></div>
         </div>
       );
     }
     if (status === 'done') {
-      return <small style={{ display: 'block', marginTop: '0.3rem', color: '#15803d', fontWeight: 600 }}>Saved automatically ✓</small>;
+      return <div className="admin-upload-state admin-upload-state--done">{preview}{fileDetails}<small>Saved automatically {'\u2713'}</small></div>;
     }
     if (status === 'error') {
-      return <small style={{ display: 'block', marginTop: '0.3rem', color: '#b45309' }}>Auto-save failed; this file will upload when you create the complaint.</small>;
+      return <div className="admin-upload-state admin-upload-state--error">{preview}{fileDetails}<small>Auto-save failed; this file will upload when you create the complaint.</small></div>;
     }
-    return null;
+    return file ? <div className="admin-upload-state">{preview}{fileDetails}</div> : null;
   }
 
   async function handleToggleCompanyStatus(id, currentStatus) {
@@ -686,10 +702,10 @@ export default function AdminDashboardPage() {
       <MainLayout>
         <section className="admin-login-page">
           <div className="admin-login-card">
-            <div className="admin-login-card__brand" aria-hidden="true">BS</div>
-            <span className="admin-login-card__eyebrow">BADService.in · ADMINISTRATION</span>
+            <Logo to="/admin" ariaLabel="BadService admin dashboard" className="admin-login-card__logo" />
+            <span className="admin-login-card__eyebrow">ADMINISTRATION</span>
             <h1>Welcome back</h1>
-            <p>Sign in to manage complaints, companies, requests and users.</p>
+            <p>Sign in to manage complaints, companies and users.</p>
             <form onSubmit={handleAdminLogin} className="admin-login-form">
               <label className="field">
                 <span>Admin username</span>
@@ -715,40 +731,68 @@ export default function AdminDashboardPage() {
               </label>
               {adminLoginError && <p className="form-banner form-banner--error" role="alert">{adminLoginError}</p>}
               <button className="submit-button admin-login-submit" type="submit" disabled={adminLoggingIn}>
-                {adminLoggingIn ? 'Signing in…' : 'Sign in to dashboard'}
+                {adminLoggingIn ? 'Signing in' : 'Sign in to dashboard'}
               </button>
             </form>
-            <p className="admin-login-card__note"><span aria-hidden="true">●</span> Secure access for authorized administrators</p>
+            <p className="admin-login-card__note"><span aria-hidden="true"></span> Secure access for authorized administrators</p>
           </div>
         </section>
       </MainLayout>
     );
   }
 
-  const tabStyle = (tab) => ({
-    padding: '0.6rem 1rem',
-    background: activeTab === tab ? '#232f3e' : '#e9ecef',
-    color: activeTab === tab ? '#fff' : '#333',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontWeight: 600,
-    fontSize: '0.9rem',
+  const complaintTotal = Number(stats?.totalComplaints) || 0;
+  const statusOverview = [
+    { label: 'Pending review', count: Number(stats?.pendingComplaints) || 0, className: 'is-pending' },
+    { label: 'Resolved', count: Number(stats?.resolvedComplaints) || 0, className: 'is-resolved' },
+    {
+      label: 'Other statuses',
+      count: Math.max(0, complaintTotal - (Number(stats?.pendingComplaints) || 0) - (Number(stats?.resolvedComplaints) || 0)),
+      className: 'is-other',
+    },
+  ];
+  const activityByDate = recentComplaints.reduce((days, complaint) => {
+    if (!complaint.createdAt) return days;
+    const date = new Date(complaint.createdAt);
+    if (Number.isNaN(date.getTime())) return days;
+    const key = date.toISOString().slice(0, 10);
+    days[key] = (days[key] || 0) + 1;
+    return days;
+  }, {});
+  const activityTrend = Object.entries(activityByDate)
+    .sort(([first], [second]) => first.localeCompare(second))
+    .slice(-7)
+    .map(([date, count]) => ({ date, count }));
+  const activityMax = Math.max(1, ...activityTrend.map((item) => item.count));
+  const activityPoints = activityTrend.map((item, index) => ({
+    ...item,
+    x: activityTrend.length < 2 ? 320 : 28 + (index * 584) / (activityTrend.length - 1),
+    y: 170 - (item.count / activityMax) * 126,
+  }));
+  const activityPath = activityPoints.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
+  let statusOffset = 0;
+  const statusSegments = statusOverview.map((item) => {
+    const percentage = complaintTotal ? (item.count / complaintTotal) * 100 : 0;
+    const segment = { ...item, percentage, offset: statusOffset };
+    statusOffset += percentage;
+    return segment;
   });
 
   return (
     <MainLayout>
-      <section className="admin-dashboard" style={{ padding: '1.5rem', maxWidth: '1200px', margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', borderBottom: '2px solid #eee', paddingBottom: '1rem' }}>
+      <section className="admin-dashboard">
+          <div className="admin-dashboard__header">
           <div>
-            <h1 style={{ margin: 0 }}>⚙️ Admin Dashboard</h1>
+              <Logo to="/admin" ariaLabel="BadService admin dashboard" className="admin-dashboard__logo" />
+              <span className="admin-dashboard__eyebrow">Administration</span>
+              <h1 style={{ margin: 0 }}>Admin dashboard</h1>
             <p style={{ margin: '0.25rem 0', color: '#666', fontSize: '0.9rem' }}>
-              Manage complaints, companies, requests and users.
+              Manage complaints, companies and users.
             </p>
           </div>
           <div className="admin-dashboard__top-actions">
             <Link className="admin-dashboard__home-link" to="/">
-              <span aria-hidden="true">←</span> Return to Home
+              <AdminIcon name="home" /> Return to Home
             </Link>
             <button
               className="admin-dashboard__signout"
@@ -756,7 +800,8 @@ export default function AdminDashboardPage() {
               onClick={handleAdminSignOut}
               disabled={adminSigningOut}
             >
-              {adminSigningOut ? 'Signing out…' : 'Sign out'}
+              {!adminSigningOut && <AdminIcon name="logout" />}
+              {adminSigningOut ? 'Signing out' : 'Sign out'}
             </button>
           </div>
         </div>
@@ -776,187 +821,116 @@ export default function AdminDashboardPage() {
           </div>
         )}
 
-        {/* Tab Navigation */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-          <button style={tabStyle('overview')} onClick={() => setActiveTab('overview')}>
-            Overview
+        <div className="admin-dashboard__workspace">
+          <button type="button" className="admin-sidebar-toggle" aria-expanded={sidebarOpen} aria-controls="admin-workspace-nav" onClick={() => setSidebarOpen((open) => !open)}>
+            <span className="admin-sidebar-toggle__bars" aria-hidden="true"><i /><i /><i /></span>
+            Workspace navigation
+            <span className="admin-sidebar-toggle__chevron" aria-hidden="true">{sidebarOpen ? '−' : '+'}</span>
           </button>
-          <button style={tabStyle('complaints')} onClick={() => setActiveTab('complaints')}>
-            Complaint Management ({stats?.totalComplaints || 0})
-          </button>
-          <button style={tabStyle('create-complaint')} onClick={() => setActiveTab('create-complaint')}>
-            Create Complaint
-          </button>
-          <button style={tabStyle('companies')} onClick={() => setActiveTab('companies')}>
-            Companies ({stats?.totalCompanies || 0})
-          </button>
-          <button style={tabStyle('users')} onClick={() => setActiveTab('users')}>
-            Users ({stats?.totalUsers || 0})
-          </button>
-          <button style={tabStyle('categories')} onClick={() => setActiveTab('categories')}>
-            Categories
-          </button>
-        </div>
+          <nav id="admin-workspace-nav" className={`admin-dashboard__sidebar${sidebarOpen ? ' is-open' : ''}`} aria-label="Admin sections">
+            <Logo to="/admin" ariaLabel="BadService admin dashboard" compact className="admin-dashboard__sidebar-brand" />
+            <span className="admin-dashboard__sidebar-label">Workspace</span>
+            {[
+              ['overview', 'Overview', 'overview'],
+              ['complaints', `Complaints  ${stats?.totalComplaints || 0}`, 'complaints'],
+              ['create-complaint', 'Create complaint', 'create'],
+              ['companies', `Companies  ${stats?.totalCompanies || 0}`, 'companies'],
+              ['users', `Users  ${stats?.totalUsers || 0}`, 'users'],
+              ['categories', 'Categories', 'categories'],
+            ].map(([tab, label, icon]) => (
+              <button
+                key={tab}
+                type="button"
+                className={`admin-dashboard__nav-item${activeTab === tab ? ' is-active' : ''}`}
+                onClick={() => { setActiveTab(tab); setSidebarOpen(false); }}
+                aria-pressed={activeTab === tab}
+              >
+                <span className="admin-dashboard__nav-icon"><AdminIcon name={icon} size={17} /></span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="admin-dashboard__content">
 
         {/* TAB: OVERVIEW */}
         {activeTab === 'overview' && (
-          <div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
-              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Total Complaints</p>
-                <h2 style={{ margin: '0.5rem 0' }}>{stats?.totalComplaints || 0}</h2>
-                <small style={{ color: '#666' }}>{stats?.pendingComplaints || 0} pending review</small>
-              </div>
-
-              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Active Companies</p>
-                <h2 style={{ margin: '0.5rem 0', color: '#28a745' }}>{stats?.totalCompanies || 0}</h2>
-                <small style={{ color: '#666' }}>Registered brands</small>
-              </div>
-
-              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Registered Users</p>
-                <h2 style={{ margin: '0.5rem 0' }}>{stats?.totalUsers || 0}</h2>
-                <small style={{ color: '#666' }}>Community members</small>
-              </div>
-
-              <div style={{ background: '#fff', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}>
-                <p style={{ margin: 0, fontSize: '0.85rem', color: '#666' }}>Soft-Deleted Archive</p>
-                <h2 style={{ margin: '0.5rem 0', color: '#6c757d' }}>{stats?.deletedComplaints || 0}</h2>
-                <small style={{ color: '#666' }}>Safely stored in DB</small>
-              </div>
+          <div className="admin-overview">
+            <div className="admin-overview__metrics">
+              <article className="admin-metric-card metric-blue"><span className="admin-metric-card__icon"><AdminIcon name="complaints" size={20} /></span><div><span className="admin-metric-card__label">Total Complaints</span><strong>{stats?.totalComplaints || 0}</strong><small>{stats?.pendingComplaints || 0} pending review</small></div></article>
+              <article className="admin-metric-card metric-green"><span className="admin-metric-card__icon"><AdminIcon name="companies" size={20} /></span><div><span className="admin-metric-card__label">Active Companies</span><strong>{stats?.totalCompanies || 0}</strong><small>Registered brands</small></div></article>
+              <article className="admin-metric-card metric-violet"><span className="admin-metric-card__icon"><AdminIcon name="users" size={20} /></span><div><span className="admin-metric-card__label">Registered Users</span><strong>{stats?.totalUsers || 0}</strong><small>Community members</small></div></article>
+              <article className="admin-metric-card metric-amber"><span className="admin-metric-card__icon"><AdminIcon name="archive" size={20} /></span><div><span className="admin-metric-card__label">Soft-Deleted Archive</span><strong>{stats?.deletedComplaints || 0}</strong><small>Safely stored in DB</small></div></article>
             </div>
 
-            <div style={{ background: '#f8f9fa', border: '1px solid #ddd', borderRadius: '8px', padding: '1.25rem' }}>
-              <h3 style={{ margin: '0 0 0.5rem 0' }}>Quick Actions</h3>
-              <ul style={{ margin: 0, paddingLeft: '1.2rem', lineHeight: '1.8' }}>
-                <li>Review and approve user-requested companies to make them publicly available for complaints.</li>
-                <li>Update complaint status as companies respond or issues get resolved.</li>
-                <li>Manage user account statuses to protect platform integrity.</li>
-              </ul>
+            <div className="admin-overview__charts">
+              <section className="admin-analytics-card" aria-labelledby="admin-status-chart-title">
+                <div className="admin-analytics-card__heading"><div><span className="admin-section-kicker">Complaint analytics</span><h2 id="admin-status-chart-title">Status overview</h2></div><span className="admin-analytics-card__meta">{complaintTotal.toLocaleString()} total reports</span></div>
+                <div className="admin-status-donut">
+                  <div className="admin-status-donut__visual">
+                    <svg viewBox="0 0 120 120" role="img" aria-label={statusOverview.map((item) => `${item.label}: ${item.count}`).join(', ')}>
+                      <circle className="admin-status-donut__track" cx="60" cy="60" r="50" />
+                      {complaintTotal > 0 && statusSegments.map((item) => <circle key={item.className} className={`admin-status-donut__segment ${item.className}`} cx="60" cy="60" r="50" pathLength="100" strokeDasharray={`${item.percentage} ${100 - item.percentage}`} strokeDashoffset={-item.offset}><title>{item.label}: {item.count}</title></circle>)}
+                    </svg>
+                    <div className="admin-status-donut__center"><strong>{complaintTotal.toLocaleString()}</strong><span>Reports</span></div>
+                  </div>
+                  <div className="admin-status-donut__legend">{statusOverview.map((item) => <div key={item.className}><span className={`admin-status-donut__dot ${item.className}`} /><span>{item.label}</span><strong>{item.count.toLocaleString()}</strong></div>)}</div>
+                </div>
+              </section>
+
+              <section className="admin-analytics-card admin-activity-chart" aria-labelledby="admin-activity-chart-title">
+                <div className="admin-analytics-card__heading"><div><span className="admin-section-kicker">Latest activity</span><h2 id="admin-activity-chart-title">Complaint activity</h2></div><span className="admin-analytics-card__meta">Recent records by date</span></div>
+                {activityTrend.length === 0 ? <div className="admin-chart-empty">No complaint date data is available yet.</div> : (
+                  <div className="admin-activity-chart__plot" role="img" aria-label={`Recent complaints by date: ${activityTrend.map((item) => `${new Date(`${item.date}T00:00:00`).toLocaleDateString()}: ${item.count}`).join(', ')}`}>
+                    <svg viewBox="0 0 640 210" preserveAspectRatio="none" aria-hidden="true">
+                      {[44, 86, 128, 170].map((y) => <line key={y} x1="28" y1={y} x2="612" y2={y} className="admin-activity-chart__gridline" />)}
+                      <path d={`${activityPath} L ${activityPoints.at(-1).x} 170 L ${activityPoints[0].x} 170 Z`} className="admin-activity-chart__area" />
+                      <path d={activityPath} className="admin-activity-chart__line" />
+                      {activityPoints.map((point) => <circle key={point.date} cx={point.x} cy={point.y} r="4" className="admin-activity-chart__point"><title>{new Date(`${point.date}T00:00:00`).toLocaleDateString()}: {point.count} complaint{point.count === 1 ? '' : 's'}</title></circle>)}
+                    </svg>
+                    <div className="admin-activity-chart__labels">{activityPoints.map((point) => <span key={point.date}>{new Date(`${point.date}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>)}</div>
+                  </div>
+                )}
+              </section>
             </div>
+
+            <section className="admin-recent-complaints" aria-labelledby="admin-recent-title">
+              <div className="admin-section-heading"><div><span className="admin-section-kicker">Latest activity</span><h2 id="admin-recent-title">Recent complaints</h2></div><button type="button" className="admin-dashboard__text-action" onClick={() => setActiveTab('complaints')}>Manage Complaints <AdminIcon name="arrow" size={16} /></button></div>
+              {recentComplaintsLoading && <div className="admin-recent-complaints__loading" role="status">Loading recent complaints</div>}
+              {!recentComplaintsLoading && recentComplaints.length === 0 && <p className="admin-recent-complaints__empty">No recent complaints to display.</p>}
+              {!recentComplaintsLoading && recentComplaints.length > 0 && (
+                <div className="admin-recent-complaints__table-wrap"><div className="admin-recent-complaints__table-head"><span>Complaint</span><span>Brand</span><span>Date</span><span>Status</span></div>
+                  <div className="admin-recent-complaints__list">{recentComplaints.map((complaint) => (
+                    <article key={complaint.id} className="admin-recent-complaints__item">
+                      <strong title={complaint.title}>{complaint.title}</strong><span className="admin-recent-complaints__brand">{complaint.company || 'Unlisted company'}</span><span className="admin-recent-complaints__date">{complaint.createdAt ? new Date(complaint.createdAt).toLocaleDateString() : 'Recently submitted'}</span>
+                      <span className={`admin-recent-complaints__status status-${String(complaint.status || 'pending').toLowerCase().replace(/_/g, '-')}`}>{String(complaint.status || 'PENDING').replace(/_/g, ' ')}</span>
+                    </article>
+                  ))}</div>
+                </div>
+              )}
+            </section>
+
+            <section className="admin-quick-actions" aria-labelledby="admin-quick-actions-title">
+              <div className="admin-section-heading"><div><span className="admin-section-kicker">Platform tools</span><h2 id="admin-quick-actions-title">Quick Actions</h2></div></div>
+              <div className="admin-quick-actions__grid">
+                <article><span><AdminIcon name="companies" /></span><p>Review and approve user-requested companies to make them publicly available for complaints.</p></article>
+                <article><span><AdminIcon name="reports" /></span><p>Update complaint status as companies respond or issues get resolved.</p></article>
+                <article><span><AdminIcon name="users" /></span><p>Manage user account statuses to protect platform integrity.</p></article>
+              </div>
+            </section>
           </div>
         )}
 
-        {/* TAB: COMPANY REQUESTS */}
-        {activeTab === 'requests' && (
-          <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <h2 style={{ margin: 0 }}>Company Requests</h2>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {['', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
-                  <button
-                    key={st}
-                    onClick={() => {
-                      setRequestFilter(st);
-                      loadRequests(st);
-                    }}
-                    style={{
-                      padding: '0.3rem 0.6rem',
-                      fontSize: '0.8rem',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc',
-                      background: requestFilter === st ? '#232f3e' : '#fff',
-                      color: requestFilter === st ? '#fff' : '#333',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    {st || 'All'}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {loading && <p>Loading requests...</p>}
-            {!loading && requests.length === 0 && (
-              <p style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '6px' }}>
-                No company requests found for filter: <strong>{requestFilter || 'All'}</strong>
-              </p>
-            )}
-
-            {!loading && requests.length > 0 && (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
-                  <thead>
-                    <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Company</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Category</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Requested By</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Notes</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Status</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.map((r) => (
-                      <tr key={r.id} style={{ borderBottom: '1px solid #eee' }}>
-                        <td style={{ padding: '0.6rem 0.8rem', fontWeight: 600 }}>{r.companyName}</td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>{r.categoryName || r.categoryId}</td>
-                        <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                          {r.requesterName} <br />
-                          <small style={{ color: '#666' }}>{r.requesterEmail}</small>
-                        </td>
-                        <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem', color: '#555' }}>
-                          {r.description || '-'}
-                        </td>
-                        <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
-                          {new Date(r.createdAt).toLocaleDateString()}
-                        </td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>
-                          <span
-                            style={{
-                              padding: '0.2rem 0.5rem',
-                              borderRadius: '4px',
-                              fontSize: '0.75rem',
-                              fontWeight: 600,
-                              background: r.status === 'APPROVED' ? '#d4edda' : r.status === 'REJECTED' ? '#f8d7da' : '#fff3cd',
-                              color: r.status === 'APPROVED' ? '#155724' : r.status === 'REJECTED' ? '#721c24' : '#856404',
-                            }}
-                          >
-                            {r.status}
-                          </span>
-                        </td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>
-                          {r.status === 'PENDING' ? (
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              <button
-                                onClick={() => handleApproveRequest(r.id)}
-                                style={{ padding: '0.3rem 0.6rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectRequest(r.id)}
-                                style={{ padding: '0.3rem 0.6rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: '0.8rem', color: '#888' }}>
-                              {r.reviewedBy ? 'Reviewed' : '-'}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        )}
 
         {/* COMPLAINT MANAGEMENT AND CREATE COMPLAINT PAGES */}
         {(activeTab === 'complaints' || activeTab === 'create-complaint') && (
           <div>
             {activeTab === 'create-complaint' && (
             <form
+              className="admin-complaint-form"
               onSubmit={handleCreateAdminComplaint}
               style={{ background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: '8px', padding: '1rem', marginBottom: '1.25rem' }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              <div className="admin-complaint-form__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '1rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: '1rem' }}>Record a complaint for a user</h3>
                   <p style={{ margin: '0.25rem 0 0', color: '#64748b', fontSize: '0.82rem' }}>
@@ -965,7 +939,8 @@ export default function AdminDashboardPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.65rem' }}>
+              <div className="admin-complaint-form__fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.65rem' }}>
+                <div className="admin-complaint-form__section-title"><span>01</span><div><strong>Complaint information</strong><small>Product or service details</small></div></div>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Type *
                   <select
@@ -1006,6 +981,7 @@ export default function AdminDashboardPage() {
                   Location *
                   <input required value={adminComplaintForm.location} onChange={(event) => handleAdminComplaintFieldChange('location', event.target.value)} placeholder="Enter location" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
+                <div className="admin-complaint-form__section-title"><span>02</span><div><strong>Complainant information</strong><small>Contact details for this report</small></div></div>
                 <label style={{ fontSize: '0.82rem', color: '#334155' }}>
                   Complainant name *
                   <input required value={adminComplaintForm.complainantName} onChange={(event) => handleAdminComplaintFieldChange('complainantName', event.target.value)} placeholder="Enter full name" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
@@ -1033,15 +1009,18 @@ export default function AdminDashboardPage() {
                   <input inputMode="numeric" maxLength="6" value={adminComplaintForm.complainantPincode} onChange={(event) => setAdminComplaintForm((form) => ({ ...form, complainantPincode: event.target.value }))} placeholder="6-digit pincode" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box' }} />
                 </label>
               </div>
-              <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
+              <section className="admin-complaint-form__section admin-complaint-form__section--wide">
+              <div className="admin-complaint-form__section-title"><span>03</span><div><strong>Incident details</strong><small>Describe what happened and where</small></div></div>
+              <label className="admin-complaint-form__wide-field" style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
                 Complainant address (optional)
                 <textarea value={adminComplaintForm.complainantAddress} onChange={(event) => handleAdminComplaintFieldChange('complainantAddress', event.target.value)} placeholder="Enter full address" rows="2" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
               </label>
-              <label style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
+              <label className="admin-complaint-form__wide-field" style={{ display: 'block', marginTop: '0.65rem', fontSize: '0.82rem', color: '#334155' }}>
                 Complaint details *
                 <textarea required value={adminComplaintForm.description} onChange={(event) => handleAdminComplaintFieldChange('description', event.target.value)} placeholder="Enter complete complaint details" rows="3" style={{ display: 'block', width: '100%', marginTop: '0.2rem', padding: '0.45rem', boxSizing: 'border-box', resize: 'vertical' }} />
               </label>
-              <fieldset style={{ margin: '0.9rem 0 0', padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '6px' }}>
+              </section>
+              <fieldset className="admin-complaint-form__evidence" style={{ margin: '0.9rem 0 0', padding: '0.8rem', border: '1px solid #bae6fd', borderRadius: '6px' }}>
                 <legend style={{ padding: '0 0.3rem', color: '#0369a1', fontSize: '0.86rem', fontWeight: 700 }}>
                   Required evidence uploads
                 </legend>
@@ -1049,9 +1028,12 @@ export default function AdminDashboardPage() {
                   Upload one required product/service photo, with up to two optional extra photos. Bill/receipt and evidence video are required.
                 </p>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.65rem' }}>
-                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  <label className="admin-upload-dropzone" style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Product / service photo *
+                    <span className="admin-upload-dropzone__icon" aria-hidden="true">+</span>
+                    <span className="admin-upload-dropzone__hint">Drop a file here or choose a photo</span>
                     <input
+                      className="admin-upload-input"
                       key={`admin-product-image-${adminComplaintMediaKey}`}
                       type="file"
                       accept={IMAGE_ACCEPT}
@@ -1061,9 +1043,12 @@ export default function AdminDashboardPage() {
                     />
                     {renderAdminUploadState('productImage')}
                   </label>
-                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  <label className="admin-upload-dropzone" style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Additional photo 2 (optional)
+                    <span className="admin-upload-dropzone__icon" aria-hidden="true">+</span>
+                    <span className="admin-upload-dropzone__hint">Drop a file here or choose a photo</span>
                     <input
+                      className="admin-upload-input"
                       key={`admin-product-image-2-${adminComplaintMediaKey}`}
                       type="file"
                       accept={IMAGE_ACCEPT}
@@ -1072,9 +1057,12 @@ export default function AdminDashboardPage() {
                     />
                     {renderAdminUploadState('productImage2')}
                   </label>
-                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  <label className="admin-upload-dropzone" style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Additional photo 3 (optional)
+                    <span className="admin-upload-dropzone__icon" aria-hidden="true">+</span>
+                    <span className="admin-upload-dropzone__hint">Drop a file here or choose a photo</span>
                     <input
+                      className="admin-upload-input"
                       key={`admin-product-image-3-${adminComplaintMediaKey}`}
                       type="file"
                       accept={IMAGE_ACCEPT}
@@ -1083,9 +1071,12 @@ export default function AdminDashboardPage() {
                     />
                     {renderAdminUploadState('productImage3')}
                   </label>
-                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  <label className="admin-upload-dropzone" style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Bill / receipt image *
+                    <span className="admin-upload-dropzone__icon" aria-hidden="true">+</span>
+                    <span className="admin-upload-dropzone__hint">Drop a file here or choose the bill image</span>
                     <input
+                      className="admin-upload-input"
                       key={`admin-bill-image-${adminComplaintMediaKey}`}
                       type="file"
                       accept={IMAGE_ACCEPT}
@@ -1095,9 +1086,12 @@ export default function AdminDashboardPage() {
                     />
                     {renderAdminUploadState('billImage')}
                   </label>
-                  <label style={{ fontSize: '0.82rem', color: '#334155' }}>
+                  <label className="admin-upload-dropzone" style={{ fontSize: '0.82rem', color: '#334155' }}>
                     Evidence video *
+                    <span className="admin-upload-dropzone__icon" aria-hidden="true">VID</span>
+                    <span className="admin-upload-dropzone__hint">Drop a file here or choose a video</span>
                     <input
+                      className="admin-upload-input"
                       key={`admin-product-video-${adminComplaintMediaKey}`}
                       type="file"
                       accept={VIDEO_ACCEPT}
@@ -1109,8 +1103,9 @@ export default function AdminDashboardPage() {
                   </label>
                 </div>
               </fieldset>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.9rem' }}>
+              <div className="admin-complaint-form__actions" style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.9rem' }}>
                 <button
+                  className="admin-complaint-form__submit"
                   type="submit"
                   disabled={creatingAdminComplaint}
                   style={{ padding: '0.45rem 0.8rem', background: '#0284c7', color: '#fff', border: 'none', borderRadius: '4px', cursor: creatingAdminComplaint ? 'not-allowed' : 'pointer', fontWeight: 700, opacity: creatingAdminComplaint ? 0.7 : 1 }}
@@ -1122,11 +1117,16 @@ export default function AdminDashboardPage() {
             )}
             {activeTab === 'complaints' && (
             <>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                <h2 style={{ margin: 0 }}>Complaints Management</h2>
+            <div className="admin-complaints-toolbar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+              <div className="admin-complaints-tabs" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <div className="admin-complaints-heading">
+                  <h2 style={{ margin: 0 }}>Complaints Management</h2>
+                  <p>Review reports, manage complaint status, and respond to customer requests.</p>
+                </div>
                 <button
                   type="button"
+                  className={`admin-complaints-tab${!deleteRequestOnly && !viewDeleted ? ' is-active' : ''}`}
+                  aria-pressed={!deleteRequestOnly && !viewDeleted}
                   onClick={() => {
                     setDeleteRequestOnly(false);
                     setViewDeleted(false);
@@ -1147,6 +1147,8 @@ export default function AdminDashboardPage() {
                 </button>
                 <button
                   type="button"
+                  className={`admin-complaints-tab${deleteRequestOnly ? ' is-active is-delete' : ''}`}
+                  aria-pressed={deleteRequestOnly}
                   onClick={() => {
                     setViewDeleted(false);
                     setDeleteRequestOnly(true);
@@ -1163,10 +1165,12 @@ export default function AdminDashboardPage() {
                     fontWeight: 600,
                   }}
                 >
-                  ⚠️ Delete Requests {stats?.pendingDeleteRequests > 0 ? `(${stats.pendingDeleteRequests})` : ''}
+                   Delete Requests {stats?.pendingDeleteRequests > 0 ? `(${stats.pendingDeleteRequests})` : ''}
                 </button>
                 <button
                   type="button"
+                  className={`admin-complaints-tab${viewDeleted ? ' is-active' : ''}`}
+                  aria-pressed={viewDeleted}
                   onClick={() => {
                     setDeleteRequestOnly(false);
                     setViewDeleted(true);
@@ -1183,11 +1187,11 @@ export default function AdminDashboardPage() {
                     fontWeight: 600,
                   }}
                 >
-                  🗄️ Soft-Deleted Archive {stats?.deletedComplaints > 0 ? `(${stats.deletedComplaints})` : ''}
+                   Soft-Deleted Archive {stats?.deletedComplaints > 0 ? `(${stats.deletedComplaints})` : ''}
                 </button>
               </div>
 
-              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <div className="admin-complaints-filters" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                 <input
                   placeholder="Search title, company, person..."
                   value={complaintSearch}
@@ -1217,34 +1221,35 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            {loading && <p>Loading complaints...</p>}
+            {loading && <p className="admin-complaints-state">Loading complaints...</p>}
             {!loading && complaints.length === 0 && (
-              <p style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '6px' }}>
+              <p className="admin-complaints-state" style={{ padding: '2rem', textAlign: 'center', background: '#f9f9f9', borderRadius: '6px' }}>
                 {deleteRequestOnly ? 'No pending delete requests.' : viewDeleted ? 'No soft-deleted complaints in archive.' : 'No complaints found matching criteria.'}
               </p>
             )}
 
             {!loading && complaints.length > 0 && (
               <>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
+                <div className="admin-complaints-table-wrap" style={{ overflowX: 'auto' }}>
+                  <table className="admin-complaints-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', background: '#fff', border: '1px solid #eee' }}>
                   <thead>
                     <tr style={{ background: '#f5f5f5', borderBottom: '2px solid #ddd' }}>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Complaint</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Type & Brand</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Complainant</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Date</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Bill (admin only)</th>
+                      <th style={{ padding: '0.6rem 0.8rem' }}>Bill and Actions</th>
                       <th style={{ padding: '0.6rem 0.8rem' }}>Status</th>
-                      <th style={{ padding: '0.6rem 0.8rem' }}>Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {complaints.map((c) => (
                       <tr key={c.id} style={{ borderBottom: '1px solid #eee', background: c.deleteRequested ? '#fffaf0' : c.isDeleted ? '#fff5f5' : 'transparent' }}>
                         <td style={{ padding: '0.6rem 0.8rem', maxWidth: '260px' }}>
+                          <small className="admin-complaint-id">ID {c.id}</small>
                           <button
                             type="button"
+                            className="admin-complaint-title"
                             onClick={() => setSelectedComplaint(c)}
                             style={{
                               background: 'none',
@@ -1259,22 +1264,22 @@ export default function AdminDashboardPage() {
                           >
                             {c.title}
                           </button>
-                          {c.location && <small style={{ display: 'block', color: '#666' }}>📍 {c.location}</small>}
+                          {c.location && <small style={{ display: 'block', color: '#666' }}> {c.location}</small>}
                           {c.deleteRequested && (
                             <span style={{ display: 'inline-block', marginTop: '4px', padding: '2px 6px', background: '#ffebee', color: '#c62828', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-                              ⚠️ DELETE REQUESTED
+                               DELETE REQUESTED
                             </span>
                           )}
                           {c.isDeleted && (
                             <div style={{ marginTop: '4px' }}>
                               <span style={{ display: 'inline-block', padding: '2px 6px', background: '#f8d7da', color: '#721c24', borderRadius: '4px', fontSize: '0.72rem', fontWeight: 700 }}>
-                                🗄️ ARCHIVED IN DB
+                                 ARCHIVED IN DB
                               </span>
                               {c.deleteAdminNote && <small style={{ display: 'block', color: '#888', fontStyle: 'italic' }}>Note: {c.deleteAdminNote}</small>}
                             </div>
                           )}
                         </td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>
+                        <td className="admin-complaint-company" style={{ padding: '0.6rem 0.8rem' }}>
                           <span style={{ fontSize: '0.75rem', fontWeight: 600, color: c.type === 'Service' ? '#856404' : '#004085', background: c.type === 'Service' ? '#fff3cd' : '#cce5ff', padding: '1px 5px', borderRadius: '3px', marginRight: '4px' }}>
                             {c.type || 'Product'}
                           </span>
@@ -1282,18 +1287,18 @@ export default function AdminDashboardPage() {
                           {c.serviceType && <small style={{ display: 'block', color: '#555' }}>Type: {c.serviceType}</small>}
                           {c.category && <small style={{ display: 'block', color: '#888' }}>{c.category}</small>}
                         </td>
-                        <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
+                        <td className="admin-complaint-person" style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                           <div>{c.complainantName || 'Anonymous'}</div>
                           {c.complainantPhone && (
                             <small style={{ color: '#555' }}>
-                              📞 {c.complainantPhone} {c.phoneVerified ? '✓' : ''}
+                               {c.complainantPhone} {c.phoneVerified ? 'Verified' : ''}
                             </small>
                           )}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                           {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : 'Recent'}
                         </td>
-                        <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
+                        <td className="admin-complaint-bill-actions" style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
                           {c.billImageUrl ? (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                               <button
@@ -1311,20 +1316,34 @@ export default function AdminDashboardPage() {
                                 }}
                                 title="Click for instant preview without opening new tab"
                               >
-                                🔒 View Bill
+                                 View Bill
                               </button>
                             </div>
                           ) : (
                             <span style={{ color: '#aaa' }}>None</span>
                           )}
+                          <div className="admin-complaint-actions" style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '8px' }}>
+                            <button type="button" onClick={() => setSelectedComplaint(c)} style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Review</button>
+                            <button type="button" onClick={() => handleStartEdit(c)} style={{ padding: '0.25rem 0.5rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }} title="Edit complaint details">Edit</button>
+                            {c.isDeleted ? (
+                              <button type="button" onClick={() => handleRestoreComplaint(c.id)} style={{ padding: '0.25rem 0.55rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }} title="Restore this complaint back to active status on the website">Restore</button>
+                            ) : (
+                              <>
+                                {c.status === 'PENDING' && <button type="button" onClick={() => handleComplaintStatusChange(c.id, 'APPROVED')} style={{ padding: '0.25rem 0.5rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>Approve</button>}
+                                {c.deleteRequested && <button type="button" onClick={() => handleApproveDeleteRequest(c.id)} style={{ padding: '0.25rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }} title="Approve deletion request and archive this complaint">Approve Delete</button>}
+                                <button type="button" onClick={() => handleDeleteComplaint(c.id)} style={{ padding: '0.25rem 0.4rem', background: '#eee', color: '#dc3545', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}>Delete</button>
+                              </>
+                            )}
+                          </div>
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem' }}>
                           {c.isDeleted ? (
                             <span style={{ fontSize: '0.78rem', fontWeight: 700, background: '#f8d7da', color: '#721c24', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                              🗑️ SOFT-DELETED
+                               SOFT-DELETED
                             </span>
                           ) : (
                             <select
+                              className={`admin-complaint-status admin-complaint-status--${String(c.status || 'PENDING').toLowerCase().replace(/_/g, '-')}`}
                               value={c.status || 'PENDING'}
                               onChange={(e) => handleComplaintStatusChange(c.id, e.target.value)}
                               style={{
@@ -1344,89 +1363,16 @@ export default function AdminDashboardPage() {
                             </select>
                           )}
                         </td>
-                        <td style={{ padding: '0.6rem 0.8rem' }}>
-                          {c.isDeleted ? (
-                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedComplaint(c)}
-                                style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                              >
-                                🔍 Review
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(c)}
-                                style={{ padding: '0.25rem 0.5rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                title="Edit complaint details"
-                              >
-                                ✏️ Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRestoreComplaint(c.id)}
-                                style={{ padding: '0.25rem 0.55rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                title="Restore this complaint back to active status on the website"
-                              >
-                                ♻️ Restore
-                              </button>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap' }}>
-                              <button
-                                type="button"
-                                onClick={() => setSelectedComplaint(c)}
-                                style={{ padding: '0.25rem 0.5rem', background: '#232f3e', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                              >
-                                🔍 Review
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(c)}
-                                style={{ padding: '0.25rem 0.5rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                title="Edit complaint details"
-                              >
-                                ✏️ Edit
-                              </button>
-                              {c.status === 'PENDING' && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleComplaintStatusChange(c.id, 'APPROVED')}
-                                  style={{ padding: '0.25rem 0.5rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                >
-                                  ✓ Approve
-                                </button>
-                              )}
-                              {c.deleteRequested && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleApproveDeleteRequest(c.id)}
-                                  style={{ padding: '0.25rem 0.5rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}
-                                  title="Approve deletion request and archive this complaint"
-                                >
-                                  Approve Delete
-                                </button>
-                              )}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteComplaint(c.id)}
-                                style={{ padding: '0.25rem 0.4rem', background: '#eee', color: '#dc3545', border: '1px solid #ddd', borderRadius: '4px', cursor: 'pointer', fontSize: '0.75rem' }}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </td>
                       </tr>
                     ))}
                   </tbody>
                   </table>
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+                <div className="admin-complaints-pagination" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginTop: '1rem' }}>
                   <small style={{ color: '#64748b' }}>
-                    Showing {((complaintPagination.page - 1) * complaintPagination.limit) + 1}–{Math.min(complaintPagination.page * complaintPagination.limit, complaintPagination.total)} of {complaintPagination.total}
+                    Showing {((complaintPagination.page - 1) * complaintPagination.limit) + 1}{Math.min(complaintPagination.page * complaintPagination.limit, complaintPagination.total)} of {complaintPagination.total}
                   </small>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <div className="admin-complaints-pagination__controls" style={{ display: 'flex', gap: '0.5rem' }}>
                     <button
                       type="button"
                       disabled={complaintPagination.page <= 1}
@@ -1497,7 +1443,7 @@ export default function AdminDashboardPage() {
                       onClick={() => setSelectedComplaint(null)}
                       style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#888' }}
                     >
-                      ×
+
                     </button>
                   </div>
 
@@ -1505,7 +1451,7 @@ export default function AdminDashboardPage() {
                   {selectedComplaint.deleteRequested && (
                     <div style={{ background: '#fff3cd', border: '1px solid #ffeeba', color: '#856404', padding: '1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                       <h4 style={{ margin: '0 0 0.35rem 0', color: '#721c24' }}>
-                        ⚠️ User Submitted a Delete Request
+                         User Submitted a Delete Request
                       </h4>
                       <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>
                         <strong>Reason:</strong> {selectedComplaint.deleteReason || 'User requested deletion'}
@@ -1521,14 +1467,14 @@ export default function AdminDashboardPage() {
                           onClick={() => handleApproveDeleteRequest(selectedComplaint.id)}
                           style={{ padding: '0.4rem 0.8rem', background: '#dc3545', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                         >
-                          ✓ Approve Delete Request (Permanently Delete)
+                           Approve Delete Request (Permanently Delete)
                         </button>
                         <button
                           type="button"
                           onClick={() => handleRejectDeleteRequest(selectedComplaint.id)}
                           style={{ padding: '0.4rem 0.8rem', background: '#6c757d', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}
                         >
-                          ✗ Reject Delete Request (Keep Complaint)
+                           Reject Delete Request (Keep Complaint)
                         </button>
                       </div>
                     </div>
@@ -1538,7 +1484,7 @@ export default function AdminDashboardPage() {
                   {selectedComplaint.isDeleted && (
                     <div style={{ background: '#f8d7da', border: '1px solid #f5c6cb', color: '#721c24', padding: '1rem', borderRadius: '6px', marginBottom: '1.25rem' }}>
                       <h4 style={{ margin: '0 0 0.35rem 0', color: '#721c24' }}>
-                        🗄️ Soft-Deleted & Safely Archived in Database
+                         Soft-Deleted & Safely Archived in Database
                       </h4>
                       <p style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem' }}>
                         <strong>Admin Deletion Note:</strong> {selectedComplaint.deleteAdminNote || 'Archived by administrator'}
@@ -1553,7 +1499,7 @@ export default function AdminDashboardPage() {
                         onClick={() => handleRestoreComplaint(selectedComplaint.id)}
                         style={{ padding: '0.45rem 1rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700, fontSize: '0.85rem' }}
                       >
-                        ♻️ Restore Complaint to Website
+                         Restore Complaint to Website
                       </button>
                     </div>
                   )}
@@ -1592,7 +1538,7 @@ export default function AdminDashboardPage() {
                             fontSize: '0.85rem',
                           }}
                         >
-                          ✓ Approve & Publish to Website
+                           Approve & Publish to Website
                         </button>
                       )}
                       {['APPROVED', 'UNDER_REVIEW', 'COMPANY_RESPONDED', 'RESOLVED'].includes(selectedComplaint.status) && (
@@ -1609,7 +1555,7 @@ export default function AdminDashboardPage() {
                             fontSize: '0.82rem',
                           }}
                         >
-                          View Public Page ↗
+                          View Public Page
                         </Link>
                       )}
                       <button
@@ -1627,7 +1573,7 @@ export default function AdminDashboardPage() {
                         }}
                         title="Edit complaint details and preserve revision history"
                       >
-                        ✏️ Edit Details
+                         Edit Details
                       </button>
                     </div>
                   </div>
@@ -1637,13 +1583,13 @@ export default function AdminDashboardPage() {
                     {/* Column 1: Complainant Details */}
                     <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', background: '#fafbfc' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e', borderBottom: '1px solid #ddd', paddingBottom: '0.4rem' }}>
-                        👤 Complainant Information
+                         Complainant Information
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.88rem' }}>
                         <div><strong>Full Name:</strong> {selectedComplaint.complainantName || 'Not specified'}</div>
                         <div>
                           <strong>Phone:</strong> {selectedComplaint.complainantPhone || 'Not specified'}
-                          {selectedComplaint.phoneVerified && <span style={{ color: '#28a745', marginLeft: '6px', fontWeight: 600 }}>✓ Phone Verified</span>}
+                          {selectedComplaint.phoneVerified && <span style={{ color: '#28a745', marginLeft: '6px', fontWeight: 600 }}> Phone Verified</span>}
                         </div>
                         <div><strong>Email:</strong> {selectedComplaint.complainantEmail || 'None'}</div>
                         <div><strong>City:</strong> {selectedComplaint.complainantCity || 'Not specified'}</div>
@@ -1656,7 +1602,7 @@ export default function AdminDashboardPage() {
                     {/* Column 2: Complaint Details */}
                     <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', background: '#fafbfc' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e', borderBottom: '1px solid #ddd', paddingBottom: '0.4rem' }}>
-                        📋 Complaint Particulars
+                         Complaint Particulars
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', fontSize: '0.88rem' }}>
                         <div><strong>Complaint Type:</strong> {selectedComplaint.type || 'Product'}</div>
@@ -1682,7 +1628,7 @@ export default function AdminDashboardPage() {
 
                   {/* Full Complaint Description */}
                   <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem', background: '#fff' }}>
-                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#232f3e' }}>📝 Full Complaint Description</h4>
+                    <h4 style={{ margin: '0 0 0.5rem 0', color: '#232f3e' }}> Full Complaint Description</h4>
                     <p style={{ margin: 0, fontSize: '0.92rem', lineHeight: '1.5', whiteSpace: 'pre-wrap', color: '#333' }}>
                       {selectedComplaint.description || 'No description provided.'}
                     </p>
@@ -1692,7 +1638,7 @@ export default function AdminDashboardPage() {
                   {Array.isArray(selectedComplaint.editHistory) && selectedComplaint.editHistory.length > 0 && (
                     <div style={{ border: '1px solid #cce5ff', background: '#f0f7ff', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem' }}>
                       <h4 style={{ margin: '0 0 0.5rem 0', color: '#004085', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        🕒 Edit & Correction History ({selectedComplaint.editHistory.length} revisions)
+                         Edit & Correction History ({selectedComplaint.editHistory.length} revisions)
                       </h4>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                         {selectedComplaint.editHistory.map((hist, idx) => (
@@ -1718,13 +1664,13 @@ export default function AdminDashboardPage() {
                   {/* Evidences Section: Bill, Photo, Video */}
                   <div style={{ border: '1px solid #e9ecef', borderRadius: '6px', padding: '1rem', marginBottom: '1.25rem', background: '#fff' }}>
                     <h4 style={{ margin: '0 0 0.75rem 0', color: '#232f3e' }}>
-                      📎 Uploaded Evidence & Verification Files
+                       Uploaded Evidence & Verification Files
                     </h4>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
                       {/* 1. Bill (Admin only) */}
                       <div style={{ border: '1px solid #ffc107', borderRadius: '6px', padding: '0.75rem', background: '#fffdf6' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                          <strong style={{ fontSize: '0.85rem' }}>🔒 Purchase Proof / Bill</strong>
+                          <strong style={{ fontSize: '0.85rem' }}> Purchase Proof / Bill</strong>
                           <span style={{ fontSize: '0.7rem', color: '#856404', background: '#fff3cd', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             Admin Only
                           </span>
@@ -1749,7 +1695,7 @@ export default function AdminDashboardPage() {
                       <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem', background: '#fafafa' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                           <strong style={{ fontSize: '0.85rem' }}>
-                            📸 {selectedComplaint.type === 'Service' ? 'Service Photo' : 'Product Photo'}
+                             {selectedComplaint.type === 'Service' ? 'Service Photo' : 'Product Photo'}
                           </strong>
                           <span style={{ fontSize: '0.7rem', color: '#155724', background: '#d4edda', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             Public Carousel
@@ -1771,7 +1717,7 @@ export default function AdminDashboardPage() {
                                   rel="noopener noreferrer"
                                   style={{ display: 'inline-block', marginTop: '6px', fontSize: '0.76rem', color: '#0066cc', fontWeight: 600 }}
                                 >
-                                  Photo {index + 1} — Open Full Size ↗
+                                  Photo {index + 1}  Open Full Size
                                 </a>
                               </div>
                             ))}
@@ -1785,7 +1731,7 @@ export default function AdminDashboardPage() {
                       <div style={{ border: '1px solid #ddd', borderRadius: '6px', padding: '0.75rem', background: '#fafafa' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                           <strong style={{ fontSize: '0.85rem' }}>
-                            🎥 {selectedComplaint.type === 'Service' ? 'Service Video' : 'Product Video'}
+                             {selectedComplaint.type === 'Service' ? 'Service Video' : 'Product Video'}
                           </strong>
                           <span style={{ fontSize: '0.7rem', color: '#155724', background: '#d4edda', padding: '2px 6px', borderRadius: '4px', fontWeight: 600 }}>
                             Public Carousel
@@ -1831,7 +1777,7 @@ export default function AdminDashboardPage() {
                           onClick={() => handleRestoreComplaint(selectedComplaint.id)}
                           style={{ padding: '0.4rem 0.8rem', background: '#28a745', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
                         >
-                          ♻️ Restore to Website
+                           Restore to Website
                         </button>
                       ) : (
                         <button
@@ -1889,7 +1835,7 @@ export default function AdminDashboardPage() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #0066cc', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
                     <div>
                       <h2 style={{ margin: 0, fontSize: '1.25rem', color: '#111' }}>
-                        ✏️ Edit Complaint #{editingComplaint.id}
+                         Edit Complaint #{editingComplaint.id}
                       </h2>
                       <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: '#666' }}>
                         Correct typos, seller, address, or details. All modifications are logged in complaint revision history.
@@ -1900,7 +1846,7 @@ export default function AdminDashboardPage() {
                       onClick={() => setEditingComplaint(null)}
                       style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: '#888' }}
                     >
-                      ×
+
                     </button>
                   </div>
 
@@ -1909,7 +1855,7 @@ export default function AdminDashboardPage() {
                       <div>
                         <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#0369a1', fontWeight: 800 }}>Type &amp; Category</span>
                         <div style={{ fontSize: '0.86rem', fontWeight: 700, color: '#0c4a6e' }}>
-                          {editingComplaint.type || 'Product'} · {editingComplaint.category || 'N/A'}
+                          {editingComplaint.type || 'Product'}  {editingComplaint.category || 'N/A'}
                         </div>
                       </div>
                       <div>
@@ -1921,7 +1867,7 @@ export default function AdminDashboardPage() {
                       <div>
                         <span style={{ fontSize: '0.72rem', textTransform: 'uppercase', color: '#0369a1', fontWeight: 800 }}>Current Status</span>
                         <div style={{ fontSize: '0.86rem', fontWeight: 700, color: editingComplaint.status === 'APPROVED' ? '#15803d' : '#854d0e' }}>
-                          ● {editingComplaint.status || 'PENDING'}
+                           {editingComplaint.status || 'PENDING'}
                         </div>
                       </div>
                     </div>
@@ -1992,7 +1938,7 @@ export default function AdminDashboardPage() {
 
                     <div style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '6px', border: '1px solid #e9ecef' }}>
                       <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem', color: '#232f3e' }}>
-                        👤 Complainant Contact & Address Details
+                         Complainant Contact & Address Details
                       </h4>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', marginBottom: '0.75rem' }}>
                         <div>
@@ -2109,7 +2055,7 @@ export default function AdminDashboardPage() {
                         disabled={savingEdit}
                         style={{ padding: '0.5rem 1.25rem', background: '#0066cc', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 700 }}
                       >
-                        {savingEdit ? 'Saving Changes…' : '💾 Save Changes & Log Revision'}
+                        {savingEdit ? 'Saving Changes' : ' Save Changes & Log Revision'}
                       </button>
                     </div>
                   </form>
@@ -2328,7 +2274,7 @@ export default function AdminDashboardPage() {
                     {categories.map((cat) => (
                       <tr key={cat.id} style={{ borderBottom: '1px solid #eee' }}>
                         <td style={{ padding: '0.6rem 0.8rem', fontWeight: cat.parentId ? 'normal' : 600 }}>
-                          {cat.parentId ? `└─ ${cat.name}` : cat.name}
+                          {cat.parentId ? ` ${cat.name}` : cat.name}
                         </td>
                         <td style={{ padding: '0.6rem 0.8rem', color: '#666', fontSize: '0.85rem' }}>{cat.slug || cat.id}</td>
                         <td style={{ padding: '0.6rem 0.8rem', fontSize: '0.85rem' }}>
@@ -2350,6 +2296,9 @@ export default function AdminDashboardPage() {
             )}
           </div>
         )}
+
+          </div>
+        </div>
 
         {/* Quick Instant Bill Viewer Modal */}
         {billPreviewOpen && (
@@ -2392,7 +2341,7 @@ export default function AdminDashboardPage() {
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '1.2rem' }}>🔒</span>
+                  <span style={{ fontSize: '1.2rem' }}></span>
                   <strong style={{ fontSize: '0.95rem', color: '#1e293b' }}>Bill / Purchase Proof (Admin Confidential)</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -2411,7 +2360,7 @@ export default function AdminDashboardPage() {
                         fontWeight: 600,
                       }}
                     >
-                      Open Full Size ↗
+                      Open Full Size
                     </a>
                   )}
                   <button
@@ -2429,7 +2378,7 @@ export default function AdminDashboardPage() {
                       color: '#475569',
                     }}
                   >
-                    ✕
+
                   </button>
                 </div>
               </div>
@@ -2448,13 +2397,13 @@ export default function AdminDashboardPage() {
               >
                 {billImageLoading && !billImageError && (
                   <div style={{ color: '#64748b', fontSize: '0.9rem', padding: '2rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <span style={{ fontSize: '1.2rem' }}>⏳</span> Loading bill proof...
+                    <span style={{ fontSize: '1.2rem' }}></span> Loading bill proof...
                   </div>
                 )}
 
                 {billImageError ? (
                   <div style={{ textAlign: 'center', padding: '2.5rem 1rem', maxWidth: '420px' }}>
-                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>📄</div>
+                    <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}></div>
                     <strong style={{ display: 'block', fontSize: '1.02rem', color: '#1e293b', marginBottom: '6px' }}>
                       Unable to render inline image preview
                     </strong>

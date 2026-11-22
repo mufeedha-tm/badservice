@@ -33,7 +33,7 @@ export default function HomePage() {
   const [todayComplaint, setTodayComplaint] = useState(null);
   const [todayComplaintImageFailed, setTodayComplaintImageFailed] = useState(false);
   const [todayComplaintPreviewError, setTodayComplaintPreviewError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [categoryError, setCategoryError] = useState('');
 
@@ -98,7 +98,11 @@ export default function HomePage() {
           {/* Box 1: Most Complained Tech & Mobiles */}
           <article className="amazon-box-card">
             <h3 className="amazon-box-card__title">Most Complained Products</h3>
-            {topProducts.length === 0 ? (
+            {topProducts.length === 0 && loading ? (
+              <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }} role="status">
+                Loading complaint rankings…
+              </div>
+            ) : topProducts.length === 0 ? (
               <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
                 No product complaints recorded yet.
               </div>
@@ -157,7 +161,11 @@ export default function HomePage() {
           {/* Box 3: Top Reported Brands */}
           <article className="amazon-box-card">
             <h3 className="amazon-box-card__title">Top Reported Brands</h3>
-            {(rankings.companies || []).length === 0 ? (
+            {(rankings.companies || []).length === 0 && loading ? (
+              <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }} role="status">
+                Loading company reports…
+              </div>
+            ) : (rankings.companies || []).length === 0 ? (
               <div style={{ padding: '1.5rem 0.5rem', textAlign: 'center', color: '#64748b', fontSize: '0.85rem' }}>
                 No brand complaints recorded yet.
               </div>

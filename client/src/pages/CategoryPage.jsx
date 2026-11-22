@@ -148,6 +148,7 @@ export default function CategoryPage() {
             <ComplaintToolbar
               search={{ category: result.categories.join(', ') }}
               resultCount={result.complaints.length}
+              showFilters={false}
             />
           </>
         )}

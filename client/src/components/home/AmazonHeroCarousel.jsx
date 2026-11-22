@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssetUrl, getComplaintRankings, getComplaints } from '../../services/api.js';
 import { getShowcaseImage } from '../../utils/showcaseImages.js';
@@ -11,6 +11,32 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
   const [activeVideoModal, setActiveVideoModal] = useState(null);
   const [activeCommentsItem, setActiveCommentsItem] = useState(null);
   const [speedLevel, setSpeedLevel] = useState('normal'); // 'slow', 'normal', 'fast'
+  const [livePaused, setLivePaused] = useState(false);
+  const [rankedPaused, setRankedPaused] = useState(false);
+  const [liveLoading, setLiveLoading] = useState(true);
+  const [rankingsLoading, setRankingsLoading] = useState(!propRankings?.products?.length);
+  const [liveManual, setLiveManual] = useState(false);
+  const [rankedManual, setRankedManual] = useState(false);
+  const [liveOffset, setLiveOffset] = useState(0);
+  const [rankedOffset, setRankedOffset] = useState(0);
+  const liveTrackRef = useRef(null);
+  const rankedTrackRef = useRef(null);
+
+  function stepCarousel(trackRef, direction, setPaused, setManual, setOffset, itemCount) {
+    setPaused(true);
+    setManual(true);
+    const track = trackRef.current;
+    const card = track?.querySelector('.amazon-multi-card');
+    if (!card || itemCount < 1) return;
+    const trackStyle = window.getComputedStyle(track);
+    const gap = Number.parseFloat(trackStyle.columnGap || trackStyle.gap) || 16;
+    const step = card.getBoundingClientRect().width + gap;
+    setOffset((offset) => {
+      const currentIndex = Math.round(offset / step);
+      const nextIndex = (currentIndex + direction + itemCount) % itemCount;
+      return nextIndex * step;
+    });
+  }
 
   // Fetch real approved live complaints for Row 1
   useEffect(() => {
@@ -24,7 +50,8 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
           setLiveComplaints(data.slice(0, 16));
         }
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => isCurrent && setLiveLoading(false));
     return () => { isCurrent = false; };
   }, []);
 
@@ -78,6 +105,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       });
 
       setItems(dynamicCards.slice(0, 12));
+      setRankingsLoading(false);
     };
 
     if (propRankings?.products?.length) {
@@ -89,7 +117,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             populateFromRankings(rankingsData);
           }
         })
-        .catch(() => {});
+        .catch(() => isCurrent && setRankingsLoading(false));
     }
 
     return () => {
@@ -165,11 +193,29 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
 
   function renderHeroCard(item, keyPrefix = '') {
     const preload = keyPrefix === 'orig1-0' || keyPrefix === 'orig1-1';
+    const liveRow = keyPrefix.startsWith('orig1-') || keyPrefix.startsWith('dup1-');
+    const rowPaused = liveRow ? livePaused : rankedPaused;
     return (
       <HeroCard
         key={`${keyPrefix}-${item.id}`}
         item={item}
         preload={preload}
+        isPaused={rowPaused}
+        onSelectCard={() => {
+          if (liveRow) {
+            setLivePaused(!rowPaused);
+            if (rowPaused) {
+              setLiveManual(false);
+              setLiveOffset(0);
+            }
+          } else {
+            setRankedPaused(!rowPaused);
+            if (rowPaused) {
+              setRankedManual(false);
+              setRankedOffset(0);
+            }
+          }
+        }}
         onVideoClick={(videoItem) => setActiveVideoModal(videoItem)}
         onCommentsClick={(commentsItem) => setActiveCommentsItem(commentsItem)}
       />
@@ -188,32 +234,46 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             <span className="live-dot" /> LIVE CONSUMER WATCH
           </span>
           <h2 className="amazon-multi-banner__title">
-            🔥 CONSUMER COMPLAINT HEADQUARTERS
+            LIVE COMPLAINTS &amp; TOP REPORTS
           </h2>
           <p className="amazon-multi-banner__subtitle">
-            Real-time live complaints and most complained-about products, brands, and services with verified photos &amp; evidence videos.
+            Real complaints. Top reports. Verified evidence.
           </p>
         </div>
       </div>
 
       <div className="amazon-two-row-grid">
         {/* ROW 1: LIVE COMPLAINTS (Endlessly moving non-stopping horizontal carousel) */}
-        <div className="hero-carousel-row-section">
+        <div className="hero-carousel-row-section hero-carousel-row-section--live">
           <div className="hero-carousel-row-header">
             <div className="hero-carousel-row-title-wrap">
               <h3 className="hero-carousel-row-title">
                 <span>🔴</span> LIVE COMPLAINTS
               </h3>
               <span style={{ fontSize: '0.78rem', color: '#94a3b8' }}>
-                Endlessly streaming verified consumer reports
+                Latest verified consumer reports
               </span>
             </div>
-            <Link to="/complaints/live" className="amazon-multi-banner__explore-btn">
-              View All Live Complaints →
-            </Link>
+            <div className="hero-carousel-row-actions">
+              <button
+                type="button"
+                className="hero-carousel-play-toggle"
+                onClick={() => setLivePaused((paused) => !paused)}
+                aria-label={`${livePaused ? 'Play' : 'Pause'} live complaints carousel`}
+                aria-pressed={livePaused}
+              >
+                <span aria-hidden="true">{livePaused ? '▶' : 'Ⅱ'}</span>
+                {livePaused ? 'Play' : 'Pause'}
+              </button>
+              <Link to="/complaints/live" className="amazon-multi-banner__explore-btn">
+                View All Live Complaints →
+              </Link>
+            </div>
           </div>
 
-          {row1LiveCards.length === 0 ? (
+          {row1LiveCards.length === 0 && liveLoading ? (
+            <div className="hero-carousel-loading" role="status">Loading the latest approved complaints…</div>
+          ) : row1LiveCards.length === 0 ? (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1', margin: '0.5rem 0' }}>
               <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>📋</div>
               <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>No Live Complaints Yet</div>
@@ -221,13 +281,15 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             </div>
           ) : (
             <div
-              className="hero-marquee-viewport"
+              className={`hero-marquee-viewport${livePaused ? ' is-paused' : ''}${liveManual ? ' is-manual' : ''}`}
               style={{ '--hero-speed': `${speedSeconds}s` }}
             >
-              <div className="hero-marquee-track hero-marquee-track--left">
+              <div ref={liveTrackRef} className="hero-marquee-track hero-marquee-track--left" style={{ '--carousel-offset': `${liveOffset}px` }}>
                 {row1MarqueeList.map((c, idx) => renderHeroCard(c, `orig1-${idx}`))}
                 {row1MarqueeList.map((c, idx) => renderHeroCard(c, `dup1-${idx}`))}
               </div>
+              <button type="button" className="hero-carousel-arrow hero-carousel-arrow--left" onClick={() => stepCarousel(liveTrackRef, -1, setLivePaused, setLiveManual, setLiveOffset, row1MarqueeList.length)} aria-label="Previous live complaint" title="Previous complaint">‹</button>
+              <button type="button" className="hero-carousel-arrow hero-carousel-arrow--right" onClick={() => stepCarousel(liveTrackRef, 1, setLivePaused, setLiveManual, setLiveOffset, row1MarqueeList.length)} aria-label="Next live complaint" title="Next complaint">›</button>
             </div>
           )}
         </div>
@@ -243,12 +305,26 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
                 Ranked highest report frequencies with verified customer evidence
               </span>
             </div>
-            <Link to="/complaints?sort=most-complained" className="amazon-multi-banner__explore-btn">
-              View Most Complained →
-            </Link>
+            <div className="hero-carousel-row-actions">
+              <button
+                type="button"
+                className="hero-carousel-play-toggle"
+                onClick={() => setRankedPaused((paused) => !paused)}
+                aria-label={`${rankedPaused ? 'Play' : 'Pause'} most complained products carousel`}
+                aria-pressed={rankedPaused}
+              >
+                <span aria-hidden="true">{rankedPaused ? '▶' : 'Ⅱ'}</span>
+                {rankedPaused ? 'Play' : 'Pause'}
+              </button>
+              <Link to="/complaints?sort=most-complained" className="amazon-multi-banner__explore-btn">
+                View Most Complained →
+              </Link>
+            </div>
           </div>
 
-          {items.length === 0 ? (
+          {items.length === 0 && rankingsLoading ? (
+            <div className="hero-carousel-loading" role="status">Loading complaint rankings…</div>
+          ) : items.length === 0 ? (
             <div style={{ padding: '2rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1', margin: '0.5rem 0' }}>
               <div style={{ fontSize: '1.8rem', marginBottom: '6px' }}>📊</div>
               <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#1e293b' }}>No Ranked Complaints Yet</div>
@@ -256,13 +332,15 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
             </div>
           ) : (
             <div
-              className="hero-marquee-viewport"
+              className={`hero-marquee-viewport${rankedPaused ? ' is-paused' : ''}${rankedManual ? ' is-manual' : ''}`}
               style={{ '--hero-speed': `${Math.round(speedSeconds * 1.15)}s` }}
             >
-              <div className="hero-marquee-track hero-marquee-track--right">
+              <div ref={rankedTrackRef} className="hero-marquee-track hero-marquee-track--right" style={{ '--carousel-offset': `${rankedOffset}px` }}>
                 {row2MarqueeList.map((c, idx) => renderHeroCard(c, `orig2-${idx}`))}
                 {row2MarqueeList.map((c, idx) => renderHeroCard(c, `dup2-${idx}`))}
               </div>
+              <button type="button" className="hero-carousel-arrow hero-carousel-arrow--left" onClick={() => stepCarousel(rankedTrackRef, -1, setRankedPaused, setRankedManual, setRankedOffset, row2MarqueeList.length)} aria-label="Previous most complained item" title="Previous item">‹</button>
+              <button type="button" className="hero-carousel-arrow hero-carousel-arrow--right" onClick={() => stepCarousel(rankedTrackRef, 1, setRankedPaused, setRankedManual, setRankedOffset, row2MarqueeList.length)} aria-label="Next most complained item" title="Next item">›</button>
             </div>
           )}
         </div>
@@ -343,7 +421,7 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
   );
 }
 
-function HeroCard({ item, preload = false, onVideoClick, onCommentsClick }) {
+function HeroCard({ item, preload = false, isPaused = false, onSelectCard, onVideoClick, onCommentsClick }) {
   const images = Array.isArray(item.images) && item.images.length > 0
     ? item.images
     : [item.imageUrl];
@@ -352,17 +430,18 @@ function HeroCard({ item, preload = false, onVideoClick, onCommentsClick }) {
 
   // Auto-rotating photo carousel for multi-image complaints
   useEffect(() => {
-    if (images.length <= 1) return;
+    if (images.length <= 1 || isPaused) return;
     const interval = setInterval(() => {
       setCurrentImgIndex((prev) => (prev + 1) % images.length);
     }, 3800);
     return () => clearInterval(interval);
-  }, [images]);
+  }, [images, isPaused]);
 
   return (
     <article
       className="amazon-multi-card"
       style={{ '--card-accent': item.colorTheme }}
+      onClickCapture={onSelectCard}
     >
       {/* Card Top Pill */}
       <div className="amazon-multi-card__top">
@@ -576,7 +655,7 @@ function HeroCard({ item, preload = false, onVideoClick, onCommentsClick }) {
             aria-label={`Watch real complaint video for ${item.productName}`}
           >
             <span className="video-play-icon">▶</span>
-            <span className="video-play-text">Real Video (30s)</span>
+            <span className="video-play-text">Video</span>
           </button>
         )}
 
