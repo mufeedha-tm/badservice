@@ -230,9 +230,6 @@ export default function AmazonHeroCarousel({ compact = false, rankings: propRank
       {/* Top Banner Header */}
       <div className="amazon-multi-banner__header">
         <div className="amazon-multi-banner__title-group">
-          <span className="amazon-multi-banner__live-badge">
-            <span className="live-dot" /> LIVE CONSUMER WATCH
-          </span>
           <h2 className="amazon-multi-banner__title">
             LIVE COMPLAINTS &amp; TOP REPORTS
           </h2>

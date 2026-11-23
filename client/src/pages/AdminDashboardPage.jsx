@@ -856,10 +856,20 @@ export default function AdminDashboardPage() {
         {activeTab === 'overview' && (
           <div className="admin-overview">
             <div className="admin-overview__metrics">
-              <article className="admin-metric-card metric-blue"><span className="admin-metric-card__icon"><AdminIcon name="complaints" size={20} /></span><div><span className="admin-metric-card__label">Total Complaints</span><strong>{stats?.totalComplaints || 0}</strong><small>{stats?.pendingComplaints || 0} pending review</small></div></article>
-              <article className="admin-metric-card metric-green"><span className="admin-metric-card__icon"><AdminIcon name="companies" size={20} /></span><div><span className="admin-metric-card__label">Active Companies</span><strong>{stats?.totalCompanies || 0}</strong><small>Registered brands</small></div></article>
-              <article className="admin-metric-card metric-violet"><span className="admin-metric-card__icon"><AdminIcon name="users" size={20} /></span><div><span className="admin-metric-card__label">Registered Users</span><strong>{stats?.totalUsers || 0}</strong><small>Community members</small></div></article>
-              <article className="admin-metric-card metric-amber"><span className="admin-metric-card__icon"><AdminIcon name="archive" size={20} /></span><div><span className="admin-metric-card__label">Soft-Deleted Archive</span><strong>{stats?.deletedComplaints || 0}</strong><small>Safely stored in DB</small></div></article>
+              <button type="button" className="admin-metric-card metric-blue admin-metric-card--action" onClick={() => { setActiveTab('complaints'); setDeleteRequestOnly(false); setViewDeleted(false); loadComplaints({ page: 1, onlyDelete: false, showOnlyDeleted: false }); }} aria-label={`Open complaints, ${stats?.totalComplaints || 0} total`}><span className="admin-metric-card__icon"><AdminIcon name="complaints" size={20} /></span><div><span className="admin-metric-card__label">Total Complaints</span><strong>{stats?.totalComplaints || 0}</strong><small>{stats?.pendingComplaints || 0} pending review</small></div></button>
+              <button type="button" className="admin-metric-card metric-green admin-metric-card--action" onClick={() => setActiveTab('companies')} aria-label={`Open companies, ${stats?.totalCompanies || 0} registered`}><span className="admin-metric-card__icon"><AdminIcon name="companies" size={20} /></span><div><span className="admin-metric-card__label">Active Companies</span><strong>{stats?.totalCompanies || 0}</strong><small>Registered brands</small></div></button>
+              <button type="button" className="admin-metric-card metric-violet admin-metric-card--action" onClick={() => setActiveTab('users')} aria-label={`Open users, ${stats?.totalUsers || 0} registered`}><span className="admin-metric-card__icon"><AdminIcon name="users" size={20} /></span><div><span className="admin-metric-card__label">Registered Users</span><strong>{stats?.totalUsers || 0}</strong><small>Community members</small></div></button>
+              <button
+                type="button"
+                className="admin-metric-card metric-amber admin-metric-card--action"
+                onClick={() => {
+                  setActiveTab('complaints');
+                  setDeleteRequestOnly(false);
+                  setViewDeleted(true);
+                  loadComplaints({ page: 1, onlyDelete: false, showOnlyDeleted: true });
+                }}
+                aria-label={`Open soft-deleted archive, ${stats?.deletedComplaints || 0} complaints`}
+              ><span className="admin-metric-card__icon"><AdminIcon name="archive" size={20} /></span><div><span className="admin-metric-card__label">Soft-Deleted Archive</span><strong>{stats?.deletedComplaints || 0}</strong><small>Safely stored in DB</small></div></button>
             </div>
 
             <div className="admin-overview__charts">
