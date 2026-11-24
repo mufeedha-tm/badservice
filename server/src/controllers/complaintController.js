@@ -62,16 +62,12 @@ export async function trackComplaintStatus(request, response) {
   if (complaint) {
     results = [complaint];
   } else {
-    // If not found by ID, search by phone number
-    const phoneDigits = query.replace(/\D/g, '');
-    if (phoneDigits.length >= 10) {
-      results = await complaintRepository.findByPhone(phoneDigits);
+    // Accept only phone-shaped values here. Do not turn an ID/phone miss into
+    // a broad title or company search that could disclose unrelated records.
+    const normalizedPhone = query.replace(/[\s\-()]/g, '');
+    if (/^(?:\+91|0)?[6-9]\d{9}$/.test(normalizedPhone)) {
+      results = await complaintRepository.findByPhone(normalizedPhone);
     }
-  }
-
-  // If still not found and query is non-empty, try search
-  if (results.length === 0) {
-    results = await complaintRepository.search({ q: query, includeDeleted: true });
   }
 
   if (results.length === 0) {

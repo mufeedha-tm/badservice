@@ -633,6 +633,9 @@ export default function FileComplaintPage() {
               ) : (
                 <span className="ghost-cta">{t('awaitingApproval')}</span>
               )}
+              <Link className="ghost-cta" to={`/track?q=${encodeURIComponent(submitted.id)}`}>
+                Track status and updates
+              </Link>
               <Link className="ghost-cta" to="/">
                 {t('backHome')}
               </Link>

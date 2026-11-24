@@ -8,7 +8,7 @@ export default function Logo({ className = '', compact = false, to = '/', ariaLa
       aria-label={ariaLabel}
     >
       <span className="logo__mark-frame" aria-hidden="true">
-        <img className="logo__mark-image" src="/badservice-shield.png" alt="" />
+        <img className="logo__mark-image" src="/favicon.svg?v=10" alt="" />
       </span>
       {!compact && <span className="logo__wordmark">BadService<span className="logo__domain">.in</span></span>}
     </Link>

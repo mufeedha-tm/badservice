@@ -6,7 +6,7 @@ import { trackComplaint, requestDeleteComplaint, cancelDeleteComplaint, getError
 const STATUS_STEPS = [
   { key: 'PENDING', label: 'Submitted', desc: 'Your complaint has been received.' },
   { key: 'UNDER_REVIEW', label: 'Under review', desc: 'The submission is being checked.' },
-  { key: 'APPROVED', label: 'Verified', desc: 'The complaint has been approved.' },
+  { key: 'APPROVED', label: 'Published', desc: 'The complaint has been approved for the public directory.' },
   { key: 'COMPANY_RESPONDED', label: 'Company update', desc: 'A response has been recorded.' },
   { key: 'RESOLVED', label: 'Resolved', desc: 'The complaint is marked resolved.' },
 ];
@@ -49,6 +49,7 @@ export default function TrackComplaintPage() {
 
   useEffect(() => {
     const value = initialQuery.trim();
+    setQuery(value);
     if (value && value !== lastAutoQuery.current) {
       lastAutoQuery.current = value;
       handleSearch(value);
@@ -60,6 +61,9 @@ export default function TrackComplaintPage() {
     if (!q) {
       setError('Enter your complaint reference ID or registered mobile number.');
       setSearched(false);
+      setComplaints([]);
+      lastAutoQuery.current = '';
+      setSearchParams({});
       return;
     }
 
@@ -72,8 +76,12 @@ export default function TrackComplaintPage() {
       const data = await trackComplaint(q);
       setComplaints(Array.isArray(data) ? data : data ? [data] : []);
     } catch (err) {
-      setError(getErrorMessage(err) || 'We could not find a complaint for those details. Check your entry and try again.');
       setComplaints([]);
+      if (err?.response?.status === 404) {
+        setError('');
+      } else {
+        setError(getErrorMessage(err) || 'We could not find a complaint for those details. Check your entry and try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -147,7 +155,7 @@ export default function TrackComplaintPage() {
                 {loading ? <><span className="tracking-spinner" aria-hidden="true" /> Searching</> : 'Track status'}
               </button>
             </div>
-            <p id="tracking-search-help">Use the reference ID from your submission, or the mobile number you registered with.</p>
+            <p id="tracking-search-help">Use the reference ID from your submission, or the registered mobile number. Names and company names can’t be used for lookup.</p>
           </form>
         </section>
 
@@ -180,7 +188,10 @@ export default function TrackComplaintPage() {
           <section className="tracking-results" aria-label="Complaint tracking results">
             <div className="tracking-results__heading">
               <div><span className="tracking-page__eyebrow">Your records</span><h2>Tracking results</h2></div>
-              <span className="tracking-results__count">{complaints.length} {complaints.length === 1 ? 'complaint' : 'complaints'}</span>
+              <div className="tracking-results__tools">
+                <span className="tracking-results__count">{complaints.length} {complaints.length === 1 ? 'complaint' : 'complaints'}</span>
+                <button className="tracking-refresh" type="button" onClick={() => handleSearch()} disabled={loading} aria-label="Refresh tracking status">↻ <span>Refresh</span></button>
+              </div>
             </div>
 
             {complaints.map((complaint) => {
@@ -291,7 +302,7 @@ export default function TrackComplaintPage() {
             <div className="tracking-guide__heading"><span className="tracking-section-heading__icon" aria-hidden="true">?</span><div><h2 id="tracking-guide-title">A clearer view of every update</h2><p>Use your submission details to securely find your complaint progress.</p></div></div>
             <div className="tracking-guide__items">
               <div><span aria-hidden="true">01</span><h3>Look up your record</h3><p>Enter a complaint reference ID or the registered mobile number to find submitted complaints.</p></div>
-              <div><span aria-hidden="true">02</span><h3>Follow verified updates</h3><p>Review the latest status, admin notes, and any company response recorded in the complaint history.</p></div>
+              <div><span aria-hidden="true">02</span><h3>Follow recorded updates</h3><p>Review the latest status, admin notes, and any company response recorded in the complaint history.</p></div>
               <div><span aria-hidden="true">03</span><h3>Need to report an issue?</h3><p>Submit a new complaint with clear details and supporting evidence.</p><Link to="/file-complaint">File a complaint <span aria-hidden="true">→</span></Link></div>
             </div>
           </section>
